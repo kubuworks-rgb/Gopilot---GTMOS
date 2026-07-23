@@ -1,0 +1,6 @@
+import type { Evidence, Source } from "@/lib/types";
+
+export function EvidenceDrawer({ evidence, sources, onClose }: { evidence: Evidence; sources: Source[]; onClose: () => void }) {
+  const source = sources.find(item => item.id === evidence.source_id);
+  return <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}><aside className="drawer" role="dialog" aria-modal="true" aria-label="Evidence detail" onMouseDown={event => event.stopPropagation()}><header><div><span className="eyebrow">Evidence record</span><h2>Why is the system saying this?</h2></div><button className="icon-button" onClick={onClose} aria-label="Close evidence">×</button></header><section><span className={`status-pill ${evidence.status}`}>{evidence.status.replace("_", " ")}</span><h3>{evidence.claim}</h3><blockquote>{evidence.passage}</blockquote></section>{source && <section className="source-detail"><div className="source-icon">↗</div><div><span className="eyebrow">Original source · {source.demo_data ? "DEMO DATA" : source.source_type}</span><h3>{source.title}</h3><p>Retrieved {new Date(source.retrieved_at).toLocaleDateString()} · Trust {Math.round(source.trust_score * 100)}% · Confidence {Math.round(evidence.confidence * 100)}%</p><a href={source.url} target="_blank" rel="noreferrer">Open original source ↗</a></div></section>}</aside></div>;
+}

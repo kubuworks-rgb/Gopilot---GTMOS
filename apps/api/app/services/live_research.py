@@ -326,6 +326,7 @@ async def execute_research(
         all_facts: list[EvidenceFactRow] = []
         failures: list[dict[str, object]] = []
         seen_urls: set[str] = set()
+        had_relevant_results = False
         for query in queries:
             if monotonic() - workflow_started >= settings.max_elapsed_seconds:
                 failures.append(
@@ -372,6 +373,9 @@ async def execute_research(
                     backend=response.backend,
                 )
                 usable = 0
+                had_relevant_results = had_relevant_results or bool(
+                    response.results
+                )
                 for result in response.results:
                     if run.documents_used >= settings.max_research_documents:
                         break
@@ -387,7 +391,11 @@ async def execute_research(
                     usable += 1
                     run.documents_used += 1
                     all_facts.extend(facts)
-                task.status = "completed" if usable else "partial"
+                task.status = (
+                    "completed"
+                    if usable or not response.results
+                    else "partial"
+                )
                 task.result_summary = {
                     "results": len(response.results),
                     "documents": usable,
@@ -432,6 +440,23 @@ async def execute_research(
             await session.commit()
 
         if not all_facts:
+            if not failures and not had_relevant_results:
+                agent_run.status = "completed"
+                agent_run.output_summary = {
+                    "searches": run.searches_used,
+                    "documents": 0,
+                    "evidence": 0,
+                    "partial_failures": 0,
+                    "outcome": "NO_RELEVANT_RESULTS",
+                }
+                agent_run.completed_at = _now()
+                run.status = "completed"
+                run.current_stage = "no_relevant_results"
+                run.error = None
+                run.updated_at = _now()
+                run.completed_at = _now()
+                await session.commit()
+                return
             agent_run.status = "failed"
             agent_run.completed_at = _now()
             agent_run.error_category = (

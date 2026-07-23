@@ -83,7 +83,7 @@ try {
         $run = Invoke-RestMethod `
             -Uri "http://127.0.0.1:8000/api/v1/research-runs/$($run.id)" `
             -Headers $headers -TimeoutSec 10
-        if ($run.status -in @("awaiting_icp", "failed", "partial")) {
+        if ($run.status -in @("awaiting_icp", "completed", "failed", "partial")) {
             break
         }
     }
@@ -130,6 +130,9 @@ try {
         workspace_id = $workspace.id
         research_run_id = $run.id
         research_status = $run.status
+        research_outcome = if (
+            $run.current_stage -eq "no_relevant_results"
+        ) { "NO_RELEVANT_RESULTS" } else { $null }
         searches_used = $run.searches_used
         documents_used = $run.documents_used
         findings = if ($null -eq $run.findings) { 0 } else { @($run.findings).Count }

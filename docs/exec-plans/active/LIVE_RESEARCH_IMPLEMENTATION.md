@@ -65,7 +65,8 @@ The approved two-stage GDELT smoke completed on 2026-07-23:
 
 - Kubu Works result: `NO_RELEVANT_RESULTS`. All four approved queries ultimately
   received HTTP 200 and returned zero articles. No irrelevant or fixture records
-  were persisted.
+  were persisted. A fully successful zero-result run terminates as `completed`
+  with stage `no_relevant_results`; it is not mislabeled as a provider failure.
 - Known-positive control: query `"OpenAI"`, backend `gdelt-doc-2`, HTTP 200, five
   real results before and after relevance filtering.
 - Isolated control run `3fc0f321-5a58-4864-9969-0f3e40e828fb` safely fetched and

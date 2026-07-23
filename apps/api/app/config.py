@@ -7,8 +7,32 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development")
+    database_url: str = os.getenv(
+        "DATABASE_URL", "postgresql+asyncpg://gtm:gtm@127.0.0.1:5432/gtm"
+    )
+    redis_url: str = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
     research_mode: str = os.getenv("RESEARCH_MODE", "fixture")
     demo_auth_enabled: bool = os.getenv("DEMO_AUTH_ENABLED", "true").lower() == "true"
+    research_gateway_url: str = os.getenv(
+        "AGENT_REACH_GATEWAY_URL", "http://127.0.0.1:8010"
+    ).rstrip("/")
+    gateway_internal_token: str | None = (
+        os.getenv("RESEARCH_GATEWAY_TOKEN") or None
+    )
+    research_gateway_timeout_seconds: float = float(
+        os.getenv("RESEARCH_GATEWAY_TIMEOUT_SECONDS", "120")
+    )
+    agent_reach_enabled: bool = (
+        os.getenv("AGENT_REACH_ENABLED", "false").lower() == "true"
+    )
+    openai_api_key: str | None = os.getenv("OPENAI_API_KEY") or None
+    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+    github_token: str | None = os.getenv("GITHUB_TOKEN") or None
+    max_research_searches: int = int(os.getenv("MAX_RESEARCH_SEARCHES", "8"))
+    max_research_documents: int = int(os.getenv("MAX_RESEARCH_DOCUMENTS", "20"))
+    max_account_candidates: int = int(os.getenv("MAX_ACCOUNT_CANDIDATES", "20"))
+    max_accounts_researched: int = int(os.getenv("MAX_ACCOUNTS_RESEARCHED", "10"))
+    max_elapsed_seconds: int = int(os.getenv("MAX_RESEARCH_ELAPSED_SECONDS", "300"))
     cors_origins: tuple[str, ...] = tuple(
         item.strip()
         for item in os.getenv(
@@ -26,6 +50,24 @@ class Settings:
             raise RuntimeError(
                 "Production forbids demo authentication and fixture research"
             )
+        if self.research_mode == "live":
+            if not self.database_url.startswith(
+                ("postgresql+asyncpg://", "postgresql://")
+            ):
+                raise RuntimeError("Live research requires PostgreSQL DATABASE_URL")
+            if not self.redis_url.startswith(("redis://", "rediss://")):
+                raise RuntimeError("Live research requires a Redis REDIS_URL")
+            if not self.research_gateway_url.startswith(("http://", "https://")):
+                raise RuntimeError("Live research requires AGENT_REACH_GATEWAY_URL")
+        for name, value in (
+            ("MAX_RESEARCH_SEARCHES", self.max_research_searches),
+            ("MAX_RESEARCH_DOCUMENTS", self.max_research_documents),
+            ("MAX_ACCOUNT_CANDIDATES", self.max_account_candidates),
+            ("MAX_ACCOUNTS_RESEARCHED", self.max_accounts_researched),
+            ("MAX_RESEARCH_ELAPSED_SECONDS", self.max_elapsed_seconds),
+        ):
+            if value <= 0:
+                raise RuntimeError(f"{name} must be positive")
 
 
 settings = Settings()

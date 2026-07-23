@@ -3,10 +3,14 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.api.app.api.routes import router
 from apps.api.app.config import settings
 
 settings.validate()
+
+if settings.research_mode == "live":
+    from apps.api.app.api.live_routes import router
+else:
+    from apps.api.app.api.routes import router
 
 app = FastAPI(
     title="GTM Intelligence OS API",

@@ -1,0 +1,1 @@
+"""Allowlisted research adapters."""

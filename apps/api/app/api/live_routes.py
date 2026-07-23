@@ -1,0 +1,638 @@
+from __future__ import annotations
+
+import csv
+import io
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from pydantic import HttpUrl
+from redis.exceptions import RedisError
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from apps.api.app.config import settings
+from apps.api.app.db.models import (
+    ApprovalRequestRow,
+    CampaignDraftRow,
+    EvidenceFactRow,
+    ICPProfileRow,
+    ResearchRunRow,
+    SourceChunkRow,
+    SourceDocumentRow,
+)
+from apps.api.app.db.session import get_session
+from apps.api.app.domain.models import (
+    Account,
+    AccountOpportunityBrief,
+    AuditEvent,
+    CampaignDraft,
+    CampaignUpdate,
+    ClaimStatus,
+    EvidenceFact,
+    ICP,
+    ProductProfile,
+    ProductProfileInput,
+    ResearchEvidence,
+    ResearchRun,
+    SourceChunk,
+    SourceDocument,
+    Workspace,
+    WorkspaceCreate,
+)
+from apps.api.app.jobs.queue import ResearchJob, enqueue_job
+from apps.api.app.providers.live import GatewayProviderError, LiveResearchProvider
+from apps.api.app.repositories.postgres import repository
+
+
+router = APIRouter(prefix="/api/v1")
+Database = Annotated[AsyncSession, Depends(get_session)]
+
+
+@dataclass(frozen=True)
+class LivePrincipal:
+    user_id: str
+    workspace_id: str
+    role: str
+
+
+async def get_live_principal(
+    session: Database,
+    x_demo_user: Annotated[str | None, Header()] = None,
+    x_workspace_id: Annotated[str | None, Header()] = None,
+) -> LivePrincipal:
+    if not settings.demo_auth_enabled:
+        raise HTTPException(
+            status_code=401,
+            detail="Verified authentication is required when demo auth is disabled",
+        )
+    user_id = x_demo_user or "demo-user"
+    try:
+        membership = await repository.resolve_membership(
+            session, user_id, x_workspace_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=403, detail="Workspace membership required") from exc
+    if membership is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No workspace exists for this user; create one first",
+        )
+    return LivePrincipal(
+        user_id=user_id,
+        workspace_id=str(membership.workspace_id),
+        role=membership.role,
+    )
+
+
+Current = Annotated[LivePrincipal, Depends(get_live_principal)]
+
+
+def _optional_positive_int(value: object) -> int | None:
+    if isinstance(value, int):
+        return value or None
+    if isinstance(value, str) and value.isdigit():
+        return int(value) or None
+    return None
+
+
+@router.get("/bootstrap")
+async def bootstrap(principal: Current, session: Database) -> dict[str, object]:
+    workspace = await repository.workspace(session, principal.workspace_id)
+    if workspace is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    product_row = await repository.latest_product(session, principal.workspace_id)
+    run_row = await repository.latest_run(session, principal.workspace_id)
+    try:
+        capabilities = [
+            item.model_dump(mode="json")
+            for item in await LiveResearchProvider().capabilities()
+        ]
+    except GatewayProviderError as exc:
+        capabilities = [
+            {
+                "channel": "research-gateway",
+                "status": "unavailable",
+                "detail": exc.safe_message,
+            }
+        ]
+    return {
+        "mode": "live",
+        "demo_data": False,
+        "workspace": workspace,
+        "product": (
+            repository.product_domain(product_row) if product_row is not None else None
+        ),
+        "research_run": (
+            await repository.run_domain(session, run_row) if run_row is not None else None
+        ),
+        "icps": await repository.list_icps(session, principal.workspace_id),
+        "accounts": await repository.list_accounts(session, principal.workspace_id),
+        "approval_count": await repository.approval_count(
+            session, principal.workspace_id
+        ),
+        "capabilities": capabilities,
+    }
+
+
+@router.post("/workspaces", response_model=Workspace, status_code=201)
+async def create_workspace(
+    payload: WorkspaceCreate,
+    session: Database,
+    x_demo_user: Annotated[str | None, Header()] = None,
+) -> Workspace:
+    if not settings.demo_auth_enabled:
+        raise HTTPException(
+            status_code=401,
+            detail="Verified authentication is required when demo auth is disabled",
+        )
+    return await repository.create_workspace(
+        session, x_demo_user or "demo-user", payload.name
+    )
+
+
+@router.post("/products", response_model=ProductProfile, status_code=201)
+async def create_product(
+    payload: ProductProfileInput, principal: Current, session: Database
+) -> ProductProfile:
+    return await repository.create_product(
+        session,
+        principal.workspace_id,
+        principal.user_id,
+        company_name=payload.company_name,
+        website=payload.website,
+        product=payload.product,
+        target_market=payload.target_market,
+    )
+
+
+async def _enqueue_or_fail(
+    session: AsyncSession, run: ResearchRunRow, job: ResearchJob
+) -> None:
+    try:
+        await enqueue_job(job)
+    except RedisError as exc:
+        run.status = "failed"
+        run.current_stage = "queue_failed"
+        run.error = {
+            "category": "QUEUE_UNAVAILABLE",
+            "message": "Redis job queue is unavailable",
+            "retryable": True,
+        }
+        run.updated_at = datetime.now(UTC)
+        await session.commit()
+        raise HTTPException(
+            status_code=503, detail="Research queue is unavailable"
+        ) from exc
+
+
+@router.post("/research-runs", response_model=ResearchRun, status_code=202)
+async def create_research(
+    product_id: str, principal: Current, session: Database
+) -> ResearchRun:
+    try:
+        result = await repository.create_run(
+            session,
+            principal.workspace_id,
+            principal.user_id,
+            product_id,
+            {
+                "max_searches": settings.max_research_searches,
+                "max_documents": settings.max_research_documents,
+                "max_elapsed_seconds": settings.max_elapsed_seconds,
+            },
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    run = await repository.run_row(session, result.id, principal.workspace_id)
+    if run is None:
+        raise HTTPException(status_code=500, detail="Research run was not persisted")
+    await _enqueue_or_fail(
+        session,
+        run,
+        ResearchJob(
+            kind="research",
+            workspace_id=principal.workspace_id,
+            target_id=result.id,
+            actor_id=principal.user_id,
+        ),
+    )
+    return result
+
+
+@router.get("/research-runs/{run_id}", response_model=ResearchRun)
+async def get_research(
+    run_id: str, principal: Current, session: Database
+) -> ResearchRun:
+    try:
+        row = await repository.run_row(session, run_id, principal.workspace_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Research run not found") from exc
+    if row is None:
+        raise HTTPException(status_code=404, detail="Research run not found")
+    return await repository.run_domain(session, row)
+
+
+@router.get(
+    "/research-runs/{run_id}/evidence",
+    response_model=ResearchEvidence,
+)
+async def get_research_evidence(
+    run_id: str, principal: Current, session: Database
+) -> ResearchEvidence:
+    row = await repository.run_row(session, run_id, principal.workspace_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Research run not found")
+    sources = list(
+        (
+            await session.scalars(
+                select(SourceDocumentRow)
+                .where(
+                    SourceDocumentRow.research_run_id == row.id,
+                    SourceDocumentRow.workspace_id
+                    == uuid.UUID(principal.workspace_id),
+                )
+                .order_by(SourceDocumentRow.created_at)
+            )
+        ).all()
+    )
+    source_ids = [source.id for source in sources]
+    evidence_rows = (
+        list(
+            (
+                await session.scalars(
+                    select(EvidenceFactRow)
+                    .where(
+                        EvidenceFactRow.workspace_id
+                        == uuid.UUID(principal.workspace_id),
+                        EvidenceFactRow.source_id.in_(source_ids),
+                    )
+                    .order_by(EvidenceFactRow.created_at)
+                )
+            ).all()
+        )
+        if source_ids
+        else []
+    )
+    chunks = (
+        list(
+            (
+                await session.scalars(
+                    select(SourceChunkRow)
+                    .where(
+                        SourceChunkRow.workspace_id
+                        == uuid.UUID(principal.workspace_id),
+                        SourceChunkRow.source_document_id.in_(source_ids),
+                    )
+                    .order_by(
+                        SourceChunkRow.source_document_id,
+                        SourceChunkRow.ordinal,
+                    )
+                )
+            ).all()
+        )
+        if source_ids
+        else []
+    )
+    chunk_by_evidence = {
+        evidence.id: next(
+            (
+                chunk.id
+                for chunk in chunks
+                if chunk.source_document_id == evidence.source_id
+                and evidence.passage in chunk.text
+            ),
+            None,
+        )
+        for evidence in evidence_rows
+    }
+    run_domain = await repository.run_domain(session, row)
+    return ResearchEvidence(
+        run_id=str(row.id),
+        findings=run_domain.findings,
+        evidence=[
+            EvidenceFact(
+                id=str(item.id),
+                workspace_id=str(item.workspace_id),
+                source_id=str(item.source_id),
+                passage=item.passage,
+                claim=item.claim,
+                confidence=float(item.confidence),
+                status=ClaimStatus(item.status),
+                observed_at=item.observed_at,
+                source_chunk_id=(
+                    str(chunk_by_evidence[item.id])
+                    if chunk_by_evidence[item.id] is not None
+                    else None
+                ),
+            )
+            for item in evidence_rows
+        ],
+        sources=[
+            SourceDocument(
+                id=str(item.id),
+                workspace_id=str(item.workspace_id),
+                platform=item.platform,
+                source_type=item.source_type,
+                backend=item.backend,
+                url=HttpUrl(item.url),
+                canonical_url=HttpUrl(item.canonical_url),
+                title=item.title,
+                published_at=item.published_at,
+                retrieved_at=item.retrieved_at,
+                permission_classification=item.permission_classification,
+                trust_score=item.trust_score,
+                demo_data=False,
+                content_hash=item.content_hash,
+                content_type=str(item.source_metadata.get("content_type") or "")
+                or None,
+                normalized_text_length=_optional_positive_int(
+                    item.source_metadata.get("normalized_text_length")
+                ),
+            )
+            for item in sources
+        ],
+        chunks=[
+            SourceChunk(
+                id=str(item.id),
+                source_document_id=str(item.source_document_id),
+                ordinal=item.ordinal,
+                text=item.text,
+                content_hash=item.content_hash,
+            )
+            for item in chunks
+        ],
+    )
+
+
+@router.get("/icps", response_model=list[ICP])
+async def list_icps(principal: Current, session: Database) -> list[ICP]:
+    return await repository.list_icps(session, principal.workspace_id)
+
+
+@router.post("/icps/{icp_id}/select", response_model=ICP, status_code=202)
+async def select_icp(
+    icp_id: str, principal: Current, session: Database
+) -> ICP:
+    try:
+        selected = await repository.select_icp(
+            session, principal.workspace_id, principal.user_id, icp_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="ICP not found") from exc
+    run = await repository.run_row(
+        session, selected.research_run_id, principal.workspace_id
+    )
+    if run is None:
+        raise HTTPException(status_code=404, detail="Research run not found")
+    await _enqueue_or_fail(
+        session,
+        run,
+        ResearchJob(
+            kind="discover_accounts",
+            workspace_id=principal.workspace_id,
+            target_id=selected.id,
+            actor_id=principal.user_id,
+        ),
+    )
+    return selected
+
+
+@router.post("/accounts/refresh", status_code=202)
+async def refresh_accounts(
+    principal: Current, session: Database
+) -> dict[str, str]:
+    icp = await session.scalar(
+        select(ICPProfileRow)
+        .where(
+            ICPProfileRow.workspace_id == uuid.UUID(principal.workspace_id),
+            ICPProfileRow.selected_at.is_not(None),
+        )
+        .order_by(desc(ICPProfileRow.selected_at))
+        .limit(1)
+    )
+    if icp is None:
+        raise HTTPException(status_code=409, detail="Select an ICP first")
+    run = await repository.run_row(
+        session, str(icp.research_run_id), principal.workspace_id
+    )
+    if run is None:
+        raise HTTPException(status_code=404, detail="Research run not found")
+    await _enqueue_or_fail(
+        session,
+        run,
+        ResearchJob(
+            kind="discover_accounts",
+            workspace_id=principal.workspace_id,
+            target_id=str(icp.id),
+            actor_id=principal.user_id,
+        ),
+    )
+    return {"status": "queued", "job": "discover_accounts"}
+
+
+@router.post("/accounts/{account_id}/research", status_code=202)
+async def research_account(
+    account_id: str, principal: Current, session: Database
+) -> dict[str, str]:
+    accounts = await repository.list_accounts(session, principal.workspace_id)
+    if not any(item.id == account_id for item in accounts):
+        raise HTTPException(status_code=404, detail="Account not found")
+    try:
+        await enqueue_job(
+            ResearchJob(
+                kind="research_account",
+                workspace_id=principal.workspace_id,
+                target_id=account_id,
+                actor_id=principal.user_id,
+            )
+        )
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Research queue is unavailable") from exc
+    return {"status": "queued", "job": "research_account"}
+
+
+@router.post("/accounts/{account_id}/regenerate-brief", status_code=202)
+async def regenerate_brief(
+    account_id: str, principal: Current, session: Database
+) -> dict[str, str]:
+    accounts = await repository.list_accounts(session, principal.workspace_id)
+    if not any(item.id == account_id for item in accounts):
+        raise HTTPException(status_code=404, detail="Account not found")
+    try:
+        await enqueue_job(
+            ResearchJob(
+                kind="regenerate_brief",
+                workspace_id=principal.workspace_id,
+                target_id=account_id,
+                actor_id=principal.user_id,
+            )
+        )
+    except RedisError as exc:
+        raise HTTPException(status_code=503, detail="Research queue is unavailable") from exc
+    return {"status": "queued", "job": "regenerate_brief"}
+
+
+@router.get("/accounts", response_model=list[Account])
+async def list_accounts(
+    principal: Current, session: Database, min_priority: int = 0
+) -> list[Account]:
+    return [
+        item
+        for item in await repository.list_accounts(session, principal.workspace_id)
+        if item.scores.priority >= min_priority
+    ]
+
+
+@router.get(
+    "/accounts/{account_id}/opportunity-brief",
+    response_model=AccountOpportunityBrief,
+)
+async def get_brief(
+    account_id: str, principal: Current, session: Database
+) -> AccountOpportunityBrief:
+    try:
+        brief = await repository.brief(session, principal.workspace_id, account_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
+    if brief is None:
+        raise HTTPException(status_code=404, detail="Account brief not found")
+    await repository.record(
+        session,
+        uuid.UUID(principal.workspace_id),
+        principal.user_id,
+        "opportunity_brief_viewed",
+        "account",
+        account_id,
+    )
+    await session.commit()
+    return brief
+
+
+@router.patch("/campaigns/{campaign_id}", response_model=CampaignDraft)
+async def update_campaign(
+    campaign_id: str,
+    payload: CampaignUpdate,
+    principal: Current,
+    session: Database,
+) -> CampaignDraft:
+    try:
+        campaign = await repository.campaign(
+            session, principal.workspace_id, campaign_id
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Campaign not found") from exc
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if payload.action == "edit":
+        campaign.subject = payload.subject if payload.subject is not None else campaign.subject
+        campaign.body = payload.body if payload.body is not None else campaign.body
+        event = "campaign_draft_edited"
+    elif payload.action == "approve":
+        campaign.status = "approved"
+        event = "campaign_draft_approved"
+    else:
+        campaign.status = "rejected"
+        event = "campaign_draft_rejected"
+    campaign.updated_at = datetime.now(UTC)
+    approval = await session.scalar(
+        select(ApprovalRequestRow)
+        .where(ApprovalRequestRow.campaign_draft_id == campaign.id)
+        .order_by(desc(ApprovalRequestRow.created_at))
+        .limit(1)
+    )
+    if approval is not None and payload.action in {"approve", "reject"}:
+        approval.status = "approved" if payload.action == "approve" else "rejected"
+        approval.decided_by = principal.user_id
+        approval.decided_at = datetime.now(UTC)
+    await repository.record(
+        session,
+        campaign.workspace_id,
+        principal.user_id,
+        event,
+        "campaign",
+        campaign_id,
+    )
+    await session.commit()
+    return CampaignDraft(
+        id=str(campaign.id),
+        account_id=str(campaign.account_id),
+        subject=campaign.subject,
+        body=campaign.body,
+        status=campaign.status,  # type: ignore[arg-type]
+        evidence_ids=campaign.evidence_ids,
+        updated_at=campaign.updated_at,
+    )
+
+
+def _csv_safe(value: object) -> str:
+    text = str(value)
+    return "'" + text if text.startswith(("=", "+", "-", "@", "\t", "\r")) else text
+
+
+@router.get("/exports/accounts.csv")
+async def export_accounts(principal: Current, session: Database) -> Response:
+    campaigns = (
+        await session.scalars(
+            select(CampaignDraftRow).where(
+                CampaignDraftRow.workspace_id
+                == uuid.UUID(principal.workspace_id),
+                CampaignDraftRow.status == "approved",
+            )
+        )
+    ).all()
+    accounts = {
+        item.id: item
+        for item in await repository.list_accounts(session, principal.workspace_id)
+    }
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "company",
+            "domain",
+            "fit",
+            "intent",
+            "confidence",
+            "priority",
+            "top_signal",
+            "recommended_action",
+        ]
+    )
+    for campaign in campaigns:
+        account = accounts.get(str(campaign.account_id))
+        if account is None:
+            continue
+        writer.writerow(
+            [
+                _csv_safe(account.name),
+                _csv_safe(account.domain),
+                account.scores.fit.score,
+                account.scores.intent.score,
+                account.scores.confidence.score,
+                account.scores.priority,
+                _csv_safe(account.top_signal),
+                _csv_safe(account.recommended_action),
+            ]
+        )
+        await repository.record(
+            session,
+            campaign.workspace_id,
+            principal.user_id,
+            "account_exported",
+            "account",
+            account.id,
+        )
+    await session.commit()
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=approved-accounts.csv"},
+    )
+
+
+@router.get("/audit", response_model=list[AuditEvent])
+async def audit(principal: Current, session: Database) -> list[AuditEvent]:
+    return await repository.audit(session, principal.workspace_id)

@@ -25,9 +25,21 @@ def test_cross_workspace_access_is_forbidden() -> None:
 
 
 def test_scoring_is_deterministic_and_fit_is_separate_from_intent() -> None:
-    inputs = dict(industry_match=90, size_match=80, geography_match=100, signal_strength=60, signal_recency=70, evidence_coverage=85, source_quality=90, fit_evidence=["fit"], signal_evidence=["intent"])
-    first = score_account(**inputs)
-    second = score_account(**inputs)
+    def calculate_score():
+        return score_account(
+            industry_match=90,
+            size_match=80,
+            geography_match=100,
+            signal_strength=60,
+            signal_recency=70,
+            evidence_coverage=85,
+            source_quality=90,
+            fit_evidence=["fit"],
+            signal_evidence=["intent"],
+        )
+
+    first = calculate_score()
+    second = calculate_score()
     assert first == second
     assert first.fit.score != first.intent.score
     assert first.priority == round((first.fit.score * .55 + first.intent.score * .45) * first.confidence.score / 100)

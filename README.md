@@ -13,7 +13,8 @@ The repository has two deliberately separate modes:
   normalized source documents, exact-passage evidence, and no fixture fallback.
 
 Live mode never converts an upstream failure into demo output. A run records a
-typed failed or partial state instead.
+typed failed or partial state instead. A successful search with no relevant
+articles completes explicitly at `no_relevant_results`.
 
 ## Product contract
 

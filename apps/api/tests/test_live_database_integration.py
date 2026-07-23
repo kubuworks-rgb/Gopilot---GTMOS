@@ -82,6 +82,23 @@ class ControlledPublicTransport(LiveResearchProvider):
         )
 
 
+class EmptyPublicTransport(LiveResearchProvider):
+    async def search(
+        self,
+        *,
+        workspace_id: str,
+        research_run_id: str,
+        query: str,
+        limit: int = 5,
+    ) -> SearchResponse:
+        del workspace_id, research_run_id, query, limit
+        return SearchResponse(
+            status="completed",
+            backend="controlled-empty-transport",
+            results=[],
+        )
+
+
 @pytest.mark.asyncio
 async def test_redis_job_contract_round_trip() -> None:
     redis = Redis.from_url(
@@ -181,3 +198,39 @@ async def test_durable_research_to_ranked_account_flow() -> None:
         sources = {row.id: row for row in source_rows}
         assert facts
         assert all(fact.passage in sources[fact.source_id].cleaned_text for fact in facts)
+
+    user_id = f"no-results-{uuid4().hex}"
+    async with SessionFactory() as session:
+        workspace = await repository.create_workspace(
+            session,
+            user_id,
+            "No relevant results workspace",
+        )
+        product = await repository.create_product(
+            session,
+            workspace.id,
+            user_id,
+            company_name="No Results Control",
+            website="https://example.com",
+            product="Public research control",
+            target_market="Narrow public research topic",
+        )
+        run = await repository.create_run(
+            session,
+            workspace.id,
+            user_id,
+            product.id,
+            {"max_searches": 4, "max_documents": 8},
+        )
+
+    await execute_research(run.id, EmptyPublicTransport())
+
+    async with SessionFactory() as session:
+        run_row = await repository.run_row(session, run.id, workspace.id)
+        assert run_row is not None
+        assert run_row.status == "completed"
+        assert run_row.current_stage == "no_relevant_results"
+        assert run_row.documents_used == 0
+        assert run_row.evidence_count == 0
+        assert run_row.error is None
+        assert await repository.list_icps(session, workspace.id) == []

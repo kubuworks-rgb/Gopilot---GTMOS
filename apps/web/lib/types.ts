@@ -9,7 +9,8 @@ export interface ICP { id: string; name: string; description: string; firmograph
 export interface Product { id: string; company_name: string; website: string; product: string; target_market: string; status: string }
 export interface ResearchRun { id: string; status: string; current_stage: string; searches_used: number; documents_used: number; findings: Finding[] }
 export interface Workspace { id: string; name: string }
-export interface Bootstrap { mode: string; demo_data: boolean; workspace: Workspace; product: Product; research_run: ResearchRun; icps: ICP[]; accounts: Account[]; approval_count: number }
+export interface Capability { channel: string; status: "available" | "degraded" | "unavailable"; backend?: string; version?: string; detail?: string }
+export interface Bootstrap { mode: string; demo_data: boolean; workspace: Workspace; product: Product | null; research_run: ResearchRun | null; icps: ICP[]; accounts: Account[]; approval_count: number; capabilities?: Capability[] }
 export interface Evidence { id: string; source_id: string; passage: string; claim: string; confidence: number; status: ClaimStatus; observed_at: string }
 export interface Source { id: string; url: string; title: string; source_type: string; platform: string; retrieved_at: string; published_at?: string; trust_score: number; demo_data: boolean }
 export interface EvidenceClaim { statement: string; status: ClaimStatus; confidence: number; evidence_ids: string[] }

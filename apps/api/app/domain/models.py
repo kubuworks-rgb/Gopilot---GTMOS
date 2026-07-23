@@ -52,6 +52,9 @@ class SourceDocument(BaseModel):
     permission_classification: str = "public"
     trust_score: float = Field(ge=0, le=1)
     demo_data: bool = True
+    content_hash: str | None = None
+    content_type: str | None = None
+    normalized_text_length: int | None = None
 
 
 class EvidenceFact(BaseModel):
@@ -63,6 +66,15 @@ class EvidenceFact(BaseModel):
     confidence: float = Field(ge=0, le=1)
     status: ClaimStatus
     observed_at: datetime
+    source_chunk_id: str | None = None
+
+
+class SourceChunk(BaseModel):
+    id: str
+    source_document_id: str
+    ordinal: int
+    text: str
+    content_hash: str
 
 
 class Finding(BaseModel):
@@ -84,15 +96,34 @@ class ResearchRun(BaseModel):
     id: str
     workspace_id: str
     product_id: str
-    status: Literal["queued", "running", "awaiting_icp", "completed", "partial", "failed"]
+    status: Literal[
+        "queued",
+        "planning",
+        "researching",
+        "extracting",
+        "awaiting_icp",
+        "discovering_accounts",
+        "scoring",
+        "completed",
+        "partial",
+        "failed",
+    ]
     current_stage: str
     started_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     completed_at: datetime | None = None
-    error: str | None = None
+    error: dict[str, object] | None = None
     searches_used: int = 0
     documents_used: int = 0
     findings: list[Finding] = Field(default_factory=list)
+
+
+class ResearchEvidence(BaseModel):
+    run_id: str
+    findings: list[Finding]
+    evidence: list[EvidenceFact]
+    sources: list[SourceDocument]
+    chunks: list[SourceChunk]
 
 
 class ICP(BaseModel):

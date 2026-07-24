@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
 from urllib.parse import urlsplit
@@ -26,6 +27,7 @@ from apps.api.app.db.models import (
     OpportunityBriefRow,
     ProductProfileRow,
     ResearchRunRow,
+    ResearchCandidateRow,
     ResearchTaskRow,
     SourceChunkRow,
     SourceDocumentRow,
@@ -42,6 +44,23 @@ from apps.api.app.domain.models import (
 from apps.api.app.providers.live import GatewayProviderError, LiveResearchProvider
 from apps.api.app.repositories.postgres import repository
 from apps.api.app.services.scoring import score_account, signal_decay
+from apps.api.app.services.scoring import priority_band
+from apps.api.app.services.company_identity import (
+    CompanyDomainIdentity,
+    ResultPageRole,
+    classify_result_page,
+    resolve_company_identity,
+)
+from apps.api.app.services.firmographics import PublicEvidenceFirmographicProvider
+from apps.api.app.services.intelligence_quality import (
+    CriterionEvaluation,
+    CriterionRequirement,
+    CriterionState,
+    SourceRole,
+    candidate_relevance_score,
+    decide_qualification,
+    source_quality_score,
+)
 from services.research_gateway.app.schemas import SearchResult, SourceDocumentInput
 
 
@@ -131,8 +150,21 @@ SOURCE_CHUNK_SIZE = 1800
 SOURCE_CHUNK_STEP = 1100
 
 
+@dataclass
+class DiscoveryCandidate:
+    result: SearchResult
+    identity: CompanyDomainIdentity
+    queries: set[str]
+    providers: set[str]
+    score: int = 0
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _attribute_string_list(value: object) -> list[str]:
+    return [str(item) for item in value] if isinstance(value, list) else []
 
 
 def _tokens(value: str) -> set[str]:
@@ -244,6 +276,34 @@ async def _persist_source(
             ).all()
         )
         return existing, existing_facts
+    page_role = classify_result_page(str(source.canonical_url))
+    source_role = {
+        ResultPageRole.OFFICIAL_ROOT: SourceRole.FIRST_PARTY,
+        ResultPageRole.OFFICIAL_SUBDOMAIN: SourceRole.FIRST_PARTY,
+        ResultPageRole.DIRECTORY: SourceRole.DIRECTORY,
+        ResultPageRole.NEWS: SourceRole.NEWS,
+        ResultPageRole.SOCIAL: SourceRole.COMMUNITY,
+        ResultPageRole.VENDOR_MARKETING: SourceRole.VENDOR_MARKETING,
+        ResultPageRole.OTHER: SourceRole.OTHER,
+    }[page_role]
+    parsed_source = urlsplit(str(source.canonical_url))
+    marketing_path = any(
+        marker in parsed_source.path.lower()
+        for marker in ("/blog", "/resources", "/guides", "/reports")
+    )
+    market_claim_language = any(
+        marker in f"{source.title} {source.text[:2000]}".lower()
+        for marker in ("market size", "market report", "industry trends")
+    )
+    if marketing_path and market_claim_language:
+        source_role = SourceRole.VENDOR_MARKETING
+    entity_match = 0.95 if source_role == SourceRole.FIRST_PARTY else 0.70
+    quality = source_quality_score(
+        role=source_role,
+        directness=0.95 if source_role == SourceRole.FIRST_PARTY else 0.70,
+        recency=0.85 if source.published_at else 0.55,
+        entity_match=entity_match,
+    )
     row = SourceDocumentRow(
         workspace_id=run.workspace_id,
         research_run_id=run.id,
@@ -260,12 +320,21 @@ async def _persist_source(
         content_hash=digest,
         cleaned_text=source.text,
         raw_storage_key=None,
-        trust_score=0.72,
+        trust_score=quality,
         permission_classification="public",
         status="retrieved",
         provenance={
             "retrieved_by": "research-gateway",
             "backend": source.backend,
+            "source_role": source_role.value,
+            "source_quality": {
+                "score": quality,
+                "directness": 0.95
+                if source_role == SourceRole.FIRST_PARTY
+                else 0.70,
+                "recency": 0.85 if source.published_at else 0.55,
+                "entity_match": entity_match,
+            },
         },
         source_metadata={
             **source.metadata,
@@ -554,15 +623,39 @@ async def execute_research(
         run.current_stage = "evidence_extraction"
         categories = list(FINDING_CATEGORIES)
         for index, fact in enumerate(all_facts[:8]):
+            category = categories[index % len(categories)]
+            fact_source = await session.get(SourceDocumentRow, fact.source_id)
+            source_role = (
+                str(
+                    fact_source.provenance.get("source_role")
+                    or SourceRole.OTHER.value
+                )
+                if fact_source is not None
+                else SourceRole.OTHER.value
+            )
+            incompatible_vendor_market_claim = (
+                category == "market"
+                and source_role == SourceRole.VENDOR_MARKETING.value
+            )
             session.add(
                 GTMFindingRow(
                     workspace_id=run.workspace_id,
                     research_run_id=run.id,
-                    category=categories[index % len(categories)],
+                    category=category,
                     claim=fact.claim,
-                    confidence=float(fact.confidence),
-                    status=fact.status,
-                    evidence_ids=[str(fact.id)],
+                    confidence=(
+                        0.35
+                        if incompatible_vendor_market_claim
+                        else float(fact.confidence)
+                    ),
+                    status=(
+                        ClaimStatus.HYPOTHESIS.value
+                        if incompatible_vendor_market_claim
+                        else fact.status
+                    ),
+                    evidence_ids=(
+                        [] if incompatible_vendor_market_claim else [str(fact.id)]
+                    ),
                 )
             )
         await _create_icps(session, run, product, all_facts)
@@ -725,6 +818,39 @@ async def _create_icps(
                 name=str(variant["name"])[:120],
                 description=str(variant["description"]),
                 definition={
+                    "criteria_version": "supportpilot-icp-v2",
+                    "criteria": [
+                        {
+                            "key": "official_domain",
+                            "requirement": "HARD",
+                            "unknown_policy": "RESEARCH_REQUIRED",
+                        },
+                        {
+                            "key": "b2b_software",
+                            "requirement": "HARD",
+                            "unknown_policy": "RESEARCH_REQUIRED",
+                        },
+                        {
+                            "key": "india_connection",
+                            "requirement": "HARD",
+                            "unknown_policy": "RESEARCH_REQUIRED",
+                        },
+                        {
+                            "key": "not_direct_competitor",
+                            "requirement": "HARD",
+                            "unknown_policy": "RESEARCH_REQUIRED",
+                        },
+                        {
+                            "key": "support_operations",
+                            "requirement": "SOFT",
+                            "unknown_policy": "NO_PENALTY",
+                        },
+                        {
+                            "key": "employee_preference",
+                            "requirement": "SOFT",
+                            "unknown_policy": "NO_PENALTY",
+                        },
+                    ],
                     "firmographics": variant["firmographics"],
                     "pains": variant["pains"],
                     "triggers": variant["triggers"],
@@ -771,10 +897,15 @@ def _normalized_company_domain(url: str) -> str | None:
         for excluded in EXCLUDED_ACCOUNT_HOSTS
     ):
         return None
-    return host
+    return resolve_company_identity(url).canonical_company_domain
 
 
 def _is_candidate_company_page(result: SearchResult) -> bool:
+    if classify_result_page(str(result.url)) not in {
+        ResultPageRole.OFFICIAL_ROOT,
+        ResultPageRole.OFFICIAL_SUBDOMAIN,
+    }:
+        return False
     parsed = urlsplit(str(result.url))
     path = parsed.path.strip("/").lower()
     first_segment = path.split("/", 1)[0] if path else ""
@@ -903,16 +1034,80 @@ def _qualify_account(
         reasons.append("Published employee evidence falls outside 50-500.")
     else:
         reasons.append("Company size remains unknown.")
-    if direct_competitor:
-        reasons.append("The company appears to sell direct support automation.")
-        return "DISQUALIFIED", reasons
-    if not domain_validated:
-        return "INSUFFICIENT_EVIDENCE", reasons
-    if is_saas and is_india and has_support_operations and size_in_range is True:
-        return "QUALIFIED", reasons
-    if is_saas and is_india:
-        return "BORDERLINE", reasons
-    return "INSUFFICIENT_EVIDENCE", reasons
+    evaluations = [
+        CriterionEvaluation(
+            "official_domain",
+            CriterionRequirement.HARD,
+            CriterionState.TRUE if domain_validated else CriterionState.UNKNOWN,
+            reason=(
+                "Official domain is validated."
+                if domain_validated
+                else "Official domain remains unverified."
+            ),
+        ),
+        CriterionEvaluation(
+            "b2b_software",
+            CriterionRequirement.HARD,
+            CriterionState.TRUE if is_saas else CriterionState.UNKNOWN,
+            reason=(
+                "B2B software model is source-supported."
+                if is_saas
+                else "B2B software model remains unknown."
+            ),
+        ),
+        CriterionEvaluation(
+            "india_connection",
+            CriterionRequirement.HARD,
+            CriterionState.TRUE if is_india else CriterionState.UNKNOWN,
+            reason=(
+                "India connection is source-supported."
+                if is_india
+                else "India connection remains unknown."
+            ),
+        ),
+        CriterionEvaluation(
+            "not_direct_competitor",
+            CriterionRequirement.HARD,
+            CriterionState.FALSE if direct_competitor else CriterionState.TRUE,
+            reason=(
+                "Direct support-automation competitor evidence found."
+                if direct_competitor
+                else "No direct-competitor evidence found."
+            ),
+        ),
+        CriterionEvaluation(
+            "support_operations",
+            CriterionRequirement.SOFT,
+            CriterionState.TRUE
+            if has_support_operations
+            else CriterionState.UNKNOWN,
+            reason=(
+                "Support operations are source-supported."
+                if has_support_operations
+                else "Support operations remain unknown."
+            ),
+        ),
+        CriterionEvaluation(
+            "employee_preference",
+            CriterionRequirement.SOFT,
+            (
+                CriterionState.TRUE
+                if size_in_range is True
+                else CriterionState.FALSE
+                if size_in_range is False
+                else CriterionState.UNKNOWN
+            ),
+            reason=(
+                "Employee evidence overlaps the preferred range."
+                if size_in_range is True
+                else "Employee evidence is outside the preferred range."
+                if size_in_range is False
+                else "Employee count remains unknown; it is not treated as false."
+            ),
+        ),
+    ]
+    decision = decide_qualification(evaluations)
+    return decision.status, [*reasons, *decision.reasons]
 
 
 async def _research_account_sources(
@@ -937,9 +1132,29 @@ async def _research_account_sources(
             "account_research",
         ),
         (
-            "ACCOUNT_SIGNAL_RESEARCH",
-            (f'"{company_name}" (funding OR launch OR expansion OR partnership)'),
+            "ACCOUNT_SIGNAL_SUPPORT_HIRING",
+            f'"{company_name}" hiring customer support OR customer success',
             "news",
+        ),
+        (
+            "ACCOUNT_SIGNAL_EXPANSION",
+            f'"{company_name}" expansion OR "opens office" OR "new market"',
+            "news",
+        ),
+        (
+            "ACCOUNT_SIGNAL_ENTERPRISE",
+            f'"{company_name}" "enterprise customer" OR "customer growth"',
+            "news",
+        ),
+        (
+            "ACCOUNT_SIGNAL_LEADERSHIP",
+            f'"{company_name}" appoints CRO OR "chief customer" OR "support leader"',
+            "news",
+        ),
+        (
+            "ACCOUNT_SIGNAL_FIRST_PARTY",
+            f"site:{domain} careers support OR news expansion",
+            "account_research",
         ),
     )
     seen_source_ids = {initial_source.id}
@@ -1058,10 +1273,15 @@ async def discover_accounts(
             "India fintech SaaS platform official company website",
         ]
         workflow_started = monotonic()
-        candidates: dict[str, SearchResult] = {}
+        candidates: dict[str, DiscoveryCandidate] = {}
+        target_terms = _tokens(
+            f"{product.target_market} {icp.name} {icp.description}"
+        )
         discovery_diagnostics = {
             "search_results": 0,
             "candidate_pages": 0,
+            "prequalified_candidates": 0,
+            "provider_fallbacks": 0,
             "fetch_failures": 0,
             "no_evidence": 0,
             "preliminary_rejections": 0,
@@ -1077,21 +1297,89 @@ async def discover_accounts(
                     workspace_id=str(run.workspace_id),
                     research_run_id=str(run.id),
                     query=query,
-                    limit=min(5, settings.max_account_candidates),
+                    limit=min(8, settings.max_account_candidates),
                     purpose="account_discovery",
                 )
                 run.searches_used += 1
                 discovery_diagnostics["search_results"] += len(response.results)
+                if (
+                    response.diagnostics is not None
+                    and response.diagnostics.fallback_used
+                ):
+                    discovery_diagnostics["provider_fallbacks"] += 1
                 for item in response.results:
-                    domain = _normalized_company_domain(str(item.url))
-                    if not domain or not _is_candidate_company_page(item):
+                    identity = resolve_company_identity(str(item.url))
+                    domain = identity.canonical_company_domain
+                    if (
+                        not domain
+                        or not _is_candidate_company_page(item)
+                        or identity.confidence < 0.75
+                    ):
                         continue
-                    candidates.setdefault(domain, item)
+                    candidate = candidates.get(domain)
+                    if candidate is None:
+                        candidate = DiscoveryCandidate(
+                            result=item,
+                            identity=identity,
+                            queries=set(),
+                            providers=set(),
+                        )
+                        candidates[domain] = candidate
+                    candidate.queries.add(query)
+                    candidate.providers.add(item.provider or item.backend)
                 discovery_diagnostics["candidate_pages"] = len(candidates)
             except GatewayProviderError:
                 continue
+        for domain, candidate in candidates.items():
+            candidate.score = candidate_relevance_score(
+                title=candidate.result.title,
+                snippet=candidate.result.snippet,
+                target_terms=target_terms,
+                official_page=True,
+                provider_score=candidate.result.provider_relevance_score,
+                query_hits=len(candidate.queries),
+                provider_hits=len(candidate.providers),
+            )
+            stage = (
+                "PREQUALIFIED"
+                if candidate.score >= settings.candidate_prequalification_floor
+                else "REJECTED_PREQUALIFICATION"
+            )
+            session.add(
+                ResearchCandidateRow(
+                    workspace_id=run.workspace_id,
+                    research_run_id=run.id,
+                    discovered_url=str(candidate.result.url),
+                    hostname=candidate.identity.hostname,
+                    registrable_domain=domain,
+                    canonical_company_domain=domain,
+                    page_role=candidate.identity.page_role.value,
+                    candidate_score=candidate.score,
+                    stage=stage,
+                    query_provenance=sorted(candidate.queries),
+                    provider_provenance=sorted(candidate.providers),
+                    diagnostics={
+                        "domain_confidence": candidate.identity.confidence,
+                        "provider_relevance_score": (
+                            candidate.result.provider_relevance_score
+                        ),
+                    },
+                )
+            )
+        await session.commit()
+        shortlisted = sorted(
+            (
+                (domain, candidate)
+                for domain, candidate in candidates.items()
+                if candidate.score >= settings.candidate_prequalification_floor
+            ),
+            key=lambda item: item[1].score,
+            reverse=True,
+        )
+        discovery_diagnostics["prequalified_candidates"] = len(shortlisted)
         created = 0
-        for domain, result in candidates.items():
+        for domain, candidate in shortlisted:
+            result = candidate.result
             if monotonic() - workflow_started >= settings.max_elapsed_seconds:
                 break
             if created >= settings.max_accounts_researched:
@@ -1125,6 +1413,14 @@ async def discover_accounts(
             )
             if preliminary_qualification == "INSUFFICIENT_EVIDENCE":
                 discovery_diagnostics["preliminary_rejections"] += 1
+                candidate_row = await session.scalar(
+                    select(ResearchCandidateRow).where(
+                        ResearchCandidateRow.research_run_id == run.id,
+                        ResearchCandidateRow.registrable_domain == domain,
+                    )
+                )
+                if candidate_row is not None:
+                    candidate_row.stage = "REJECTED_DEEP_RESEARCH"
                 continue
             sources, facts = await _research_account_sources(
                 session,
@@ -1153,7 +1449,52 @@ async def discover_accounts(
             )
             if qualification == "INSUFFICIENT_EVIDENCE":
                 discovery_diagnostics["final_rejections"] += 1
+                candidate_row = await session.scalar(
+                    select(ResearchCandidateRow).where(
+                        ResearchCandidateRow.research_run_id == run.id,
+                        ResearchCandidateRow.registrable_domain == domain,
+                    )
+                )
+                if candidate_row is not None:
+                    candidate_row.stage = "REJECTED_QUALIFICATION"
                 continue
+            firmographics = await PublicEvidenceFirmographicProvider().enrich(
+                company_name=_account_name(source.title, domain),
+                domain=domain,
+                public_text=combined_text,
+                source_ids=tuple(str(item.id) for item in official_sources),
+            )
+            qualification_coverage = (
+                1.0 if qualification == "QUALIFIED" else 0.75
+            )
+            firmographic_payload = {
+                "provider": firmographics.provider,
+                "employee_count": {
+                    "value": firmographics.employee_count.value,
+                    "precision": firmographics.employee_count.precision.value,
+                    "confidence": firmographics.employee_count.confidence,
+                    "source_ids": list(firmographics.employee_count.source_ids),
+                    "rationale": firmographics.employee_count.rationale,
+                },
+                "geography": {
+                    "value": firmographics.geography.value,
+                    "precision": firmographics.geography.precision.value,
+                    "confidence": firmographics.geography.confidence,
+                    "source_ids": list(firmographics.geography.source_ids),
+                },
+                "business_model": {
+                    "value": firmographics.business_model.value,
+                    "precision": firmographics.business_model.precision.value,
+                    "confidence": firmographics.business_model.confidence,
+                    "source_ids": list(firmographics.business_model.source_ids),
+                },
+                "industry": {
+                    "value": firmographics.industry.value,
+                    "precision": firmographics.industry.precision.value,
+                    "confidence": firmographics.industry.confidence,
+                    "source_ids": list(firmographics.industry.source_ids),
+                },
+            }
             lowered_text = combined_text.lower()
             industry = (
                 "B2B SaaS"
@@ -1208,6 +1549,16 @@ async def discover_accounts(
                         "company_size_status": size_status,
                         "company_size_in_range": size_in_range is True,
                         "discovery_source": str(result.url),
+                        "registrable_domain": domain,
+                        "official_subdomains": list(
+                            candidate.identity.official_subdomains
+                        ),
+                        "domain_confidence": candidate.identity.confidence,
+                        "candidate_relevance_score": candidate.score,
+                        "query_provenance": sorted(candidate.queries),
+                        "provider_provenance": sorted(candidate.providers),
+                        "qualification_coverage": qualification_coverage,
+                        "firmographics": firmographic_payload,
                         "domain_validation": (
                             "VALIDATED" if domain_validated else "MISMATCH"
                         ),
@@ -1233,12 +1584,30 @@ async def discover_accounts(
                     "company_size_status": size_status,
                     "company_size_in_range": size_in_range is True,
                     "discovery_source": str(result.url),
+                    "registrable_domain": domain,
+                    "official_subdomains": list(
+                        candidate.identity.official_subdomains
+                    ),
+                    "domain_confidence": candidate.identity.confidence,
+                    "candidate_relevance_score": candidate.score,
+                    "query_provenance": sorted(candidate.queries),
+                    "provider_provenance": sorted(candidate.providers),
+                    "qualification_coverage": qualification_coverage,
+                    "firmographics": firmographic_payload,
                     "domain_validation": (
                         "VALIDATED" if domain_validated else "MISMATCH"
                     ),
                     "source_ids": [str(item.id) for item in sources],
                 }
             await _score_and_brief(session, run, product, icp, account, source, facts)
+            candidate_row = await session.scalar(
+                select(ResearchCandidateRow).where(
+                    ResearchCandidateRow.research_run_id == run.id,
+                    ResearchCandidateRow.registrable_domain == domain,
+                )
+            )
+            if candidate_row is not None:
+                candidate_row.stage = "ACCEPTED"
             created += 1
             run.documents_used += 1
             await session.commit()
@@ -1291,21 +1660,24 @@ def _news_result_matches_company(
     domain: str,
 ) -> bool:
     """Require a specific entity token before external news becomes evidence."""
-    haystack = re.sub(
-        r"[^a-z0-9]",
-        "",
-        f"{result.title} {result.snippet}".lower(),
-    )
-    brand = re.sub(r"[^a-z0-9]", "", _domain_brand(domain).lower())
-    if len(brand) >= 4 and brand in haystack:
+    haystack = f"{result.title} {result.snippet}".lower()
+    brand = _domain_brand(domain).lower()
+    if len(brand) >= 4 and re.search(
+        rf"(?<![a-z0-9]){re.escape(brand)}(?![a-z0-9])", haystack
+    ):
         return True
-    company = re.sub(r"[^a-z0-9]", "", company_name.lower())
-    return len(company) >= 4 and company in haystack
+    company = re.sub(r"\s+", " ", company_name.lower()).strip()
+    return len(company) >= 4 and re.search(
+        rf"(?<![a-z0-9]){re.escape(company)}(?![a-z0-9])", haystack
+    ) is not None
 
 
 def _signals_from_facts(
     facts: list[EvidenceFactRow],
     source_by_id: dict[uuid.UUID, SourceDocumentRow] | None = None,
+    *,
+    company_name: str | None = None,
+    domain: str | None = None,
 ) -> list[tuple[str, EvidenceFactRow]]:
     matches: list[tuple[str, EvidenceFactRow]] = []
     seen: set[tuple[str, uuid.UUID]] = set()
@@ -1315,6 +1687,33 @@ def _signals_from_facts(
             if not all(any(term in lowered for term in group) for group in term_groups):
                 continue
             source = source_by_id.get(fact.source_id) if source_by_id else None
+            if source is not None:
+                source_role = str(
+                    source.provenance.get("source_role") or SourceRole.OTHER.value
+                )
+                if source_role == SourceRole.VENDOR_MARKETING.value:
+                    continue
+                source_domain = _normalized_company_domain(source.canonical_url)
+                first_party = bool(domain and source_domain == domain)
+                if (
+                    company_name
+                    and domain
+                    and not first_party
+                    and not _news_result_matches_company(
+                        SearchResult.model_validate(
+                            {
+                                "url": source.url,
+                                "canonical_url": source.canonical_url,
+                                "title": source.title,
+                                "snippet": fact.passage,
+                                "backend": source.backend,
+                            }
+                        ),
+                        company_name=company_name,
+                        domain=domain,
+                    )
+                ):
+                    continue
             if source is not None and signal_type != "CUSTOMER_GROWTH_INDICATOR":
                 dated_or_event_page = source.published_at is not None or any(
                     marker in source.url.lower()
@@ -1358,7 +1757,13 @@ async def _score_and_brief(
             )
         ).all()
     )
-    signal_matches = _signals_from_facts(facts, {item.id: item for item in source_rows})
+    source_by_id = {item.id: item for item in source_rows}
+    signal_matches = _signals_from_facts(
+        facts,
+        source_by_id,
+        company_name=account.name,
+        domain=account.domain,
+    )
     signal_match = signal_matches[0] if signal_matches else None
     signal_evidence = [str(item[1].id) for item in signal_matches]
     fit_evidence = [str(facts[0].id)]
@@ -1380,11 +1785,14 @@ async def _score_and_brief(
         )
         else 0.0
     )
-    size_match = (
+    size_status = account.attributes.get("company_size_status")
+    size_in_range = account.attributes.get("company_size_in_range")
+    size_match: float | None = (
         100.0
-        if account.attributes.get("company_size_status") == "VERIFIED"
-        and account.attributes.get("company_size_in_range") is True
+        if size_status == "VERIFIED" and size_in_range is True
         else 0.0
+        if size_status == "VERIFIED" and size_in_range is False
+        else None
     )
     if account.attributes.get("qualification_status") == "DISQUALIFIED":
         industry_match = 0.0
@@ -1403,7 +1811,11 @@ async def _score_and_brief(
         signal_strength=signal_strength,
         signal_recency=signal_decay(observed_at) * 100 if score_signal else 0,
         evidence_coverage=min(100, len(facts) * 30),
-        source_quality=source.trust_score * 100,
+        source_quality=(
+            sum(item.trust_score for item in source_rows)
+            / max(1, len(source_rows))
+            * 100
+        ),
         fit_evidence=fit_evidence,
         signal_evidence=signal_evidence,
     )
@@ -1411,7 +1823,7 @@ async def _score_and_brief(
         workspace_id=run.workspace_id,
         account_id=account.id,
         research_run_id=run.id,
-        scoring_version="real-gtm-v2",
+        scoring_version="intelligence-quality-v3",
         scores=scores.model_dump(mode="json"),
         weights={"fit": 0.55, "intent": 0.45, "confidence_gate": True},
         inputs={
@@ -1419,6 +1831,7 @@ async def _score_and_brief(
             "verified_signal": signal_match is not None,
             "verified_signal_count": len(signal_matches),
             "source_quality": source.trust_score,
+            "unknown_size_excluded_from_fit_denominator": size_match is None,
             "qualification_status": account.attributes.get(
                 "qualification_status", "INSUFFICIENT_EVIDENCE"
             ),
@@ -1449,6 +1862,28 @@ async def _score_and_brief(
     why_now: list[EvidenceClaim] = []
     for signal_type, fact in signal_matches:
         adjusted = signal_strength / 100 * signal_decay(fact.observed_at)
+        high_relevance_types = {
+            "SUPPORT_HIRING",
+            "CUSTOMER_SUCCESS_HIRING",
+            "NEW_MARKET",
+            "ENTERPRISE_EXPANSION",
+            "CUSTOMER_GROWTH_INDICATOR",
+            "TECHNOLOGY_CHANGE",
+        }
+        relevance = 0.95 if signal_type in high_relevance_types else 0.65
+        signal_source = source_by_id.get(fact.source_id)
+        source_role = (
+            str(signal_source.provenance.get("source_role") or SourceRole.OTHER.value)
+            if signal_source
+            else SourceRole.OTHER.value
+        )
+        entity_match_score = (
+            1.0
+            if signal_source
+            and _normalized_company_domain(signal_source.canonical_url)
+            == account.domain
+            else 0.95
+        )
         signal_row = IntentSignalRow(
             workspace_id=run.workspace_id,
             account_id=account.id,
@@ -1458,7 +1893,7 @@ async def _score_and_brief(
             observed_at=fact.observed_at,
             expires_at=None,
             base_strength=signal_strength / 100,
-            relevance=0.8,
+            relevance=relevance,
             confidence=float(fact.confidence),
             adjusted_strength=adjusted,
             evidence_ids=[str(fact.id)],
@@ -1473,6 +1908,10 @@ async def _score_and_brief(
                 observed_at=fact.observed_at,
                 strength=adjusted,
                 evidence_ids=[str(fact.id)],
+                entity_match_score=entity_match_score,
+                event_confidence=float(fact.confidence),
+                relevance=relevance,
+                source_role=source_role,
             )
         )
         why_now.append(
@@ -1483,36 +1922,44 @@ async def _score_and_brief(
                 evidence_ids=[str(fact.id)],
             )
         )
+    qualification = str(
+        account.attributes.get("qualification_status") or "INSUFFICIENT_EVIDENCE"
+    )
+    band, recommended_action = priority_band(
+        scores,
+        qualification_status=qualification,
+        has_verified_signal=signal_match is not None,
+    )
     if signal_match:
         signal_type, fact = signal_match
-        qualification = str(
-            account.attributes.get("qualification_status") or "INSUFFICIENT_EVIDENCE"
-        )
-        recommended_action = (
-            "Prioritize for human review of the verified trigger"
-            if qualification == "QUALIFIED"
-            else "Review qualification gaps before considering any outreach"
-        )
         account.attributes = {
             **account.attributes,
             "top_signal": fact.claim,
             "top_signal_type": signal_type,
             "recommended_action": recommended_action,
+            "priority_band": band,
+            "research_candidate": qualification != "QUALIFIED",
         }
     else:
-        size_unknown = (
-            account.attributes.get("company_size_status", "UNKNOWN") == "UNKNOWN"
-        )
         account.attributes = {
             **account.attributes,
             "top_signal": "No verified current signal",
             "top_signal_type": None,
-            "recommended_action": (
-                "Research missing company-size evidence"
-                if size_unknown
-                else "Monitor for a verified buying trigger"
-            ),
+            "recommended_action": recommended_action,
+            "priority_band": band,
+            "research_candidate": True,
         }
+    run.budgets = {
+        **run.budgets,
+        "searches_used": run.searches_used,
+        "documents_used": run.documents_used,
+        "search_limit": settings.max_research_searches,
+        "document_limit": settings.max_research_documents,
+        "estimated_provider_cost_usd": run.budgets.get(
+            "estimated_provider_cost_usd", 0
+        ),
+        "cost_status": "ESTIMATE_ONLY",
+    }
     session.add(
         AccountResearchSnapshotRow(
             workspace_id=run.workspace_id,
@@ -1566,6 +2013,27 @@ async def _score_and_brief(
         evidence=evidence_domains,
         sources=source_domains,
         signals=signal_models,
+        verified_facts=[
+            EvidenceClaim(
+                statement=item.claim,
+                status=ClaimStatus.SUPPORTED,
+                confidence=float(item.confidence),
+                evidence_ids=[str(item.id)],
+            )
+            for item in facts[:5]
+        ],
+        unknowns=[
+            reason
+            for reason in _attribute_string_list(
+                account.attributes.get("qualification_reasons", [])
+            )
+            if "unknown" in str(reason).lower()
+            or "unverified" in str(reason).lower()
+            or "remain" in str(reason).lower()
+        ],
+        research_candidate=bool(
+            account.attributes.get("research_candidate", True)
+        ),
         campaign=CampaignDraft(
             id=str(draft_id),
             account_id=str(account.id),
@@ -1667,9 +2135,7 @@ async def research_account(
                 (
                     result
                     for result in response.results
-                    if (urlsplit(str(result.url)).hostname or "")
-                    .removeprefix("www.")
-                    .lower()
+                    if _normalized_company_domain(str(result.url))
                     == account.domain.lower()
                 ),
                 response.results[0] if response.results else None,
@@ -1746,6 +2212,11 @@ async def research_account(
             "company_size_status": size_status,
             "company_size_in_range": size_in_range is True,
             "domain_validation": "VALIDATED",
+            "registrable_domain": account.domain,
+            "domain_confidence": 0.99,
+            "qualification_coverage": (
+                1.0 if qualification == "QUALIFIED" else 0.75
+            ),
             "source_ids": [str(item.id) for item in sources],
         }
         await _score_and_brief(session, run, product, icp, account, source, facts)

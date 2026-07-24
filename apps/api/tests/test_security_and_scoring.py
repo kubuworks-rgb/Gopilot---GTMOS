@@ -108,7 +108,7 @@ def test_account_qualification_preserves_unknown_size() -> None:
         size_in_range=None,
     )
 
-    assert status == "BORDERLINE"
+    assert status == "QUALIFIED_WITH_UNCERTAINTY"
     assert "Company size remains unknown." in reasons
     assert _company_size_from_text("Our team builds software.") == (
         None,

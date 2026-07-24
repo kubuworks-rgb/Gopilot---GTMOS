@@ -12,6 +12,7 @@ coverage/
 .coverage
 htmlcov/
 output/
+tmp/
 *.pyc
 *.db
 *.log

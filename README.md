@@ -126,10 +126,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/live_smoke.ps1
 
 Review that egress before running it in a controlled environment.
 
-Search transports are configured explicitly. Bing RSS remains a general-web
-fallback, while `gdelt_doc` is a news-intelligence channel for time-sensitive
-company events. GDELT is not used as a replacement for official-site, pricing,
-careers, product, or technical-documentation discovery.
+Search transports are configured explicitly. `exa_mcp` is the default reviewed
+general-web transport and uses Exa's official remote MCP endpoint. Its bounded
+free tier does not require a key; `EXA_API_KEY` can be configured for production
+rate limits. Bing RSS remains an explicit fallback. Requests with the `news`
+purpose route to GDELT for time-sensitive company events. GDELT is never used as
+a replacement for official-site, pricing, careers, product, or technical-
+documentation discovery.
 
 ## Research lifecycle
 
@@ -218,9 +221,8 @@ It does not claim that a public-web smoke occurred.
 - Account identity, industry, geography, and employee size remain `Unverified`
   unless source text proves them.
 - Public search availability and result quality depend on the configured upstream.
-- Bing RSS did not return sufficiently relevant results for the approved Kubu
-  Works queries in the 2026-07-23 smoke. A stronger general-web provider is still
-  required for company and official-site discovery.
+- The no-key Exa tier is rate-limited; production workloads should configure an
+  API key and retain explicit partial/failure behavior.
 - The public-web smoke must only run in an environment that explicitly permits
   sending its queries to the configured provider.
 

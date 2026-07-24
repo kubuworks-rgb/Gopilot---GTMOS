@@ -28,6 +28,19 @@ class GatewaySettings:
         os.getenv("EXA_CONTEXT_MAX_CHARACTERS", "4000")
     )
     exa_min_interval_seconds: float = float(os.getenv("EXA_MIN_INTERVAL_SECONDS", "2"))
+    secondary_search_provider: str = os.getenv(
+        "SECONDARY_SEARCH_PROVIDER", "tavily"
+    ).lower()
+    tavily_api_key: str | None = os.getenv("TAVILY_API_KEY") or None
+    tavily_endpoint: str = os.getenv(
+        "TAVILY_SEARCH_ENDPOINT", "https://api.tavily.com/search"
+    )
+    minimum_general_search_results: int = int(
+        os.getenv("MINIMUM_GENERAL_SEARCH_RESULTS", "3")
+    )
+    production_acceptance: bool = (
+        os.getenv("PRODUCTION_ACCEPTANCE", "false").lower() == "true"
+    )
     gdelt_endpoint: str = os.getenv(
         "GDELT_SEARCH_ENDPOINT",
         "https://api.gdeltproject.org/api/v2/doc/doc",

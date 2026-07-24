@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+import re
 from datetime import UTC, datetime
 
 from sqlalchemy import Select, desc, select
@@ -12,11 +13,13 @@ from apps.api.app.db.models import (
     AuditEventRow,
     CampaignDraftRow,
     EvidenceFactRow,
+    FeedbackEventRow,
     GTMFindingRow,
     ICPProfileRow,
     MembershipRow,
     OpportunityBriefRow,
     ProductProfileRow,
+    QAEvaluationRow,
     ResearchRunRow,
     SourceDocumentRow,
     WorkspaceRow,
@@ -29,9 +32,17 @@ from apps.api.app.domain.models import (
     CampaignDraft,
     ClaimStatus,
     EvidenceFact,
+    FeedbackInput,
+    FeedbackRecord,
     Finding,
     ICP,
     ProductProfile,
+    ProfileClaim,
+    ProvenanceStatus,
+    QualificationStatus,
+    QAEvaluationInput,
+    QAEvaluationRecord,
+    CompanySizeStatus,
     ResearchRun,
     SourceDocument,
     Workspace,
@@ -54,6 +65,159 @@ def _string_list(value: object) -> list[str]:
     return [str(item) for item in value] if isinstance(value, list) else []
 
 
+def _product_understanding(
+    company_name: str, website: str, product: str, target_market: str
+) -> list[dict[str, object]]:
+    claims: list[dict[str, object]] = [
+        {
+            "field": "company_name",
+            "value": company_name,
+            "status": ProvenanceStatus.USER_CONFIRMED.value,
+            "evidence_ids": [],
+        },
+        {
+            "field": "website",
+            "value": website,
+            "status": ProvenanceStatus.USER_CONFIRMED.value,
+            "evidence_ids": [],
+        },
+        {
+            "field": "product",
+            "value": product,
+            "status": ProvenanceStatus.USER_CONFIRMED.value,
+            "evidence_ids": [],
+        },
+        {
+            "field": "target_market",
+            "value": target_market,
+            "status": ProvenanceStatus.USER_CONFIRMED.value,
+            "evidence_ids": [],
+        },
+    ]
+    geography = next(
+        (
+            name
+            for name in ("India", "APAC", "United States", "Europe")
+            if name.lower() in target_market.lower()
+        ),
+        None,
+    )
+    size_match = re.search(r"\b(\d{1,5})\s*[-–]\s*(\d{1,5})\b", target_market)
+    claims.extend(
+        [
+            {
+                "field": "geography",
+                "value": geography,
+                "status": (
+                    ProvenanceStatus.USER_CONFIRMED.value
+                    if geography
+                    else ProvenanceStatus.UNKNOWN.value
+                ),
+                "evidence_ids": [],
+            },
+            {
+                "field": "preferred_company_size",
+                "value": (
+                    f"{size_match.group(1)}-{size_match.group(2)} employees"
+                    if size_match
+                    else None
+                ),
+                "status": (
+                    ProvenanceStatus.USER_CONFIRMED.value
+                    if size_match
+                    else ProvenanceStatus.UNKNOWN.value
+                ),
+                "evidence_ids": [],
+            },
+            {
+                "field": "product_category",
+                "value": product.split(".", 1)[0][:240],
+                "status": ProvenanceStatus.USER_CONFIRMED.value,
+                "evidence_ids": [],
+                "rationale": "Category is taken from the user-confirmed product description.",
+            },
+            {
+                "field": "problem_solved",
+                "value": "Growing repetitive customer-support workload",
+                "status": ProvenanceStatus.INFERRED.value,
+                "evidence_ids": [],
+                "rationale": "Initial hypothesis derived from the product description.",
+            },
+            {
+                "field": "primary_outcomes",
+                "value": (
+                    "Reduce repetitive tickets and response time; increase support "
+                    "capacity without proportional headcount growth"
+                ),
+                "status": ProvenanceStatus.INFERRED.value,
+                "evidence_ids": [],
+                "rationale": "Potential outcomes require customer or product evidence.",
+            },
+            {
+                "field": "business_model",
+                "value": "B2B software platform",
+                "status": ProvenanceStatus.INFERRED.value,
+                "evidence_ids": [],
+            },
+            {
+                "field": "possible_buyer_roles",
+                "value": (
+                    "Head of Customer Support; Head of CX; COO; Founder; "
+                    "VP Customer Success"
+                ),
+                "status": ProvenanceStatus.INFERRED.value,
+                "evidence_ids": [],
+            },
+            {
+                "field": "company_characteristics",
+                "value": target_market,
+                "status": ProvenanceStatus.USER_CONFIRMED.value,
+                "evidence_ids": [],
+            },
+            {
+                "field": "pain_hypotheses",
+                "value": (
+                    "Support volume grows with customers; repetitive tickets may "
+                    "consume specialist capacity"
+                ),
+                "status": ProvenanceStatus.INFERRED.value,
+                "evidence_ids": [],
+            },
+            {
+                "field": "buying_triggers",
+                "value": (
+                    "Support hiring; customer growth; enterprise expansion; "
+                    "new market or product launch"
+                ),
+                "status": ProvenanceStatus.INFERRED.value,
+                "evidence_ids": [],
+            },
+            {
+                "field": "disqualifiers",
+                "value": (
+                    "Direct support-automation vendor; outside preferred size; "
+                    "no B2B SaaS or India evidence"
+                ),
+                "status": ProvenanceStatus.INFERRED.value,
+                "evidence_ids": [],
+            },
+            {
+                "field": "competitors_or_alternatives",
+                "value": None,
+                "status": ProvenanceStatus.UNKNOWN.value,
+                "evidence_ids": [],
+            },
+            {
+                "field": "profile_confidence",
+                "value": "Medium before market research",
+                "status": ProvenanceStatus.INFERRED.value,
+                "evidence_ids": [],
+            },
+        ]
+    )
+    return claims
+
+
 class PostgresRepository:
     async def resolve_membership(
         self, session: AsyncSession, user_id: str, workspace_id: str | None
@@ -62,7 +226,9 @@ class PostgresRepository:
             MembershipRow.user_id == user_id
         )
         if workspace_id:
-            statement = statement.where(MembershipRow.workspace_id == _uuid(workspace_id))
+            statement = statement.where(
+                MembershipRow.workspace_id == _uuid(workspace_id)
+            )
         statement = statement.order_by(MembershipRow.workspace_id).limit(1)
         return await session.scalar(statement)
 
@@ -72,9 +238,7 @@ class PostgresRepository:
         row = WorkspaceRow(name=name)
         session.add(row)
         await session.flush()
-        session.add(
-            MembershipRow(workspace_id=row.id, user_id=user_id, role="owner")
-        )
+        session.add(MembershipRow(workspace_id=row.id, user_id=user_id, role="owner"))
         await self.record(
             session,
             row.id,
@@ -113,7 +277,12 @@ class PostgresRepository:
             product=product,
             target_market=target_market,
             status="confirmed",
-            profile_data={"input_classification": "user_confirmed"},
+            profile_data={
+                "input_classification": "user_confirmed",
+                "understanding": _product_understanding(
+                    company_name, website, product, target_market
+                ),
+            },
         )
         session.add(row)
         await session.flush()
@@ -231,9 +400,7 @@ class PostgresRepository:
             ],
         )
 
-    async def list_icps(
-        self, session: AsyncSession, workspace_id: str
-    ) -> list[ICP]:
+    async def list_icps(self, session: AsyncSession, workspace_id: str) -> list[ICP]:
         rows = (
             await session.scalars(
                 select(ICPProfileRow)
@@ -321,12 +488,42 @@ class PostgresRepository:
             location=row.location or "Unverified",
             employee_band=row.employee_band or "Unverified",
             scores=scores,
-            top_signal=str(row.attributes.get("top_signal") or "No verified current signal"),
+            top_signal=str(
+                row.attributes.get("top_signal") or "No verified current signal"
+            ),
             recommended_action=str(
                 row.attributes.get("recommended_action")
                 or "Review public evidence before outreach"
             ),
             last_researched_at=row.last_researched_at or row.created_at,
+            qualification_status=QualificationStatus(
+                str(
+                    row.attributes.get("qualification_status")
+                    or QualificationStatus.INSUFFICIENT_EVIDENCE.value
+                )
+            ),
+            qualification_reasons=_string_list(
+                row.attributes.get("qualification_reasons")
+            ),
+            company_size_status=CompanySizeStatus(
+                str(
+                    row.attributes.get("company_size_status")
+                    or CompanySizeStatus.UNKNOWN.value
+                )
+            ),
+            discovery_source=(
+                str(row.attributes["discovery_source"])
+                if row.attributes.get("discovery_source")
+                else None
+            ),
+            domain_validation=str(row.attributes.get("domain_validation") or "UNKNOWN"),
+            evidence_ids=row.evidence_ids,
+            source_ids=_string_list(row.attributes.get("source_ids")),
+            top_signal_type=(
+                str(row.attributes["top_signal_type"])
+                if row.attributes.get("top_signal_type")
+                else None
+            ),
         )
 
     async def brief(
@@ -375,9 +572,7 @@ class PostgresRepository:
             return None
         return row
 
-    async def approval_count(
-        self, session: AsyncSession, workspace_id: str
-    ) -> int:
+    async def approval_count(self, session: AsyncSession, workspace_id: str) -> int:
         rows = (
             await session.scalars(
                 select(CampaignDraftRow).where(
@@ -388,9 +583,7 @@ class PostgresRepository:
         ).all()
         return len(rows)
 
-    async def audit(
-        self, session: AsyncSession, workspace_id: str
-    ) -> list[AuditEvent]:
+    async def audit(self, session: AsyncSession, workspace_id: str) -> list[AuditEvent]:
         rows = (
             await session.scalars(
                 select(AuditEventRow)
@@ -433,8 +626,104 @@ class PostgresRepository:
             )
         )
 
+    async def create_feedback(
+        self,
+        session: AsyncSession,
+        workspace_id: str,
+        actor_id: str,
+        payload: FeedbackInput,
+    ) -> FeedbackRecord:
+        row = FeedbackEventRow(
+            workspace_id=_uuid(workspace_id),
+            actor_id=actor_id,
+            target_type=payload.target_type,
+            target_id=payload.target_id,
+            rating=payload.rating,
+            reason=payload.reason,
+            notes=payload.notes,
+        )
+        session.add(row)
+        await self.record(
+            session,
+            row.workspace_id,
+            actor_id,
+            "feedback_recorded",
+            payload.target_type,
+            payload.target_id,
+            {"rating": payload.rating},
+        )
+        await session.commit()
+        await session.refresh(row)
+        return FeedbackRecord(
+            id=str(row.id),
+            workspace_id=str(row.workspace_id),
+            actor_id=row.actor_id,
+            target_type=row.target_type,  # type: ignore[arg-type]
+            target_id=row.target_id,
+            rating=row.rating,  # type: ignore[arg-type]
+            reason=row.reason,
+            notes=row.notes,
+            created_at=row.created_at,
+        )
+
+    async def create_qa_evaluation(
+        self,
+        session: AsyncSession,
+        workspace_id: str,
+        evaluator_id: str,
+        payload: QAEvaluationInput,
+    ) -> QAEvaluationRecord:
+        row = QAEvaluationRow(
+            workspace_id=_uuid(workspace_id),
+            research_run_id=_uuid(payload.research_run_id),
+            account_id=_uuid(payload.account_id),
+            evaluator_id=evaluator_id,
+            company_validity=payload.company_validity,
+            domain_correctness=payload.domain_correctness,
+            icp_relevance=payload.icp_relevance,
+            evidence_correctness=payload.evidence_correctness,
+            signal_relevance=payload.signal_relevance,
+            brief_usefulness=payload.brief_usefulness,
+            evidence_links_working=payload.evidence_links_working,
+            unsupported_important_claim=payload.unsupported_important_claim,
+            notes=payload.notes,
+        )
+        session.add(row)
+        await self.record(
+            session,
+            row.workspace_id,
+            evaluator_id,
+            "qa_evaluation_recorded",
+            "account",
+            payload.account_id,
+            {"research_run_id": payload.research_run_id},
+        )
+        await session.commit()
+        await session.refresh(row)
+        return QAEvaluationRecord(
+            id=str(row.id),
+            workspace_id=str(row.workspace_id),
+            evaluator_id=row.evaluator_id,
+            research_run_id=str(row.research_run_id),
+            account_id=str(row.account_id),
+            company_validity=row.company_validity,  # type: ignore[arg-type]
+            domain_correctness=row.domain_correctness,  # type: ignore[arg-type]
+            icp_relevance=row.icp_relevance,
+            evidence_correctness=row.evidence_correctness,  # type: ignore[arg-type]
+            signal_relevance=row.signal_relevance,
+            brief_usefulness=row.brief_usefulness,
+            evidence_links_working=row.evidence_links_working,
+            unsupported_important_claim=row.unsupported_important_claim,
+            notes=row.notes,
+            created_at=row.created_at,
+        )
+
     @staticmethod
     def product_domain(row: ProductProfileRow) -> ProductProfile:
+        raw_understanding = row.profile_data.get("understanding", [])
+        understanding_items = (
+            raw_understanding if isinstance(raw_understanding, list) else []
+        )
         return ProductProfile(
             id=str(row.id),
             workspace_id=str(row.workspace_id),
@@ -443,6 +732,11 @@ class PostgresRepository:
             product=row.product,
             target_market=row.target_market,
             status=row.status,  # type: ignore[arg-type]
+            understanding=[
+                ProfileClaim.model_validate(item)
+                for item in understanding_items
+                if isinstance(item, dict)
+            ],
             created_at=row.created_at,
         )
 
@@ -464,6 +758,8 @@ class PostgresRepository:
             rationale=str(definition.get("rationale") or ""),
             evidence_ids=row.evidence_ids,
             selected=row.selected_at is not None,
+            recommended=bool(definition.get("recommended")),
+            qualification_logic=_string_list(definition.get("qualification_logic")),
         )
 
     @staticmethod

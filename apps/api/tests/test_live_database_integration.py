@@ -10,6 +10,7 @@ from sqlalchemy import select
 
 from apps.api.app.db.models import EvidenceFactRow, SourceDocumentRow
 from apps.api.app.db.session import SessionFactory
+from apps.api.app.domain.models import FeedbackInput, QAEvaluationInput
 from apps.api.app.jobs.queue import ResearchJob, decode_job, enqueue_job
 from apps.api.app.providers.live import LiveResearchProvider
 from apps.api.app.repositories.postgres import repository
@@ -38,8 +39,38 @@ class ControlledPublicTransport(LiveResearchProvider):
         research_run_id: str,
         query: str,
         limit: int = 5,
+        freshness_days: int | None = 365,
+        purpose: str = "market_research",
     ) -> SearchResponse:
-        del workspace_id, research_run_id, limit
+        del workspace_id, research_run_id, limit, freshness_days
+        if purpose == "news":
+            return SearchResponse(
+                status="completed",
+                backend="controlled-integration-transport",
+                results=[],
+            )
+        if purpose in {"account_discovery", "account_research"}:
+            url = HttpUrl(
+                "https://verified-software.example/"
+                if purpose == "account_discovery"
+                else "https://verified-software.example/about"
+            )
+            return SearchResponse(
+                status="completed",
+                backend="controlled-integration-transport",
+                results=[
+                    SearchResult(
+                        url=url,
+                        canonical_url=url,
+                        title="Verified Software Company",
+                        snippet=(
+                            "India B2B SaaS enterprise software with a 180 employee "
+                            "team and a growing customer support operation."
+                        ),
+                        backend="controlled-integration-transport",
+                    )
+                ],
+            )
         suffix = abs(hash(query)) % 10_000
         url = HttpUrl(f"https://verified-{suffix}.example/company")
         return SearchResponse(
@@ -74,9 +105,11 @@ class ControlledPublicTransport(LiveResearchProvider):
             published_at=datetime.now(UTC),
             content_type="text/html",
             text=(
-                "Verified Software Company builds workflow software for founder-led "
-                "B2B SaaS teams in India. The company launched a new product for "
-                "revenue teams and is hiring go-to-market specialists."
+                "Verified Software Company is an India B2B SaaS enterprise software "
+                "platform for founder-led teams. Our team has 180 employees. Its "
+                "customer support operation handles technical support for a growing "
+                "customer base. The company launched a new product for revenue teams "
+                "and is hiring go-to-market specialists."
             ),
             metadata={"test_transport": True},
         )
@@ -90,8 +123,10 @@ class EmptyPublicTransport(LiveResearchProvider):
         research_run_id: str,
         query: str,
         limit: int = 5,
+        freshness_days: int | None = 365,
+        purpose: str = "market_research",
     ) -> SearchResponse:
-        del workspace_id, research_run_id, query, limit
+        del workspace_id, research_run_id, query, limit, freshness_days, purpose
         return SearchResponse(
             status="completed",
             backend="controlled-empty-transport",
@@ -101,9 +136,7 @@ class EmptyPublicTransport(LiveResearchProvider):
 
 @pytest.mark.asyncio
 async def test_redis_job_contract_round_trip() -> None:
-    redis = Redis.from_url(
-        "redis://127.0.0.1:6379/0", decode_responses=True
-    )
+    redis = Redis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
     await redis.delete("gtm:research-jobs")
     job = ResearchJob(
         kind="research",
@@ -165,6 +198,9 @@ async def test_durable_research_to_ranked_account_flow() -> None:
     await discover_accounts(selected.id, transport)
 
     async with SessionFactory() as session:
+        refreshed_run = await repository.run_row(session, run.id, workspace.id)
+        assert refreshed_run is not None
+        assert refreshed_run.status == "completed", refreshed_run.error
         accounts = await repository.list_accounts(session, workspace.id)
         assert accounts
         assert accounts == sorted(
@@ -182,22 +218,54 @@ async def test_durable_research_to_ranked_account_flow() -> None:
         source_rows = (
             await session.scalars(
                 select(SourceDocumentRow).where(
-                    SourceDocumentRow.workspace_id
-                    == UUID(workspace.id)
+                    SourceDocumentRow.workspace_id == UUID(workspace.id)
                 )
             )
         ).all()
         facts = (
             await session.scalars(
                 select(EvidenceFactRow).where(
-                    EvidenceFactRow.workspace_id
-                    == UUID(workspace.id)
+                    EvidenceFactRow.workspace_id == UUID(workspace.id)
                 )
             )
         ).all()
         sources = {row.id: row for row in source_rows}
         assert facts
-        assert all(fact.passage in sources[fact.source_id].cleaned_text for fact in facts)
+        assert all(
+            fact.passage in sources[fact.source_id].cleaned_text for fact in facts
+        )
+        feedback = await repository.create_feedback(
+            session,
+            workspace.id,
+            user_id,
+            FeedbackInput(
+                target_type="account",
+                target_id=accounts[0].id,
+                rating="GOOD_ACCOUNT",
+                reason="Live integration persistence check",
+            ),
+        )
+        qa = await repository.create_qa_evaluation(
+            session,
+            workspace.id,
+            user_id,
+            QAEvaluationInput(
+                research_run_id=run.id,
+                account_id=accounts[0].id,
+                company_validity="REAL",
+                domain_correctness="CORRECT",
+                icp_relevance=3,
+                evidence_correctness="SUPPORTED",
+                signal_relevance=0,
+                brief_usefulness=2,
+                evidence_links_working=True,
+                unsupported_important_claim=False,
+                notes="Controlled live integration record",
+            ),
+        )
+        assert feedback.workspace_id == workspace.id
+        assert qa.research_run_id == run.id
+        assert qa.account_id == accounts[0].id
 
     user_id = f"no-results-{uuid4().hex}"
     async with SessionFactory() as session:

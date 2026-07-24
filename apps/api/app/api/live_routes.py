@@ -15,10 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.config import settings
 from apps.api.app.db.models import (
+    AccountRow,
     ApprovalRequestRow,
     CampaignDraftRow,
     EvidenceFactRow,
+    GTMFindingRow,
     ICPProfileRow,
+    IntentSignalRow,
+    OpportunityBriefRow,
     ResearchRunRow,
     SourceChunkRow,
     SourceDocumentRow,
@@ -32,9 +36,13 @@ from apps.api.app.domain.models import (
     CampaignUpdate,
     ClaimStatus,
     EvidenceFact,
+    FeedbackInput,
+    FeedbackRecord,
     ICP,
     ProductProfile,
     ProductProfileInput,
+    QAEvaluationInput,
+    QAEvaluationRecord,
     ResearchEvidence,
     ResearchRun,
     SourceChunk,
@@ -74,7 +82,9 @@ async def get_live_principal(
             session, user_id, x_workspace_id
         )
     except KeyError as exc:
-        raise HTTPException(status_code=403, detail="Workspace membership required") from exc
+        raise HTTPException(
+            status_code=403, detail="Workspace membership required"
+        ) from exc
     if membership is None:
         raise HTTPException(
             status_code=404,
@@ -126,7 +136,9 @@ async def bootstrap(principal: Current, session: Database) -> dict[str, object]:
             repository.product_domain(product_row) if product_row is not None else None
         ),
         "research_run": (
-            await repository.run_domain(session, run_row) if run_row is not None else None
+            await repository.run_domain(session, run_row)
+            if run_row is not None
+            else None
         ),
         "icps": await repository.list_icps(session, principal.workspace_id),
         "accounts": await repository.list_accounts(session, principal.workspace_id),
@@ -251,8 +263,7 @@ async def get_research_evidence(
                 select(SourceDocumentRow)
                 .where(
                     SourceDocumentRow.research_run_id == row.id,
-                    SourceDocumentRow.workspace_id
-                    == uuid.UUID(principal.workspace_id),
+                    SourceDocumentRow.workspace_id == uuid.UUID(principal.workspace_id),
                 )
                 .order_by(SourceDocumentRow.created_at)
             )
@@ -373,9 +384,7 @@ async def list_icps(principal: Current, session: Database) -> list[ICP]:
 
 
 @router.post("/icps/{icp_id}/select", response_model=ICP, status_code=202)
-async def select_icp(
-    icp_id: str, principal: Current, session: Database
-) -> ICP:
+async def select_icp(icp_id: str, principal: Current, session: Database) -> ICP:
     try:
         selected = await repository.select_icp(
             session, principal.workspace_id, principal.user_id, icp_id
@@ -401,9 +410,7 @@ async def select_icp(
 
 
 @router.post("/accounts/refresh", status_code=202)
-async def refresh_accounts(
-    principal: Current, session: Database
-) -> dict[str, str]:
+async def refresh_accounts(principal: Current, session: Database) -> dict[str, str]:
     icp = await session.scalar(
         select(ICPProfileRow)
         .where(
@@ -450,7 +457,9 @@ async def research_account(
             )
         )
     except RedisError as exc:
-        raise HTTPException(status_code=503, detail="Research queue is unavailable") from exc
+        raise HTTPException(
+            status_code=503, detail="Research queue is unavailable"
+        ) from exc
     return {"status": "queued", "job": "research_account"}
 
 
@@ -471,7 +480,9 @@ async def regenerate_brief(
             )
         )
     except RedisError as exc:
-        raise HTTPException(status_code=503, detail="Research queue is unavailable") from exc
+        raise HTTPException(
+            status_code=503, detail="Research queue is unavailable"
+        ) from exc
     return {"status": "queued", "job": "regenerate_brief"}
 
 
@@ -527,7 +538,9 @@ async def update_campaign(
     if campaign is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
     if payload.action == "edit":
-        campaign.subject = payload.subject if payload.subject is not None else campaign.subject
+        campaign.subject = (
+            payload.subject if payload.subject is not None else campaign.subject
+        )
         campaign.body = payload.body if payload.body is not None else campaign.body
         event = "campaign_draft_edited"
     elif payload.action == "approve":
@@ -577,8 +590,7 @@ async def export_accounts(principal: Current, session: Database) -> Response:
     campaigns = (
         await session.scalars(
             select(CampaignDraftRow).where(
-                CampaignDraftRow.workspace_id
-                == uuid.UUID(principal.workspace_id),
+                CampaignDraftRow.workspace_id == uuid.UUID(principal.workspace_id),
                 CampaignDraftRow.status == "approved",
             )
         )
@@ -636,3 +648,56 @@ async def export_accounts(principal: Current, session: Database) -> Response:
 @router.get("/audit", response_model=list[AuditEvent])
 async def audit(principal: Current, session: Database) -> list[AuditEvent]:
     return await repository.audit(session, principal.workspace_id)
+
+
+@router.post("/feedback", response_model=FeedbackRecord, status_code=201)
+async def create_feedback(
+    payload: FeedbackInput, principal: Current, session: Database
+) -> FeedbackRecord:
+    model_by_target = {
+        "account": AccountRow,
+        "signal": IntentSignalRow,
+        "finding": GTMFindingRow,
+        "brief": OpportunityBriefRow,
+    }
+    try:
+        target_uuid = uuid.UUID(payload.target_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404, detail="Feedback target not found"
+        ) from exc
+    target = await session.get(model_by_target[payload.target_type], target_uuid)
+    if target is None or str(target.workspace_id) != principal.workspace_id:
+        raise HTTPException(status_code=404, detail="Feedback target not found")
+    return await repository.create_feedback(
+        session,
+        principal.workspace_id,
+        principal.user_id,
+        payload,
+    )
+
+
+@router.post("/qa-evaluations", response_model=QAEvaluationRecord, status_code=201)
+async def create_qa_evaluation(
+    payload: QAEvaluationInput, principal: Current, session: Database
+) -> QAEvaluationRecord:
+    try:
+        account_id = uuid.UUID(payload.account_id)
+        run_id = uuid.UUID(payload.research_run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="QA target not found") from exc
+    account = await session.get(AccountRow, account_id)
+    run = await session.get(ResearchRunRow, run_id)
+    if (
+        account is None
+        or run is None
+        or str(account.workspace_id) != principal.workspace_id
+        or str(run.workspace_id) != principal.workspace_id
+    ):
+        raise HTTPException(status_code=404, detail="QA target not found")
+    return await repository.create_qa_evaluation(
+        session,
+        principal.workspace_id,
+        principal.user_id,
+        payload,
+    )

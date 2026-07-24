@@ -1,4 +1,4 @@
-import type { Bootstrap, Brief, Campaign, ICP, Product, ResearchRun, Workspace } from "./types";
+import type { Bootstrap, Brief, Campaign, Feedback, FeedbackRating, ICP, Product, ResearchRun, Workspace } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 
@@ -29,4 +29,6 @@ export const api = {
   selectICP: (icpId: string) =>
     request<ICP>(`/icps/${icpId}/select`, { method: "POST" }),
   campaign: (campaignId: string, payload: { action: "approve" | "reject" | "edit"; subject?: string; body?: string }) => request<Campaign>(`/campaigns/${campaignId}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  feedback: (payload: { target_type: "account" | "signal" | "finding" | "brief"; target_id: string; rating: FeedbackRating; reason?: string; notes?: string }) =>
+    request<Feedback>("/feedback", { method: "POST", body: JSON.stringify(payload) }),
 };

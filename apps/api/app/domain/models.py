@@ -18,6 +18,34 @@ class ClaimStatus(StrEnum):
     CONTRADICTED = "contradicted"
 
 
+class ProvenanceStatus(StrEnum):
+    USER_CONFIRMED = "USER_CONFIRMED"
+    SOURCE_SUPPORTED = "SOURCE_SUPPORTED"
+    INFERRED = "INFERRED"
+    UNKNOWN = "UNKNOWN"
+
+
+class QualificationStatus(StrEnum):
+    QUALIFIED = "QUALIFIED"
+    BORDERLINE = "BORDERLINE"
+    DISQUALIFIED = "DISQUALIFIED"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+class CompanySizeStatus(StrEnum):
+    VERIFIED = "VERIFIED"
+    ESTIMATED = "ESTIMATED"
+    UNKNOWN = "UNKNOWN"
+
+
+class ProfileClaim(BaseModel):
+    field: str
+    value: str | None
+    status: ProvenanceStatus
+    evidence_ids: list[str] = Field(default_factory=list)
+    rationale: str | None = None
+
+
 class Workspace(BaseModel):
     id: str
     name: str
@@ -35,6 +63,7 @@ class ProductProfile(ProductProfileInput):
     id: str
     workspace_id: str
     status: Literal["draft", "confirmed"] = "confirmed"
+    understanding: list[ProfileClaim] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=utc_now)
 
 
@@ -138,6 +167,8 @@ class ICP(BaseModel):
     rationale: str
     evidence_ids: list[str]
     selected: bool = False
+    recommended: bool = False
+    qualification_logic: list[str] = Field(default_factory=list)
 
 
 class Signal(BaseModel):
@@ -182,6 +213,16 @@ class Account(BaseModel):
     top_signal: str
     recommended_action: str
     last_researched_at: datetime
+    qualification_status: QualificationStatus = (
+        QualificationStatus.INSUFFICIENT_EVIDENCE
+    )
+    qualification_reasons: list[str] = Field(default_factory=list)
+    company_size_status: CompanySizeStatus = CompanySizeStatus.UNKNOWN
+    discovery_source: str | None = None
+    domain_validation: str = "UNKNOWN"
+    evidence_ids: list[str] = Field(default_factory=list)
+    source_ids: list[str] = Field(default_factory=list)
+    top_signal_type: str | None = None
 
 
 class EvidenceClaim(BaseModel):
@@ -236,3 +277,49 @@ class CampaignUpdate(BaseModel):
     action: Literal["approve", "reject", "edit"]
     subject: str | None = Field(default=None, max_length=200)
     body: str | None = Field(default=None, max_length=5000)
+
+
+class FeedbackInput(BaseModel):
+    target_type: Literal["account", "signal", "finding", "brief"]
+    target_id: str = Field(min_length=1, max_length=128)
+    rating: Literal[
+        "GOOD_ACCOUNT",
+        "BAD_ACCOUNT",
+        "USEFUL_SIGNAL",
+        "IRRELEVANT_SIGNAL",
+        "CORRECT",
+        "INCORRECT",
+        "USEFUL",
+        "NOT_USEFUL",
+        "NEEDS_REVIEW",
+    ]
+    reason: str | None = Field(default=None, max_length=500)
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+class FeedbackRecord(FeedbackInput):
+    id: str
+    workspace_id: str
+    actor_id: str
+    created_at: datetime = Field(default_factory=utc_now)
+
+
+class QAEvaluationInput(BaseModel):
+    research_run_id: str
+    account_id: str
+    company_validity: Literal["REAL", "WRONG_ENTITY", "UNCERTAIN"]
+    domain_correctness: Literal["CORRECT", "INCORRECT", "UNCERTAIN"]
+    icp_relevance: int = Field(ge=0, le=3)
+    evidence_correctness: Literal["SUPPORTED", "PARTIAL", "UNSUPPORTED"]
+    signal_relevance: int = Field(ge=0, le=3)
+    brief_usefulness: int = Field(ge=0, le=3)
+    evidence_links_working: bool
+    unsupported_important_claim: bool = False
+    notes: str | None = Field(default=None, max_length=2000)
+
+
+class QAEvaluationRecord(QAEvaluationInput):
+    id: str
+    workspace_id: str
+    evaluator_id: str
+    created_at: datetime = Field(default_factory=utc_now)

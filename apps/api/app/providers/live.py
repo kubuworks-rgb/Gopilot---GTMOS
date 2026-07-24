@@ -104,12 +104,16 @@ class LiveResearchProvider:
         research_run_id: str,
         query: str,
         limit: int = 5,
+        freshness_days: int | None = 365,
+        purpose: str = "market_research",
     ) -> SearchResponse:
         request = SearchRequest(
             workspace_id=workspace_id,
             research_run_id=research_run_id,
             query=query,
             limit=limit,
+            freshness_days=freshness_days,
+            purpose=purpose,
         )
         result = SearchResponse.model_validate(
             await self._post("/internal/v1/search", request.model_dump(mode="json"))

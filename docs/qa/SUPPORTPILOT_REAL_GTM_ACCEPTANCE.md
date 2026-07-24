@@ -1,6 +1,6 @@
 # SupportPilot Real GTM Intelligence QA
 
-Date: 2026-07-23  
+Date: 2026-07-23
 Test product: `SupportPilot AI` — test profile, not a claim that a real company exists.
 
 ## Acceptance runs

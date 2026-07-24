@@ -27,6 +27,7 @@ class ProvenanceStatus(StrEnum):
 
 class QualificationStatus(StrEnum):
     QUALIFIED = "QUALIFIED"
+    QUALIFIED_WITH_UNCERTAINTY = "QUALIFIED_WITH_UNCERTAINTY"
     BORDERLINE = "BORDERLINE"
     DISQUALIFIED = "DISQUALIFIED"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
@@ -169,6 +170,8 @@ class ICP(BaseModel):
     selected: bool = False
     recommended: bool = False
     qualification_logic: list[str] = Field(default_factory=list)
+    criteria_version: str = "legacy"
+    criteria: list[dict[str, str]] = Field(default_factory=list)
 
 
 class Signal(BaseModel):
@@ -178,6 +181,10 @@ class Signal(BaseModel):
     observed_at: datetime
     strength: float = Field(ge=0, le=1)
     evidence_ids: list[str]
+    entity_match_score: float = Field(default=0, ge=0, le=1)
+    event_confidence: float = Field(default=0, ge=0, le=1)
+    relevance: float = Field(default=0, ge=0, le=1)
+    source_role: str = "OTHER"
 
 
 class ScoreComponent(BaseModel):
@@ -223,6 +230,12 @@ class Account(BaseModel):
     evidence_ids: list[str] = Field(default_factory=list)
     source_ids: list[str] = Field(default_factory=list)
     top_signal_type: str | None = None
+    registrable_domain: str | None = None
+    official_subdomains: list[str] = Field(default_factory=list)
+    domain_confidence: float = Field(default=0, ge=0, le=1)
+    qualification_coverage: float = Field(default=0, ge=0, le=1)
+    priority_band: Literal["HIGH", "MEDIUM", "LOW", "MONITOR"] = "MONITOR"
+    research_candidate: bool = True
 
 
 class EvidenceClaim(BaseModel):
@@ -255,6 +268,9 @@ class AccountOpportunityBrief(BaseModel):
     sources: list[SourceDocument]
     signals: list[Signal]
     campaign: CampaignDraft
+    verified_facts: list[EvidenceClaim] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)
+    research_candidate: bool = True
     generated_at: datetime = Field(default_factory=utc_now)
 
 
@@ -295,6 +311,19 @@ class FeedbackInput(BaseModel):
     ]
     reason: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
+
+    @model_validator(mode="after")
+    def reason_required_for_negative_feedback(self) -> "FeedbackInput":
+        negative = {
+            "BAD_ACCOUNT",
+            "IRRELEVANT_SIGNAL",
+            "INCORRECT",
+            "NOT_USEFUL",
+            "NEEDS_REVIEW",
+        }
+        if self.rating in negative and not (self.reason or "").strip():
+            raise ValueError("Negative feedback requires a reason")
+        return self
 
 
 class FeedbackRecord(FeedbackInput):

@@ -26,6 +26,13 @@ class Settings:
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY") or None
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
     github_token: str | None = os.getenv("GITHUB_TOKEN") or None
+    firmographic_provider: str = os.getenv(
+        "FIRMOGRAPHIC_PROVIDER", "public_evidence"
+    )
+    firmographic_api_key: str | None = os.getenv("FIRMOGRAPHIC_API_KEY") or None
+    candidate_prequalification_floor: int = int(
+        os.getenv("CANDIDATE_PREQUALIFICATION_FLOOR", "45")
+    )
     max_research_searches: int = int(os.getenv("MAX_RESEARCH_SEARCHES", "60"))
     max_research_documents: int = int(os.getenv("MAX_RESEARCH_DOCUMENTS", "100"))
     max_account_candidates: int = int(os.getenv("MAX_ACCOUNT_CANDIDATES", "40"))
@@ -63,6 +70,7 @@ class Settings:
             ("MAX_ACCOUNT_CANDIDATES", self.max_account_candidates),
             ("MAX_ACCOUNTS_RESEARCHED", self.max_accounts_researched),
             ("MAX_RESEARCH_ELAPSED_SECONDS", self.max_elapsed_seconds),
+            ("CANDIDATE_PREQUALIFICATION_FLOOR", self.candidate_prequalification_floor),
         ):
             if value <= 0:
                 raise RuntimeError(f"{name} must be positive")

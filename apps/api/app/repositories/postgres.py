@@ -65,6 +65,16 @@ def _string_list(value: object) -> list[str]:
     return [str(item) for item in value] if isinstance(value, list) else []
 
 
+def _criteria_list(value: object) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    return [
+        {str(key): str(item_value) for key, item_value in item.items()}
+        for item in value
+        if isinstance(item, dict)
+    ]
+
+
 def _product_understanding(
     company_name: str, website: str, product: str, target_market: str
 ) -> list[dict[str, object]]:
@@ -524,6 +534,26 @@ class PostgresRepository:
                 if row.attributes.get("top_signal_type")
                 else None
             ),
+            registrable_domain=(
+                str(row.attributes["registrable_domain"])
+                if row.attributes.get("registrable_domain")
+                else row.domain
+            ),
+            official_subdomains=_string_list(
+                row.attributes.get("official_subdomains")
+            ),
+            domain_confidence=float(
+                str(row.attributes.get("domain_confidence") or 0)
+            ),
+            qualification_coverage=float(
+                str(row.attributes.get("qualification_coverage") or 0)
+            ),
+            priority_band=str(
+                row.attributes.get("priority_band") or "MONITOR"
+            ),  # type: ignore[arg-type]
+            research_candidate=bool(
+                row.attributes.get("research_candidate", True)
+            ),
         )
 
     async def brief(
@@ -760,6 +790,8 @@ class PostgresRepository:
             selected=row.selected_at is not None,
             recommended=bool(definition.get("recommended")),
             qualification_logic=_string_list(definition.get("qualification_logic")),
+            criteria_version=str(definition.get("criteria_version") or "legacy"),
+            criteria=_criteria_list(definition.get("criteria")),
         )
 
     @staticmethod

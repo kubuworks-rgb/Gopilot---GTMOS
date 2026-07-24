@@ -97,6 +97,31 @@ class ResearchTaskRow(TenantRecord):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ResearchCandidateRow(TenantRecord):
+    __tablename__ = "research_candidates"
+    research_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="CASCADE"), index=True
+    )
+    discovered_url: Mapped[str] = mapped_column(Text)
+    hostname: Mapped[str] = mapped_column(String(255))
+    registrable_domain: Mapped[str] = mapped_column(String(255), index=True)
+    canonical_company_domain: Mapped[str | None] = mapped_column(String(255))
+    page_role: Mapped[str] = mapped_column(String(48))
+    candidate_score: Mapped[int] = mapped_column(Integer)
+    stage: Mapped[str] = mapped_column(String(32), index=True)
+    query_provenance: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    provider_provenance: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    diagnostics: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    __table_args__ = (
+        Index(
+            "uq_candidate_run_domain",
+            "research_run_id",
+            "registrable_domain",
+            unique=True,
+        ),
+    )
+
+
 class SourceDocumentRow(TenantRecord):
     __tablename__ = "source_documents"
     research_run_id: Mapped[uuid.UUID] = mapped_column(

@@ -24,6 +24,11 @@ from services.research_gateway.app.schemas import (
     SearchRequest,
     SearchResult,
 )
+from services.research_gateway.app.providers.general_search import (
+    CallableSearchProvider,
+    CompositeGeneralSearchProvider,
+    TavilySearchProvider,
+)
 from services.research_gateway.app.security.url_policy import (
     UnsafeUrlError,
     validate_public_url,
@@ -45,11 +50,25 @@ class SearchAdapter:
         self._last_exa_request = 0.0
         self._gdelt_lock = asyncio.Lock()
         self._last_gdelt_request = 0.0
+        secondary = (
+            TavilySearchProvider()
+            if settings.secondary_search_provider == "tavily"
+            else None
+        )
+        self._general_search = CompositeGeneralSearchProvider(
+            CallableSearchProvider(
+                name="exa",
+                configured=bool(settings.exa_api_key),
+                callback=self._search_exa_routed,
+            ),
+            secondary,
+            settings.minimum_general_search_results,
+        )
 
     @property
     def backend(self) -> str:
         if settings.search_backend == "exa_mcp":
-            return "exa-mcp"
+            return "exa-mcp+tavily-api"
         return "gdelt-doc-2" if settings.search_backend == "gdelt_doc" else "bing-rss"
 
     async def health(self) -> AdapterHealth:
@@ -60,12 +79,25 @@ class SearchAdapter:
                 backend=settings.search_backend,
                 detail="Configured search backend is not implemented",
             )
+        authenticated = bool(settings.exa_api_key)
+        secondary_authenticated = bool(settings.tavily_api_key)
+        production_ready = authenticated and secondary_authenticated
         return AdapterHealth(
             adapter=self.name,
-            status="available",
+            status=(
+                "available"
+                if production_ready or not settings.production_acceptance
+                else "degraded"
+            ),
             backend=self.backend,
             detail=(
-                "Exa remote MCP general-web transport configured"
+                (
+                    "Authenticated Exa primary and Tavily secondary configured"
+                    if production_ready
+                    else "CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE: "
+                    f"exa_authenticated={authenticated}, "
+                    f"tavily_authenticated={secondary_authenticated}"
+                )
                 if settings.search_backend == "exa_mcp"
                 else f"Public {self.backend} search transport configured"
             ),
@@ -85,7 +117,7 @@ class SearchAdapter:
                     raise
                 return await self._search_exa_routed(request)
         if settings.search_backend == "exa_mcp":
-            return await self._search_exa_routed(request)
+            return await self._general_search.search(request)
         if settings.search_backend == "gdelt_doc":
             return await self._search_gdelt(request)
         if settings.search_backend != "bing_rss":
@@ -261,6 +293,7 @@ class SearchAdapter:
                     published_at=_exa_datetime(block.get("published")),
                     retrieved_at=now,
                     backend=self.backend,
+                    provider="exa",
                 )
             )
             if len(results) >= request.limit:
@@ -356,6 +389,7 @@ class SearchAdapter:
                     snippet=snippet,
                     retrieved_at=now,
                     backend=self.backend,
+                    provider="bing",
                 )
             )
             if len(results) >= request.limit:
@@ -454,6 +488,7 @@ class SearchAdapter:
                     published_at=_gdelt_datetime(article.get("seendate")),
                     retrieved_at=now,
                     backend=self.backend,
+                    provider="gdelt",
                 )
             )
             if len(results) >= request.limit:

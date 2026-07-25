@@ -32,6 +32,9 @@ from services.research_gateway.app.providers.general_search import (
     authenticated_provider_order,
     production_acceptance_ready,
 )
+from services.research_gateway.app.providers.exa_diagnostics import (
+    diagnostic_from_response,
+)
 from services.research_gateway.app.security.url_policy import (
     UnsafeUrlError,
     validate_public_url,
@@ -156,7 +159,11 @@ class SearchAdapter:
                 except GatewayAdapterError as exc:
                     self._last_exa_request = monotonic()
                     if attempt or (
-                        exc.code != "SEARCH_PROVIDER_INVALID_RESPONSE"
+                        exc.code
+                        not in {
+                            "SEARCH_PROVIDER_INVALID_RESPONSE",
+                            "EXA_RESPONSE_INVALID",
+                        }
                         and not exc.retryable
                     ):
                         raise
@@ -643,13 +650,13 @@ def _mcp_json(response: httpx.Response) -> dict[str, object]:
             value = response.json()
         except ValueError as exc:
             raise GatewayAdapterError(
-                "SEARCH_PROVIDER_INVALID_RESPONSE",
+                "EXA_RESPONSE_INVALID",
                 "Exa MCP returned invalid JSON",
             ) from exc
         if isinstance(value, dict):
             return value
         raise GatewayAdapterError(
-            "SEARCH_PROVIDER_INVALID_RESPONSE",
+            "EXA_RESPONSE_INVALID",
             "Exa MCP returned an invalid payload",
         )
     for line in response.text.splitlines():
@@ -662,7 +669,7 @@ def _mcp_json(response: httpx.Response) -> dict[str, object]:
         if isinstance(value, dict):
             return value
     raise GatewayAdapterError(
-        "SEARCH_PROVIDER_INVALID_RESPONSE",
+        "EXA_RESPONSE_INVALID",
         "Exa MCP returned no message event",
     )
 
@@ -671,44 +678,49 @@ def _mcp_result(response: httpx.Response, *, expected_id: int) -> dict[str, obje
     payload = _mcp_json(response)
     if payload.get("id") != expected_id:
         raise GatewayAdapterError(
-            "SEARCH_PROVIDER_INVALID_RESPONSE",
+            "EXA_MCP_TRANSPORT_FAILURE",
             "Exa MCP response identifier did not match",
         )
     error = payload.get("error")
     if isinstance(error, dict):
         code = error.get("code")
-        message = normalize_whitespace(str(error.get("message") or "MCP call failed"))
         raise GatewayAdapterError(
-            "RATE_LIMITED" if code == -32001 else "SEARCH_PROVIDER_UNAVAILABLE",
-            f"Exa MCP error: {message[:300]}",
+            "EXA_RATE_LIMITED" if code == -32001 else "EXA_MCP_TRANSPORT_FAILURE",
+            (
+                "Exa MCP rate limit reached"
+                if code == -32001
+                else "Exa MCP protocol error"
+            ),
             retryable=code in {-32001, -32603},
         )
     result = payload.get("result")
     if not isinstance(result, dict):
         raise GatewayAdapterError(
-            "SEARCH_PROVIDER_INVALID_RESPONSE",
+            "EXA_MCP_TRANSPORT_FAILURE",
             "Exa MCP returned no result object",
         )
     if result.get("isError") is True:
-        content = result.get("content")
-        message = "Exa MCP search failed"
-        if isinstance(content, list) and content and isinstance(content[0], dict):
-            message = normalize_whitespace(str(content[0].get("text") or message))[:300]
         raise GatewayAdapterError(
-            "SEARCH_PROVIDER_UNAVAILABLE", message, retryable=True
+            "EXA_MCP_TRANSPORT_FAILURE",
+            "Exa MCP search tool reported a failure",
+            retryable=True,
         )
     return result
 
 
 def _exa_http_error(response: httpx.Response) -> GatewayAdapterError:
-    if response.status_code == 429:
-        return GatewayAdapterError(
-            "RATE_LIMITED", "Exa search rate limit reached", retryable=True
-        )
+    diagnostic = diagnostic_from_response(
+        response,
+        transport="mcp",
+        endpoint_class="exa_mcp",
+        latency_ms=0,
+        success_category="EXA_MCP_AUTHENTICATED_PASS",
+    )
+    category = diagnostic.error_category
     return GatewayAdapterError(
-        "SEARCH_PROVIDER_UNAVAILABLE",
-        f"Exa MCP returned HTTP {response.status_code}",
-        retryable=response.status_code >= 500,
+        category,
+        f"Exa MCP request failed ({category})",
+        retryable=category in {"EXA_RATE_LIMITED", "EXA_PROVIDER_SERVER_ERROR"},
     )
 
 

@@ -29,6 +29,28 @@ from services.research_gateway.app.security.url_policy import (
 SearchPayload = tuple[list[SearchResult], SearchDiagnostics]
 
 
+def production_acceptance_ready(
+    *,
+    exa_authenticated: bool,
+    tavily_authenticated: bool,
+    psl_dependency_installed: bool,
+) -> bool:
+    return psl_dependency_installed and (
+        exa_authenticated or tavily_authenticated
+    )
+
+
+def authenticated_provider_order(
+    *, exa_authenticated: bool, tavily_authenticated: bool
+) -> tuple[str, ...]:
+    providers: list[str] = []
+    if exa_authenticated:
+        providers.append("exa")
+    if tavily_authenticated:
+        providers.append("tavily")
+    return tuple(providers)
+
+
 class GeneralSearchProvider(Protocol):
     name: str
 
@@ -225,7 +247,7 @@ class CompositeGeneralSearchProvider:
 
     @property
     def authenticated(self) -> bool:
-        return self.primary.authenticated and bool(
+        return self.primary.authenticated or bool(
             self.secondary and self.secondary.authenticated
         )
 
@@ -275,10 +297,10 @@ class CompositeGeneralSearchProvider:
                     error_code="CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE",
                 )
             )
-            if settings.production_acceptance:
+            if settings.production_acceptance and not self.primary.authenticated:
                 raise GatewayAdapterError(
                     "CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE",
-                    "A keyed secondary general-web provider is required for production acceptance",
+                    "At least one authenticated general-web provider is required for production acceptance",
                 )
             if primary_diagnostics is not None:
                 primary_diagnostics.provider_attempts = attempts

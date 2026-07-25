@@ -16,8 +16,10 @@ $providerState = [ordered]@{
 }
 
 if (
-    -not $providerState.exa_authenticated -or
-    -not $providerState.tavily_authenticated -or
+    (
+        -not $providerState.exa_authenticated -and
+        -not $providerState.tavily_authenticated
+    ) -or
     -not $providerState.psl_dependency_installed
 ) {
     $result = [ordered]@{
@@ -26,8 +28,8 @@ if (
         providers = $providerState
         live_run_started = $false
         message = (
-            "SupportPilot V2 requires authenticated Exa, authenticated Tavily, " +
-            "and the pinned PSL dependency. No degraded acceptance is allowed."
+            "SupportPilot V2 requires the pinned PSL dependency and at least " +
+            "one authenticated general-web provider. No anonymous acceptance is allowed."
         )
         checked_at = [DateTimeOffset]::UtcNow.ToString("o")
     }

@@ -35,10 +35,10 @@ personal enrichment, CRM, billing, or production auth.
 
 | Root cause | Implementation | Test | Live result | Risk / next step |
 | --- | --- | --- | --- | --- |
-| Anonymous search exhaustion | Authenticated Exa plus keyed Tavily fallback and fail-closed acceptance | Fallback and auth-gate tests pass | Config blocked | Configure both keys; run repeats |
+| Anonymous search exhaustion | Authenticated Exa primary, optional keyed Tavily fallback, and fail-closed OR gate | Four provider-state regressions pass | Config blocked | Expose one key to the process; run repeats |
 | Weak candidate precision | Broad collection, result roles, agreement score, persisted prequalification | Candidate scoring tests pass | Config blocked | Run first-30 comparison |
 | Ambiguous ICP semantics | Versioned HARD/SOFT/INFORMATIONAL criteria and three-valued state | Unknown tests pass | Controlled pass | Measure live coverage |
-| Canonical subdomain errors | PSL-aware registrable domains and separate discovered/canonical identity | HROne plus 20-domain matrix passes | 20/20 controlled | Install pinned PSL package in CI |
+| Canonical subdomain errors | PSL-aware registrable domains and separate discovered/canonical identity | HROne plus 20-domain matrix passes | 20/20 controlled | Pinned PSL installed and verified |
 | Weak firmographics | Provider abstraction and conservative company-level public fallback | Unknown/exact/range tests pass | Controlled pass | Select licensed provider if needed |
 | Weak source compatibility | Source roles, quality components, claim/source policy | Vendor-market regression passes | Controlled pass | QA holdout claims |
 | Generic signals | Event queries, entity/date/relevance gates, no-signal outcome | Wrong-entity/no-signal tests pass | Positive live control blocked | Run known-positive control |
@@ -59,14 +59,16 @@ personal enrichment, CRM, billing, or production auth.
 
 - Fresh SupportPilot V2 workspace and search run.
 - No manually seeded final accounts.
-- Authenticated Exa primary plus keyed Tavily secondary.
+- At least one authenticated provider; Exa is primary when configured and
+  Tavily is an optional fallback.
 - Separate known-positive signal control.
 - Manual top-10 QA without changing target thresholds.
 
 Current holdout state: `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE`.
-Authenticated Exa passed the 2026-07-25 credential-presence preflight; the
-keyed Tavily fallback and pinned PSL dependency remain absent. The preflight
-correctly did not start a live run.
+`tldextract==5.3.0` is installed and all provider OR-gate regressions pass, but
+the rotated Exa credential is not visible to the current acceptance process.
+Tavily is optional and not configured. The preflight correctly did not start an
+anonymous live run.
 
 ## Release rule
 

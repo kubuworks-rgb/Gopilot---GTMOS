@@ -7,17 +7,18 @@ Last updated: 2026-07-25
 `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE`
 
 This is not an A, B, C, or D quality classification. The clean holdout did not
-start because authenticated production providers and the pinned PSL dependency
-are not configured in this environment. Per the Phase 4 policy, no anonymous
-or degraded result is accepted as production evidence, no quality pass is
-claimed, and no merge is allowed.
+start because no authenticated provider credential is visible to the current
+acceptance process. The pinned PSL dependency is installed. Per the Phase 4
+policy, no anonymous result is accepted as production evidence, no quality
+pass is claimed, and no merge is allowed.
 
 ## Search Providers
 
 Primary: Exa remote MCP behind `GeneralSearchProvider`.
 
-Auth mode: keyed `x-api-key`; credential presence passed the 2026-07-25
-preflight. The value was neither logged nor persisted by the acceptance run.
+Auth mode: keyed `x-api-key`. The rotated credential is not visible to the
+current Codex process, user environment, machine environment, or an untracked
+workspace environment file. No value was read into output or persisted.
 
 Secondary: Tavily Search API.
 
@@ -26,8 +27,9 @@ Auth mode: keyed Bearer token; `TAVILY_API_KEY` is not configured.
 Fallback behavior: the composite provider falls back after a primary error or
 an insufficient result count. Typed diagnostics expose
 `completed_with_provider_fallback`, provider attempts, authentication state,
-result count, latency, and fallback use. Production acceptance fails closed if
-either keyed route is absent.
+result count, latency, and fallback use. Production acceptance requires
+`tldextract==5.3.0` and at least one keyed provider. Exa is primary when
+configured; Tavily is optional and used as fallback when configured.
 
 Reliability: controlled primary-exhaustion/secondary-success regression passes.
 Repeated authenticated public-web reliability testing is config-blocked.
@@ -87,10 +89,8 @@ Accuracy: controlled matrix 20/20 (100%).
 
 Errors: no controlled failures. `go.hrone.cloud` resolves to canonical
 `hrone.cloud`; directory and news hosts cannot become canonical company
-domains. The pinned `tldextract` dependency could not be installed because
-third-party package installation approval was denied. A bounded degraded
-resolver supports local gates; installed environments use the packaged PSL
-snapshot without runtime network access.
+domains. `tldextract==5.3.0` is installed in `C:\Python313\python.exe`; the
+resolver uses its packaged PSL snapshot without runtime network access.
 
 ## Signal Evaluation
 
@@ -166,18 +166,18 @@ NO:
 
 ## Tests
 
-- Python/API/gateway: 63 passed, 2 skipped in the ordinary suite.
+- Python/API/gateway: 72 passed, 2 skipped in the ordinary suite.
 - PostgreSQL/Redis integration after migration: 2 passed.
-- Intelligence-quality plus gateway contract regression: 40 passed.
-- Domain matrix: 20/20.
+- Intelligence-quality regression: 39 passed.
+- Domain matrix: 20/20, plus the HROne subdomain case.
 - Web: 2 passed.
 - Alembic: `0006_intelligence_quality (head)`.
 - Ruff and Mypy: passed.
 - ESLint, TypeScript, Next.js build: see final engineering-gate run.
 - `git diff --check`: passed.
-- SupportPilot V2 preflight: authenticated Exa was detected, then correctly
-  returned `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE` for missing Tavily and
-  PSL configuration; no live run started.
+- SupportPilot V2 preflight: PSL dependency detected, then correctly returned
+  `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE` because neither provider
+  credential is visible to this process; no live run started.
 
 ## Git
 
@@ -197,17 +197,15 @@ deployment.
 
 ## Known Limitations
 
-- Authenticated Exa passed credential-presence preflight.
-- `TAVILY_API_KEY` is absent from the acceptance process.
-- The pinned PSL dependency is not installed.
+- The rotated `EXA_API_KEY` is not visible to the current acceptance process.
+- `TAVILY_API_KEY` is optional and not configured.
 - Authenticated repeat reliability, first-30 precision, known-positive live
   signal recall, clean SupportPilot V2, evidence-link reachability, and manual
   top-10 QA remain blocked.
 - The optional licensed firmographic provider has an interface and config gate
   but no licensed vendor was selected or configured.
-- Local PSL tests used the bounded degraded resolver because package download
-  was not approved; CI/deployed environments must install
-  `tldextract==5.3.0`.
+- `tldextract==5.3.0` is installed and verified in the exact runtime used by
+  the API, gateway, tests, and harness.
 
 ## Final Question
 

@@ -34,6 +34,7 @@ _FALLBACK_MULTILABEL_SUFFIXES = {
     "net.au",
     "org.au",
 }
+_RESERVED_TEST_TLDS = {"example", "test", "invalid", "localhost"}
 
 
 class ResultPageRole(StrEnum):
@@ -94,7 +95,12 @@ def registrable_domain(value: str) -> str | None:
     if _extract is not None:
         extracted = _extract(host)
         registered = extracted.top_domain_under_public_suffix
-        return registered.lower() if registered else None
+        if registered:
+            return registered.lower()
+        labels = host.split(".")
+        if len(labels) >= 2 and labels[-1] in _RESERVED_TEST_TLDS:
+            return ".".join(labels[-2:])
+        return None
     labels = host.split(".")
     if len(labels) < 2:
         return None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import json
 import re
 from datetime import UTC, datetime
@@ -28,6 +29,8 @@ from services.research_gateway.app.providers.general_search import (
     CallableSearchProvider,
     CompositeGeneralSearchProvider,
     TavilySearchProvider,
+    authenticated_provider_order,
+    production_acceptance_ready,
 )
 from services.research_gateway.app.security.url_policy import (
     UnsafeUrlError,
@@ -81,7 +84,16 @@ class SearchAdapter:
             )
         authenticated = bool(settings.exa_api_key)
         secondary_authenticated = bool(settings.tavily_api_key)
-        production_ready = authenticated and secondary_authenticated
+        psl_installed = importlib.util.find_spec("tldextract") is not None
+        production_ready = production_acceptance_ready(
+            exa_authenticated=authenticated,
+            tavily_authenticated=secondary_authenticated,
+            psl_dependency_installed=psl_installed,
+        )
+        provider_order = authenticated_provider_order(
+            exa_authenticated=authenticated,
+            tavily_authenticated=secondary_authenticated,
+        )
         return AdapterHealth(
             adapter=self.name,
             status=(
@@ -92,11 +104,12 @@ class SearchAdapter:
             backend=self.backend,
             detail=(
                 (
-                    "Authenticated Exa primary and Tavily secondary configured"
+                    "Authenticated provider order: " + ", ".join(provider_order)
                     if production_ready
                     else "CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE: "
                     f"exa_authenticated={authenticated}, "
-                    f"tavily_authenticated={secondary_authenticated}"
+                    f"tavily_authenticated={secondary_authenticated}, "
+                    f"psl_dependency_installed={psl_installed}"
                 )
                 if settings.search_backend == "exa_mcp"
                 else f"Public {self.backend} search transport configured"

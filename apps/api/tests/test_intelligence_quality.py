@@ -29,6 +29,8 @@ from services.research_gateway.app.errors import GatewayAdapterError
 from services.research_gateway.app.providers.general_search import (
     CallableSearchProvider,
     CompositeGeneralSearchProvider,
+    authenticated_provider_order,
+    production_acceptance_ready,
 )
 from services.research_gateway.app.schemas import (
     SearchDiagnostics,
@@ -220,9 +222,10 @@ class _ControlledProvider:
         *,
         results: list[SearchResult] | None = None,
         error: GatewayAdapterError | None = None,
+        authenticated: bool = True,
     ) -> None:
         self.name = name
-        self.authenticated = True
+        self.authenticated = authenticated
         self.results = results or []
         self.error = error
 
@@ -306,3 +309,176 @@ async def test_anonymous_exa_is_rejected_for_production_acceptance(
             )
         )
     assert caught.value.code == "CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE"
+
+
+@pytest.mark.parametrize(
+    ("exa", "tavily", "expected_ready", "expected_order"),
+    [
+        (True, False, True, ("exa",)),
+        (False, True, True, ("tavily",)),
+        (False, False, False, ()),
+        (True, True, True, ("exa", "tavily")),
+    ],
+)
+def test_production_acceptance_uses_provider_or_semantics(
+    exa: bool,
+    tavily: bool,
+    expected_ready: bool,
+    expected_order: tuple[str, ...],
+) -> None:
+    assert (
+        production_acceptance_ready(
+            exa_authenticated=exa,
+            tavily_authenticated=tavily,
+            psl_dependency_installed=True,
+        )
+        is expected_ready
+    )
+    assert authenticated_provider_order(
+        exa_authenticated=exa,
+        tavily_authenticated=tavily,
+    ) == expected_order
+
+
+def test_production_acceptance_always_requires_psl_dependency() -> None:
+    assert not production_acceptance_ready(
+        exa_authenticated=True,
+        tavily_authenticated=True,
+        psl_dependency_installed=False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_exa_only_acceptance_uses_authenticated_primary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import services.research_gateway.app.providers.general_search as module
+
+    monkeypatch.setattr(module, "settings", SimpleNamespace(production_acceptance=True))
+    exa_result = SearchResult(
+        url="https://exa-primary.example",
+        canonical_url="https://exa-primary.example",
+        title="Exa primary",
+        snippet="Authenticated result",
+        backend="exa",
+        provider="exa",
+    )
+    composite = CompositeGeneralSearchProvider(
+        _ControlledProvider("exa", results=[exa_result]),
+        None,
+        minimum_results=1,
+    )
+    results, diagnostics = await composite.search(
+        SearchRequest(
+            workspace_id="workspace",
+            research_run_id="run",
+            query="authenticated exa",
+        )
+    )
+    assert results == [exa_result]
+    assert diagnostics.fallback_used is False
+
+
+@pytest.mark.asyncio
+async def test_tavily_only_acceptance_uses_authenticated_secondary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import services.research_gateway.app.providers.general_search as module
+
+    monkeypatch.setattr(module, "settings", SimpleNamespace(production_acceptance=True))
+
+    async def anonymous_exa(
+        request: SearchRequest,
+    ) -> tuple[list[SearchResult], SearchDiagnostics]:
+        raise AssertionError(request)
+
+    tavily_result = SearchResult(
+        url="https://tavily-secondary.example",
+        canonical_url="https://tavily-secondary.example",
+        title="Tavily secondary",
+        snippet="Authenticated result",
+        backend="tavily",
+        provider="tavily",
+    )
+    composite = CompositeGeneralSearchProvider(
+        CallableSearchProvider("exa", False, anonymous_exa),
+        _ControlledProvider("tavily", results=[tavily_result]),
+        minimum_results=1,
+    )
+    results, diagnostics = await composite.search(
+        SearchRequest(
+            workspace_id="workspace",
+            research_run_id="run",
+            query="authenticated tavily",
+        )
+    )
+    assert results == [tavily_result]
+    assert diagnostics.fallback_used is True
+
+
+@pytest.mark.asyncio
+async def test_neither_provider_returns_config_required(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import services.research_gateway.app.providers.general_search as module
+
+    monkeypatch.setattr(module, "settings", SimpleNamespace(production_acceptance=True))
+
+    async def anonymous_exa(
+        request: SearchRequest,
+    ) -> tuple[list[SearchResult], SearchDiagnostics]:
+        raise AssertionError(request)
+
+    composite = CompositeGeneralSearchProvider(
+        CallableSearchProvider("exa", False, anonymous_exa),
+        None,
+        minimum_results=1,
+    )
+    with pytest.raises(GatewayAdapterError) as caught:
+        await composite.search(
+            SearchRequest(
+                workspace_id="workspace",
+                research_run_id="run",
+                query="no authenticated providers",
+            )
+        )
+    assert caught.value.code == "CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE"
+
+
+@pytest.mark.asyncio
+async def test_both_providers_keep_exa_primary_without_unneeded_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import services.research_gateway.app.providers.general_search as module
+
+    monkeypatch.setattr(module, "settings", SimpleNamespace(production_acceptance=True))
+    exa_result = SearchResult(
+        url="https://exa-primary.example",
+        canonical_url="https://exa-primary.example",
+        title="Exa primary",
+        snippet="Authenticated result",
+        backend="exa",
+        provider="exa",
+    )
+    tavily_result = SearchResult(
+        url="https://tavily-fallback.example",
+        canonical_url="https://tavily-fallback.example",
+        title="Tavily fallback",
+        snippet="Should not be called",
+        backend="tavily",
+        provider="tavily",
+    )
+    composite = CompositeGeneralSearchProvider(
+        _ControlledProvider("exa", results=[exa_result]),
+        _ControlledProvider("tavily", results=[tavily_result]),
+        minimum_results=1,
+    )
+    results, diagnostics = await composite.search(
+        SearchRequest(
+            workspace_id="workspace",
+            research_run_id="run",
+            query="both authenticated",
+        )
+    )
+    assert results == [exa_result]
+    assert diagnostics.fallback_used is False

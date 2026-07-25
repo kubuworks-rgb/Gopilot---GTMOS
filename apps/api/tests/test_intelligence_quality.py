@@ -284,6 +284,43 @@ async def test_secondary_keyed_provider_fallback_is_diagnostic() -> None:
 
 
 @pytest.mark.asyncio
+async def test_secondary_provider_fallback_after_typed_exa_failure() -> None:
+    result = SearchResult(
+        url="https://typed-fallback.example",
+        canonical_url="https://typed-fallback.example",
+        title="Typed fallback",
+        snippet="Authenticated secondary result",
+        backend="secondary",
+        provider="secondary",
+    )
+    composite = CompositeGeneralSearchProvider(
+        _ControlledProvider(
+            "exa",
+            error=GatewayAdapterError(
+                "EXA_RATE_LIMITED",
+                "Exa rate limit reached",
+                retryable=True,
+            ),
+        ),
+        _ControlledProvider("tavily", results=[result]),
+        minimum_results=1,
+    )
+
+    results, diagnostics = await composite.search(
+        SearchRequest(
+            workspace_id="workspace",
+            research_run_id="run",
+            query="typed provider fallback",
+            limit=5,
+        )
+    )
+
+    assert results == [result]
+    assert diagnostics.fallback_used is True
+    assert diagnostics.provider_attempts[0].error_code == "EXA_RATE_LIMITED"
+
+
+@pytest.mark.asyncio
 async def test_anonymous_exa_is_rejected_for_production_acceptance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

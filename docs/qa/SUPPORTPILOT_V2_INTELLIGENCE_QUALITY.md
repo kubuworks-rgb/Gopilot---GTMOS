@@ -4,13 +4,41 @@ Last updated: 2026-07-25
 
 ## Classification
 
-`D — FAILURE OR REGRESSION`
+`B — IMPROVED BUT NOT READY`
 
-The credentialed acceptance run started with a process-local Exa credential,
-but the authenticated provider check failed before producing a sanitized
-search result. The clean holdout therefore did not start. No anonymous result
-is accepted as production evidence, no quality pass is claimed, and no merge
-is allowed.
+The sanitized rerun proved both direct Exa REST and the production MCP
+transport with authenticated HTTP 200 responses and three relevant results
+each. The previous D was an observability failure in the temporary helper, not
+a current credential, account, network, payload, or MCP failure. Repeated
+reliability and the clean holdout did not run during the one-time credential
+lifetime, so no quality pass or merge is allowed.
+
+## Exa Diagnostic
+
+| Check | Result |
+| --- | --- |
+| Direct REST | `PASS` |
+| MCP | `PASS` |
+| Production adapter selected | Exa remote MCP |
+| REST HTTP status | `200` |
+| MCP HTTP status | `200` |
+| Error tag | unavailable |
+| REST category | `EXA_REST_AUTHENTICATED_PASS` |
+| MCP category | `EXA_MCP_AUTHENTICATED_PASS` |
+| REST request ID | `b04ee19d2693f2c3f8efa2dc29c03def` |
+| MCP request ID | unavailable |
+
+Direct REST returned three relevant GitHub results in 2823 ms. A separately
+initialized MCP session completed initialization, tool discovery, and
+`web_search_exa` with the same three relevant results in 3514 ms. Since the
+existing gateway boundary and production MCP path are reliable, MCP remains
+the authenticated primary; REST remains the independent control.
+
+Root cause: the previous temporary runner collapsed its failure before
+retaining a safe category. The replacement classifier retains only the
+allowlisted transport, endpoint class, status, safe tag/category, sanitized
+request ID, latency, content type, authentication-attempt flag, and timestamp.
+It never retains request headers or raw provider bodies.
 
 ## Search Providers
 
@@ -34,8 +62,9 @@ result count, latency, and fallback use. Production acceptance requires
 configured; Tavily is optional and used as fallback when configured.
 
 Reliability: controlled primary-exhaustion/secondary-success regression passes.
-The authenticated preflight failed before a verified result, so repeated
-public-web reliability testing did not complete.
+One direct REST request and one complete MCP search passed. Repeated bounded
+production reliability testing did not run before the one-time credential was
+scrubbed.
 
 ## ICP Model
 
@@ -59,14 +88,14 @@ become `QUALIFIED_WITH_UNCERTAINTY`. Criteria are persisted under
 ## Discovery Funnel
 
 ```text
-raw discovered: not run — provider check failed
-prequalified: not run — provider check failed
-enriched: not run — provider check failed
-deep researched: not run — provider check failed
-qualified: not run — provider check failed
-borderline / qualified with uncertainty: not run — provider check failed
-rejected: not run — provider check failed
-top 10: not run — provider check failed
+raw discovered: not run — credential lifetime ended after diagnostics
+prequalified: not run — credential lifetime ended after diagnostics
+enriched: not run — credential lifetime ended after diagnostics
+deep researched: not run — credential lifetime ended after diagnostics
+qualified: not run — credential lifetime ended after diagnostics
+borderline / qualified with uncertainty: not run
+rejected: not run
+top 10: not run
 ```
 
 The implemented funnel performs broad multi-query collection, PSL-aware result
@@ -102,8 +131,8 @@ Persisted signals: unavailable for the live holdout.
 
 Precision: unavailable for the live holdout.
 
-Known-positive recall: live control did not run because the authenticated
-provider check failed.
+Known-positive recall: live control did not run during the one-time credential
+lifetime.
 
 Entity-match errors: zero across controlled HROne/HR One and robotaxi IPO
 regressions.
@@ -116,12 +145,12 @@ evidence, and permit a valid no-signal/monitor outcome.
 
 ## Top 10
 
-No top-10 QA table exists because the clean SupportPilot V2 holdout correctly
-stopped at provider preflight.
+No top-10 QA table exists because the clean SupportPilot V2 holdout did not run
+after the successful transport diagnostics.
 
 | Rank | Company | Domain | ICP | Claims | Signal | Brief | Result |
 | ---: | --- | --- | --- | --- | --- | --- | --- |
-| — | Not run | Not run | Not run | Not run | Not run | Not run | Provider check failed |
+| — | Not run | Not run | Not run | Not run | Not run | Not run | Acceptance incomplete |
 
 ## Previous vs New Metrics
 
@@ -171,19 +200,21 @@ NO:
 
 ## Tests
 
-- Python/API/gateway: 72 passed, 2 skipped in the ordinary suite.
+- Python/API/gateway: 98 passed, 2 skipped in the ordinary suite.
 - PostgreSQL/Redis integration after migration: 2 passed.
-- Intelligence-quality regression: 39 passed.
+- Focused intelligence-quality and Exa diagnostic regression: 65 passed.
 - Domain matrix: 20/20, plus the HROne subdomain case.
 - Web: 2 passed.
+- Research-gateway security: 10 passed.
 - Alembic: `0006_intelligence_quality (head)`.
 - Ruff and Mypy: passed.
 - ESLint, TypeScript, and Next.js production build: passed.
+- Docker Compose: configuration valid; PostgreSQL healthy and Redis running.
 - `git diff --check`: passed.
-- Credentialed acceptance: exact runtime and pinned PSL dependency verified;
-  authenticated Exa provider check failed before a sanitized result, so
-  reliability, precision, positive-signal control, holdout, and top-10 QA did
-  not run.
+- Credentialed diagnostics: direct REST and initialized MCP search both passed
+  with HTTP 200 and three relevant public results. Typed failure and redaction
+  regressions pass. Repeated reliability, precision, positive-signal control,
+  holdout, and top-10 QA did not run during the credential lifetime.
 
 ## Git
 
@@ -197,17 +228,20 @@ Commits:
   and regression suite.
 - `a475062` — allow either authenticated search provider at acceptance.
 - `a726e15` — record the credentialed acceptance preflight.
+- `dd3df22` — stabilize PSL resolution and record the prior acceptance result.
 
 Remote SHAs: no Phase 4 remote SHA; the branch has not been pushed.
+
+Current typed-diagnostic changes remain uncommitted because the final
+classification is not A.
 
 Merge status: **DO NOT MERGE**. No merge to `develop` or `main`, and no public
 deployment.
 
 ## Known Limitations
 
-- P0: the authenticated Exa request failed before a sanitized provider result;
-  the secure helper intentionally retained no raw response, so the provider or
-  transport failure category is not proven.
+- P0: the authenticated transport is proven, but the full quality acceptance
+  was not executed during the one-time process-local credential lifetime.
 - P1: authenticated repeat reliability, first-30 precision, known-positive
   live signal recall, clean SupportPilot V2, funnel counts, and manual top-10
   QA did not execute.
@@ -226,8 +260,7 @@ deployment.
 
 **NO — not yet proven.**
 
-The implementation makes materially better decisions in controlled tests,
-especially for identity, unknowns, provenance, source compatibility, and false
-signals. But the required authenticated holdout and top-10 manual QA did not
-run, so founder value cannot honestly be promoted from an engineering
-improvement to an acceptance result.
+The implementation makes materially better decisions in controlled tests and
+both authenticated Exa transports now have live proof. But the required
+authenticated holdout and top-10 manual QA did not run, so founder value cannot
+honestly be promoted from an engineering improvement to an acceptance result.

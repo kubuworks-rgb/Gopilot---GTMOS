@@ -35,13 +35,13 @@ personal enrichment, CRM, billing, or production auth.
 
 | Root cause | Implementation | Test | Live result | Risk / next step |
 | --- | --- | --- | --- | --- |
-| Anonymous search exhaustion | Authenticated Exa primary, optional keyed Tavily fallback, and fail-closed OR gate | Four provider-state regressions pass | Config blocked | Expose one key to the process; run repeats |
-| Weak candidate precision | Broad collection, result roles, agreement score, persisted prequalification | Candidate scoring tests pass | Config blocked | Run first-30 comparison |
+| Anonymous search exhaustion | Authenticated Exa primary, optional keyed Tavily fallback, and fail-closed OR gate | Four provider-state regressions pass | Credentialed Exa check failed before result | Diagnose provider/transport category without retaining secrets |
+| Weak candidate precision | Broad collection, result roles, agreement score, persisted prequalification | Candidate scoring tests pass | Not run after provider failure | Run first-30 comparison after preflight succeeds |
 | Ambiguous ICP semantics | Versioned HARD/SOFT/INFORMATIONAL criteria and three-valued state | Unknown tests pass | Controlled pass | Measure live coverage |
 | Canonical subdomain errors | PSL-aware registrable domains and separate discovered/canonical identity | HROne plus 20-domain matrix passes | 20/20 controlled | Pinned PSL installed and verified |
 | Weak firmographics | Provider abstraction and conservative company-level public fallback | Unknown/exact/range tests pass | Controlled pass | Select licensed provider if needed |
 | Weak source compatibility | Source roles, quality components, claim/source policy | Vendor-market regression passes | Controlled pass | QA holdout claims |
-| Generic signals | Event queries, entity/date/relevance gates, no-signal outcome | Wrong-entity/no-signal tests pass | Positive live control blocked | Run known-positive control |
+| Generic signals | Event queries, entity/date/relevance gates, no-signal outcome | Wrong-entity/no-signal tests pass | Positive live control not run | Run known-positive control after preflight succeeds |
 | Unknown-heavy scoring | Missing-aware deterministic scoring and priority floors | Score matrix passes | Controlled pass | Compare live ranking |
 | Generic briefs | Verified facts, unknowns, hypotheses, event/relevance split, candidate label | Integration/API tests pass | Controlled pass | Grade top 10 |
 
@@ -64,11 +64,12 @@ personal enrichment, CRM, billing, or production auth.
 - Separate known-positive signal control.
 - Manual top-10 QA without changing target thresholds.
 
-Current holdout state: `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE`.
-`tldextract==5.3.0` is installed and all provider OR-gate regressions pass, but
-the rotated Exa credential is not visible to the current acceptance process.
-Tavily is optional and not configured. The preflight correctly did not start an
-anonymous live run.
+Current holdout state: `D — FAILURE OR REGRESSION`.
+`tldextract==5.3.0` is installed and all provider OR-gate regressions pass. The
+rotated Exa credential was supplied once through a secure process-local prompt,
+but the authenticated provider check failed before producing a sanitized
+result. Tavily is optional and `NOT_CONFIGURED`. The holdout did not start and
+no anonymous result was accepted.
 
 ## Release rule
 

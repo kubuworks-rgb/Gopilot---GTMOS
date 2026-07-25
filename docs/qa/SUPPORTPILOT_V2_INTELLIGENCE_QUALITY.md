@@ -4,21 +4,23 @@ Last updated: 2026-07-25
 
 ## Classification
 
-`CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE`
+`D — FAILURE OR REGRESSION`
 
-This is not an A, B, C, or D quality classification. The clean holdout did not
-start because no authenticated provider credential is visible to the current
-acceptance process. The pinned PSL dependency is installed. Per the Phase 4
-policy, no anonymous result is accepted as production evidence, no quality
-pass is claimed, and no merge is allowed.
+The credentialed acceptance run started with a process-local Exa credential,
+but the authenticated provider check failed before producing a sanitized
+search result. The clean holdout therefore did not start. No anonymous result
+is accepted as production evidence, no quality pass is claimed, and no merge
+is allowed.
 
 ## Search Providers
 
 Primary: Exa remote MCP behind `GeneralSearchProvider`.
 
-Auth mode: keyed `x-api-key`. The rotated credential is not visible to the
-current Codex process, user environment, machine environment, or an untracked
-workspace environment file. No value was read into output or persisted.
+Auth mode: keyed `x-api-key`. The rotated credential was supplied once through
+a secure PowerShell prompt and existed only in the acceptance process. The
+helper removed the process variable, zero-freed its secure-string buffer, and
+deleted itself and its temporary runner. No credential value or raw provider
+response was printed, logged, committed, or persisted.
 
 Secondary: Tavily Search API.
 
@@ -32,7 +34,8 @@ result count, latency, and fallback use. Production acceptance requires
 configured; Tavily is optional and used as fallback when configured.
 
 Reliability: controlled primary-exhaustion/secondary-success regression passes.
-Repeated authenticated public-web reliability testing is config-blocked.
+The authenticated preflight failed before a verified result, so repeated
+public-web reliability testing did not complete.
 
 ## ICP Model
 
@@ -56,14 +59,14 @@ become `QUALIFIED_WITH_UNCERTAINTY`. Criteria are persisted under
 ## Discovery Funnel
 
 ```text
-raw discovered: config-blocked
-prequalified: config-blocked
-enriched: config-blocked
-deep researched: config-blocked
-qualified: config-blocked
-borderline / qualified with uncertainty: config-blocked
-rejected: config-blocked
-top 10: config-blocked
+raw discovered: not run — provider check failed
+prequalified: not run — provider check failed
+enriched: not run — provider check failed
+deep researched: not run — provider check failed
+qualified: not run — provider check failed
+borderline / qualified with uncertainty: not run — provider check failed
+rejected: not run — provider check failed
+top 10: not run — provider check failed
 ```
 
 The implemented funnel performs broad multi-query collection, PSL-aware result
@@ -90,7 +93,8 @@ Accuracy: controlled matrix 20/20 (100%).
 Errors: no controlled failures. `go.hrone.cloud` resolves to canonical
 `hrone.cloud`; directory and news hosts cannot become canonical company
 domains. `tldextract==5.3.0` is installed in `C:\Python313\python.exe`; the
-resolver uses its packaged PSL snapshot without runtime network access.
+resolver uses its packaged PSL snapshot without runtime network access or a
+disk cache.
 
 ## Signal Evaluation
 
@@ -98,7 +102,8 @@ Persisted signals: unavailable for the live holdout.
 
 Precision: unavailable for the live holdout.
 
-Known-positive recall: live control blocked by provider configuration.
+Known-positive recall: live control did not run because the authenticated
+provider check failed.
 
 Entity-match errors: zero across controlled HROne/HR One and robotaxi IPO
 regressions.
@@ -116,7 +121,7 @@ stopped at provider preflight.
 
 | Rank | Company | Domain | ICP | Claims | Signal | Brief | Result |
 | ---: | --- | --- | --- | --- | --- | --- | --- |
-| — | Not run | Not run | Not run | Not run | Not run | Not run | Config blocked |
+| — | Not run | Not run | Not run | Not run | Not run | Not run | Provider check failed |
 
 ## Previous vs New Metrics
 
@@ -173,11 +178,12 @@ NO:
 - Web: 2 passed.
 - Alembic: `0006_intelligence_quality (head)`.
 - Ruff and Mypy: passed.
-- ESLint, TypeScript, Next.js build: see final engineering-gate run.
+- ESLint, TypeScript, and Next.js production build: passed.
 - `git diff --check`: passed.
-- SupportPilot V2 preflight: PSL dependency detected, then correctly returned
-  `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE` because neither provider
-  credential is visible to this process; no live run started.
+- Credentialed acceptance: exact runtime and pinned PSL dependency verified;
+  authenticated Exa provider check failed before a sanitized result, so
+  reliability, precision, positive-signal control, holdout, and top-10 QA did
+  not run.
 
 ## Git
 
@@ -189,6 +195,8 @@ Commits:
 - `02e2727` — authenticated primary/secondary provider fallback.
 - `c905119` — identity, qualification, discovery, scoring, briefs, UI, migration,
   and regression suite.
+- `a475062` — allow either authenticated search provider at acceptance.
+- `a726e15` — record the credentialed acceptance preflight.
 
 Remote SHAs: no Phase 4 remote SHA; the branch has not been pushed.
 
@@ -197,11 +205,16 @@ deployment.
 
 ## Known Limitations
 
-- The rotated `EXA_API_KEY` is not visible to the current acceptance process.
-- `TAVILY_API_KEY` is optional and not configured.
-- Authenticated repeat reliability, first-30 precision, known-positive live
-  signal recall, clean SupportPilot V2, evidence-link reachability, and manual
-  top-10 QA remain blocked.
+- P0: the authenticated Exa request failed before a sanitized provider result;
+  the secure helper intentionally retained no raw response, so the provider or
+  transport failure category is not proven.
+- P1: authenticated repeat reliability, first-30 precision, known-positive
+  live signal recall, clean SupportPilot V2, funnel counts, and manual top-10
+  QA did not execute.
+- P2: live evidence-link reachability and founder-value metrics remain
+  unmeasured.
+- `TAVILY_API_KEY` is optional and `NOT_CONFIGURED`; the acceptance gate
+  correctly uses OR semantics and did not require it.
 - The optional licensed firmographic provider has an interface and config gate
   but no licensed vendor was selected or configured.
 - `tldextract==5.3.0` is installed and verified in the exact runtime used by

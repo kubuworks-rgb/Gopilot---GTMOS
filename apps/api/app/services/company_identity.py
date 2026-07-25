@@ -10,7 +10,11 @@ except ModuleNotFoundError:  # Local sandbox may not permit dependency installat
     tldextract = None  # type: ignore[assignment]
 
 
-_extract = tldextract.TLDExtract(suffix_list_urls=()) if tldextract else None
+_extract = (
+    tldextract.TLDExtract(cache_dir=None, suffix_list_urls=())
+    if tldextract
+    else None
+)
 _FALLBACK_MULTILABEL_SUFFIXES = {
     "co.in",
     "co.uk",

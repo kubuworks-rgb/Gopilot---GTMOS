@@ -13,11 +13,21 @@ $env:AGENT_REACH_GATEWAY_URL = "http://127.0.0.1:8010"
 $env:RESEARCH_GATEWAY_TIMEOUT_SECONDS = "180"
 $env:GATEWAY_FETCH_TIMEOUT_SECONDS = "45"
 $env:GDELT_MAX_ATTEMPTS = "1"
-$env:MAX_RESEARCH_SEARCHES = "60"
-$env:MAX_RESEARCH_DOCUMENTS = "100"
-$env:MAX_ACCOUNT_CANDIDATES = "40"
-$env:MAX_ACCOUNTS_RESEARCHED = "15"
-$env:MAX_RESEARCH_ELAPSED_SECONDS = "900"
+if (-not $env:MAX_RESEARCH_SEARCHES) {
+    $env:MAX_RESEARCH_SEARCHES = "60"
+}
+if (-not $env:MAX_RESEARCH_DOCUMENTS) {
+    $env:MAX_RESEARCH_DOCUMENTS = "100"
+}
+if (-not $env:MAX_ACCOUNT_CANDIDATES) {
+    $env:MAX_ACCOUNT_CANDIDATES = "40"
+}
+if (-not $env:MAX_ACCOUNTS_RESEARCHED) {
+    $env:MAX_ACCOUNTS_RESEARCHED = "15"
+}
+if (-not $env:MAX_RESEARCH_ELAPSED_SECONDS) {
+    $env:MAX_RESEARCH_ELAPSED_SECONDS = "900"
+}
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $logDir = Join-Path $root "tmp\supportpilot-acceptance"

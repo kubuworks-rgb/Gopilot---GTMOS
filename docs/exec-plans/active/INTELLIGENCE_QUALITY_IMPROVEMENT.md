@@ -1,6 +1,6 @@
 # Intelligence Quality Improvement
 
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 
 ## Objective
 
@@ -63,9 +63,10 @@ personal enrichment, CRM, billing, or production auth.
 - Separate known-positive signal control.
 - Manual top-10 QA without changing target thresholds.
 
-Current holdout state: `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE` because
-`EXA_API_KEY` and `TAVILY_API_KEY` are absent. The preflight correctly did not
-start a live run.
+Current holdout state: `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE`.
+Authenticated Exa passed the 2026-07-25 credential-presence preflight; the
+keyed Tavily fallback and pinned PSL dependency remain absent. The preflight
+correctly did not start a live run.
 
 ## Release rule
 

@@ -1,6 +1,6 @@
 # GoPilot — Intelligence Quality Improvement
 
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 
 ## Classification
 
@@ -16,7 +16,8 @@ claimed, and no merge is allowed.
 
 Primary: Exa remote MCP behind `GeneralSearchProvider`.
 
-Auth mode: keyed `x-api-key`; `EXA_API_KEY` is not configured.
+Auth mode: keyed `x-api-key`; credential presence passed the 2026-07-25
+preflight. The value was neither logged nor persisted by the acceptance run.
 
 Secondary: Tavily Search API.
 
@@ -174,9 +175,9 @@ NO:
 - Ruff and Mypy: passed.
 - ESLint, TypeScript, Next.js build: see final engineering-gate run.
 - `git diff --check`: passed.
-- SupportPilot V2 preflight: correctly returned
-  `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE` for missing Exa, Tavily, and PSL
-  configuration; no live run started.
+- SupportPilot V2 preflight: authenticated Exa was detected, then correctly
+  returned `CONFIG_REQUIRED_FOR_PRODUCTION_ACCEPTANCE` for missing Tavily and
+  PSL configuration; no live run started.
 
 ## Git
 
@@ -196,7 +197,9 @@ deployment.
 
 ## Known Limitations
 
-- `EXA_API_KEY` and `TAVILY_API_KEY` are absent.
+- Authenticated Exa passed credential-presence preflight.
+- `TAVILY_API_KEY` is absent from the acceptance process.
+- The pinned PSL dependency is not installed.
 - Authenticated repeat reliability, first-30 precision, known-positive live
   signal recall, clean SupportPilot V2, evidence-link reachability, and manual
   top-10 QA remain blocked.

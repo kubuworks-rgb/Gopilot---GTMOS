@@ -18,6 +18,26 @@ from apps.api.app.db.models import (
 from apps.api.app.db.session import SessionFactory
 
 
+def prequalification_outcome(
+    stage: str,
+    diagnostics: dict[str, object],
+) -> str:
+    explicit_outcome = diagnostics.get("prequalification_outcome")
+    if explicit_outcome:
+        return str(explicit_outcome)
+    if stage in {
+        "PREQUALIFIED",
+        "PREQUALIFIED_WITH_UNCERTAINTY",
+        "REVIEW_REQUIRED",
+        "REJECTED",
+    }:
+        return stage
+    if stage == "ACCEPTED":
+        # Older runs replaced the original state after account creation.
+        return "PREQUALIFIED"
+    return "REJECTED"
+
+
 async def export(result_path: Path, output_path: Path) -> None:
     result = json.loads(result_path.read_text(encoding="utf-8-sig"))
     run_id = UUID(str(result["research_run"]["id"]))
@@ -56,6 +76,11 @@ async def export(result_path: Path, output_path: Path) -> None:
             ).all()
         )
     stages = Counter(item.stage for item in candidates)
+    prequalification_outcomes: Counter[str] = Counter()
+    for item in candidates:
+        prequalification_outcomes[
+            prequalification_outcome(item.stage, item.diagnostics)
+        ] += 1
     accounts = list(result.get("accounts") or [])
     qualifications = Counter(
         str(item.get("qualification_status") or "UNKNOWN") for item in accounts
@@ -78,10 +103,21 @@ async def export(result_path: Path, output_path: Path) -> None:
         },
         "funnel": {
             "raw_candidates": len(candidates),
-            "prequalified": sum(
-                item.stage != "REJECTED_PREQUALIFICATION" for item in candidates
+            "prequalified": prequalification_outcomes["PREQUALIFIED"],
+            "prequalified_with_uncertainty": prequalification_outcomes[
+                "PREQUALIFIED_WITH_UNCERTAINTY"
+            ],
+            "review_required": prequalification_outcomes["REVIEW_REQUIRED"],
+            "rejected_prequalification": prequalification_outcomes["REJECTED"],
+            "shortlisted_for_deep_research": (
+                prequalification_outcomes["PREQUALIFIED"]
+                + prequalification_outcomes["PREQUALIFIED_WITH_UNCERTAINTY"]
             ),
-            "rejected_prequalification": stages["REJECTED_PREQUALIFICATION"],
+            "deeply_researched": (
+                stages["ACCEPTED"]
+                + stages["REJECTED_DEEP_RESEARCH"]
+                + stages["REJECTED_QUALIFICATION"]
+            ),
             "rejected_deep_research": stages["REJECTED_DEEP_RESEARCH"],
             "rejected_qualification": stages["REJECTED_QUALIFICATION"],
             "accepted": stages["ACCEPTED"],

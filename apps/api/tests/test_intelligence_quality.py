@@ -21,6 +21,8 @@ from apps.api.app.services.intelligence_quality import (
     decide_qualification,
 )
 from apps.api.app.services.live_research import (
+    DiscoveryCandidate,
+    _discovery_prequalification_input,
     _news_result_matches_company,
     _signals_from_facts,
 )
@@ -171,6 +173,22 @@ def test_hrone_does_not_match_distinct_hr_one_entity_or_robotaxi_ipo() -> None:
     )
 
 
+def test_other_first_party_domain_cannot_pass_shared_brand_news_match() -> None:
+    other_entity = SearchResult(
+        url="https://optivian.ai/insights/funding",
+        canonical_url="https://optivian.ai/insights/funding",
+        title="Optivian AI funding announcement",
+        snippet="Optivian AI raised a pre-seed round.",
+        backend="controlled",
+    )
+
+    assert not _news_result_matches_company(
+        other_entity,
+        company_name="Optivian Cloud",
+        domain="optivian.cloud",
+    )
+
+
 def test_zero_signal_is_valid_and_maps_to_monitor() -> None:
     assert _signals_from_facts([]) == []
     scores = score_account(
@@ -213,6 +231,28 @@ def test_candidate_score_rewards_query_and_provider_agreement() -> None:
         provider_hits=2,
     )
     assert agreed > single
+
+
+def test_provider_query_terms_do_not_auto_prequalify_candidate_model() -> None:
+    result = SearchResult(
+        url="https://acme.example",
+        canonical_url="https://acme.example",
+        title="Acme",
+        snippet="Tools for modern teams",
+        backend="controlled",
+    )
+    candidate = DiscoveryCandidate(
+        result=result,
+        identity=resolve_company_identity(str(result.url)),
+        queries={"India B2B SaaS companies official websites"},
+        providers={"controlled"},
+        score=40,
+    )
+
+    prequalification_input = _discovery_prequalification_input(candidate)
+
+    assert prequalification_input.b2b_software_state.value == "UNKNOWN"
+    assert prequalification_input.saas_state.value == "UNKNOWN"
 
 
 class _ControlledProvider:

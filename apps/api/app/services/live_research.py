@@ -52,6 +52,18 @@ from apps.api.app.services.company_identity import (
     resolve_company_identity,
 )
 from apps.api.app.services.firmographics import PublicEvidenceFirmographicProvider
+from apps.api.app.services.entity_resolution import (
+    AttachmentDecision,
+    BriefState,
+    ClaimScope,
+    CompanyIdentityRecord,
+    EntityRelation,
+    EvidenceAttachmentAssessment,
+    VerifiedAlias,
+    VerifiedEntityRelationship,
+    assess_evidence_attachment,
+    decide_brief_state,
+)
 from apps.api.app.services.intelligence_quality import (
     CandidatePrequalificationDecision,
     CandidatePrequalificationInput,
@@ -949,12 +961,11 @@ def _is_candidate_company_page(result: SearchResult) -> bool:
 def _discovery_prequalification_input(
     candidate: DiscoveryCandidate,
 ) -> CandidatePrequalificationInput:
+    # Provider queries describe what GoPilot requested, not what the result
+    # company actually is. Including them here makes every candidate look like
+    # B2B SaaS and destroys the uncertainty/review distinction.
     discovery_text = " ".join(
-        [
-            candidate.result.title,
-            candidate.result.snippet,
-            *sorted(candidate.queries),
-        ]
+        [candidate.result.title, candidate.result.snippet]
     ).lower()
     plausible_software = any(
         term in discovery_text
@@ -1567,6 +1578,9 @@ async def discover_accounts(
                         "research_worthiness": (
                             candidate.prequalification.research_worthiness
                         ),
+                        "prequalification_outcome": (
+                            candidate.prequalification.outcome.value
+                        ),
                         "score_contributions": candidate.score_diagnostics,
                         "research_requirements": list(
                             candidate.prequalification.research_requirements
@@ -1961,6 +1975,17 @@ def _news_result_matches_company(
     domain: str,
 ) -> bool:
     """Require a specific entity token before external news becomes evidence."""
+    result_domain = _normalized_company_domain(str(result.canonical_url or result.url))
+    target_domain = _normalized_company_domain(
+        domain if "://" in domain else f"https://{domain}"
+    )
+    if (
+        result_domain
+        and target_domain
+        and result_domain != target_domain
+        and _domain_brand(result_domain) == _domain_brand(target_domain)
+    ):
+        return False
     haystack = f"{result.title} {result.snippet}".lower()
     brand = _domain_brand(domain).lower()
     if len(brand) >= 4 and re.search(
@@ -1973,16 +1998,251 @@ def _news_result_matches_company(
     ) is not None
 
 
+def _identity_record_for_account(account: AccountRow) -> CompanyIdentityRecord:
+    raw = account.attributes.get("company_identity")
+    aliases: list[VerifiedAlias] = []
+    relationships: list[VerifiedEntityRelationship] = []
+    if isinstance(raw, dict):
+        for item in raw.get("known_aliases", []):
+            if not isinstance(item, dict):
+                continue
+            evidence_ids = tuple(
+                str(value) for value in item.get("evidence_ids", []) if value
+            )
+            if item.get("name") and evidence_ids:
+                aliases.append(
+                    VerifiedAlias(str(item["name"]), evidence_ids)
+                )
+        for item in raw.get("relationships", []):
+            if not isinstance(item, dict):
+                continue
+            try:
+                relation = EntityRelation(str(item.get("relation")))
+            except ValueError:
+                continue
+            evidence_ids = tuple(
+                str(value) for value in item.get("evidence_ids", []) if value
+            )
+            if item.get("subject_domain") and item.get("object_domain"):
+                relationships.append(
+                    VerifiedEntityRelationship(
+                        subject_domain=str(item["subject_domain"]),
+                        object_domain=str(item["object_domain"]),
+                        relation=relation,
+                        evidence_ids=evidence_ids,
+                    )
+                )
+    official_domains = {
+        account.domain,
+        *(
+            str(value)
+            for value in (
+                raw.get("verified_official_domains", [])
+                if isinstance(raw, dict)
+                else []
+            )
+            if value
+        ),
+    }
+    warnings = tuple(
+        str(value)
+        for value in (
+            raw.get("unresolved_identity_warnings", [])
+            if isinstance(raw, dict)
+            else []
+        )
+        if value
+    )
+    return CompanyIdentityRecord(
+        canonical_company_name=(
+            str(raw.get("canonical_company_name"))
+            if isinstance(raw, dict) and raw.get("canonical_company_name")
+            else account.name
+        ),
+        canonical_registrable_domain=account.domain,
+        verified_official_domains=tuple(sorted(official_domains)),
+        known_aliases=tuple(aliases),
+        legal_name=(
+            str(raw["legal_name"])
+            if isinstance(raw, dict) and raw.get("legal_name")
+            else None
+        ),
+        product_names=(),
+        product_domains=tuple(
+            str(value)
+            for value in (
+                raw.get("product_domains", [])
+                if isinstance(raw, dict)
+                else []
+            )
+            if value
+        ),
+        parent_organization=(
+            str(raw["parent_organization"])
+            if isinstance(raw, dict) and raw.get("parent_organization")
+            else None
+        ),
+        subsidiaries=tuple(
+            str(value)
+            for value in (
+                raw.get("subsidiaries", [])
+                if isinstance(raw, dict)
+                else []
+            )
+            if value
+        ),
+        relationships=tuple(relationships),
+        relationship_evidence_ids=tuple(
+            str(value)
+            for relationship in relationships
+            for value in relationship.evidence_ids
+        ),
+        identity_confidence=float(
+            str(account.attributes.get("domain_confidence") or 0)
+        ),
+        unresolved_identity_warnings=warnings,
+    )
+
+
+def _assess_account_evidence(
+    account: AccountRow,
+    facts: list[EvidenceFactRow],
+    source_by_id: dict[uuid.UUID, SourceDocumentRow],
+) -> tuple[
+    CompanyIdentityRecord,
+    list[EvidenceFactRow],
+    dict[uuid.UUID, EvidenceAttachmentAssessment],
+    list[dict[str, object]],
+]:
+    identity = _identity_record_for_account(account)
+    conflicting_entities = tuple(
+        _account_name(
+            item.title,
+            _normalized_company_domain(item.canonical_url) or "",
+        )
+        for item in source_by_id.values()
+        if str(item.provenance.get("source_role") or "") == SourceRole.FIRST_PARTY
+        and _normalized_company_domain(item.canonical_url)
+        not in identity.verified_official_domains
+    )
+    attached: list[EvidenceFactRow] = []
+    assessments: dict[uuid.UUID, EvidenceAttachmentAssessment] = {}
+    rejected: list[dict[str, object]] = []
+    unresolved_identity_conflict = False
+    for fact in facts:
+        source = source_by_id.get(fact.source_id)
+        if source is None:
+            continue
+        current_page_role = classify_result_page(source.canonical_url)
+        current_source_role = {
+            ResultPageRole.OFFICIAL_ROOT: SourceRole.FIRST_PARTY,
+            ResultPageRole.OFFICIAL_SUBDOMAIN: SourceRole.FIRST_PARTY,
+            ResultPageRole.DIRECTORY: SourceRole.DIRECTORY,
+            ResultPageRole.NEWS: SourceRole.NEWS,
+            ResultPageRole.SOCIAL: SourceRole.COMMUNITY,
+            ResultPageRole.VENDOR_MARKETING: SourceRole.VENDOR_MARKETING,
+            ResultPageRole.OTHER: SourceRole.OTHER,
+        }[current_page_role]
+        persisted_source_role = str(
+            source.provenance.get("source_role") or SourceRole.OTHER.value
+        )
+        source_role = (
+            current_source_role.value
+            if current_source_role
+            in {
+                SourceRole.DIRECTORY,
+                SourceRole.NEWS,
+                SourceRole.COMMUNITY,
+            }
+            else persisted_source_role
+        )
+        assessment = assess_evidence_attachment(
+            identity,
+            source_url=source.canonical_url,
+            source_role=source_role,
+            source_title=source.title,
+            passage=fact.passage,
+            subject_entity=fact.subject,
+            claim_scope=None,
+            conflicting_entities=conflicting_entities,
+        )
+        assessments[fact.id] = assessment
+        if assessment.decision == AttachmentDecision.ATTACHED:
+            attached.append(fact)
+        else:
+            source_brand = (
+                re.sub(r"[^a-z0-9]", "", _domain_brand(assessment.source_domain))
+                if assessment.source_domain
+                else ""
+            )
+            account_brand = re.sub(
+                r"[^a-z0-9]", "", _domain_brand(account.domain)
+            )
+            unresolved_identity_conflict = (
+                unresolved_identity_conflict
+                or assessment.decision == AttachmentDecision.RELATED_ENTITY_ONLY
+                or (
+                    len(source_brand) >= 4
+                    and len(account_brand) >= 4
+                    and (
+                        source_brand.startswith(account_brand)
+                        or account_brand.startswith(source_brand)
+                    )
+                )
+            )
+            rejected.append(
+                {
+                    "evidence_id": str(fact.id),
+                    "source_id": str(fact.source_id),
+                    "source_domain": assessment.source_domain,
+                    "subject": assessment.subject_entity,
+                    "relation": assessment.relation.value,
+                    "scope": assessment.claim_scope.value,
+                    "decision": assessment.decision.value,
+                    "reason": assessment.reason,
+                }
+            )
+    if unresolved_identity_conflict:
+        identity = CompanyIdentityRecord(
+            **{
+                **identity.__dict__,
+                "unresolved_identity_warnings": tuple(
+                    sorted(
+                        {
+                            *identity.unresolved_identity_warnings,
+                            "One or more sources may belong to another entity.",
+                        }
+                    )
+                ),
+            }
+        )
+    return identity, attached, assessments, rejected
+
+
 def _signals_from_facts(
     facts: list[EvidenceFactRow],
     source_by_id: dict[uuid.UUID, SourceDocumentRow] | None = None,
     *,
     company_name: str | None = None,
     domain: str | None = None,
+    attachment_by_fact_id: (
+        dict[uuid.UUID, EvidenceAttachmentAssessment] | None
+    ) = None,
 ) -> list[tuple[str, EvidenceFactRow]]:
     matches: list[tuple[str, EvidenceFactRow]] = []
     seen: set[tuple[str, uuid.UUID]] = set()
     for fact in facts:
+        assessment = (
+            attachment_by_fact_id.get(fact.id)
+            if attachment_by_fact_id is not None
+            else None
+        )
+        if assessment is not None and (
+            assessment.decision != AttachmentDecision.ATTACHED
+            or assessment.claim_scope
+            in {ClaimScope.MARKET_LEVEL, ClaimScope.PARTNER_LEVEL}
+        ):
+            continue
         lowered = fact.claim.lower()
         for signal_type, term_groups in SIGNAL_RULES.items():
             if not all(any(term in lowered for term in group) for group in term_groups):
@@ -2029,6 +2289,8 @@ def _signals_from_facts(
                 )
                 if not dated_or_event_page:
                     continue
+            if (_now() - fact.observed_at).days > 730:
+                continue
             key = (signal_type, fact.id)
             if key not in seen:
                 matches.append((signal_type, fact))
@@ -2045,11 +2307,8 @@ async def _score_and_brief(
     source: SourceDocumentRow,
     facts: list[EvidenceFactRow],
 ) -> None:
-    target_tokens = _tokens(product.target_market)
-    evidence_tokens = _tokens(" ".join(item.claim for item in facts))
-    overlap = len(target_tokens & evidence_tokens) / max(1, len(target_tokens))
     source_ids = list(dict.fromkeys(item.source_id for item in facts))
-    source_rows = list(
+    all_source_rows = list(
         (
             await session.scalars(
                 select(SourceDocumentRow)
@@ -2058,12 +2317,30 @@ async def _score_and_brief(
             )
         ).all()
     )
+    all_source_by_id = {item.id: item for item in all_source_rows}
+    (
+        identity_record,
+        attached_facts,
+        attachment_by_fact_id,
+        rejected_evidence,
+    ) = _assess_account_evidence(account, facts, all_source_by_id)
+    if not attached_facts:
+        raise ValueError("No entity-compatible account evidence remains")
+    facts = attached_facts
+    attached_source_ids = {item.source_id for item in facts}
+    source_rows = [
+        item for item in all_source_rows if item.id in attached_source_ids
+    ]
     source_by_id = {item.id: item for item in source_rows}
+    target_tokens = _tokens(product.target_market)
+    evidence_tokens = _tokens(" ".join(item.claim for item in facts))
+    overlap = len(target_tokens & evidence_tokens) / max(1, len(target_tokens))
     signal_matches = _signals_from_facts(
         facts,
         source_by_id,
         company_name=account.name,
         domain=account.domain,
+        attachment_by_fact_id=attachment_by_fact_id,
     )
     signal_match = signal_matches[0] if signal_matches else None
     signal_evidence = [str(item[1].id) for item in signal_matches]
@@ -2179,12 +2456,11 @@ async def _score_and_brief(
             else SourceRole.OTHER.value
         )
         entity_match_score = (
-            1.0
-            if signal_source
-            and _normalized_company_domain(signal_source.canonical_url)
-            == account.domain
-            else 0.95
+            attachment_by_fact_id[fact.id].entity_match_confidence
+            if fact.id in attachment_by_fact_id
+            else 0.0
         )
+        attachment = attachment_by_fact_id.get(fact.id)
         signal_row = IntentSignalRow(
             workspace_id=run.workspace_id,
             account_id=account.id,
@@ -2213,6 +2489,27 @@ async def _score_and_brief(
                 event_confidence=float(fact.confidence),
                 relevance=relevance,
                 source_role=source_role,
+                subject_entity=(
+                    attachment.subject_entity if attachment else fact.subject
+                ),
+                canonical_subject_domain=(
+                    attachment.canonical_subject_domain
+                    if attachment
+                    else account.domain
+                ),
+                event_date=fact.observed_at,
+                source_id=str(fact.source_id),
+                supporting_passage=fact.passage,
+                claim_scope=(
+                    attachment.claim_scope.value
+                    if attachment
+                    else ClaimScope.COMPANY_LEVEL.value
+                ),
+                claim_scope_compatible=bool(
+                    attachment and attachment.claim_scope_compatible
+                ),
+                attachment_decision=AttachmentDecision.ATTACHED.value,
+                rejection_reason=None,
             )
         )
         why_now.append(
@@ -2226,11 +2523,37 @@ async def _score_and_brief(
     qualification = str(
         account.attributes.get("qualification_status") or "INSUFFICIENT_EVIDENCE"
     )
+    competitor = account.attributes.get("competitor")
+    direct_competitor_conflict = bool(
+        isinstance(competitor, dict)
+        and competitor.get("classification") == "DIRECT_COMPETITOR"
+        and competitor.get("automatic_rejection_eligible")
+    )
+    brief_state = decide_brief_state(
+        identity_verified=(
+            account.domain in identity_record.verified_official_domains
+            and identity_record.identity_confidence >= 0.8
+        ),
+        unresolved_identity_warnings=(
+            identity_record.unresolved_identity_warnings
+        ),
+        qualification_status=qualification,
+        has_supported_icp_fact=bool(facts),
+        has_actionable_signal=bool(signal_matches),
+        supported_important_claims=not rejected_evidence,
+        direct_competitor_conflict=direct_competitor_conflict,
+    )
     band, recommended_action = priority_band(
         scores,
         qualification_status=qualification,
         has_verified_signal=signal_match is not None,
     )
+    if brief_state == BriefState.IDENTITY_REVIEW_REQUIRED:
+        recommended_action = "Resolve entity ownership before using this account."
+    elif brief_state == BriefState.DO_NOT_TARGET:
+        recommended_action = "Do not target this account."
+    elif brief_state == BriefState.MONITOR:
+        recommended_action = "Monitor for a verified, account-specific trigger."
     if signal_match:
         signal_type, fact = signal_match
         account.attributes = {
@@ -2240,6 +2563,15 @@ async def _score_and_brief(
             "recommended_action": recommended_action,
             "priority_band": band,
             "research_candidate": qualification != "QUALIFIED",
+            "brief_state": brief_state.value,
+            "company_identity": identity_record.as_persisted_dict(),
+            "evidence_attachment_audit": [
+                {
+                    "evidence_id": str(fact_id),
+                    **assessment.as_persisted_dict(),
+                }
+                for fact_id, assessment in attachment_by_fact_id.items()
+            ],
         }
     else:
         account.attributes = {
@@ -2249,7 +2581,21 @@ async def _score_and_brief(
             "recommended_action": recommended_action,
             "priority_band": band,
             "research_candidate": True,
+            "brief_state": brief_state.value,
+            "company_identity": identity_record.as_persisted_dict(),
+            "evidence_attachment_audit": [
+                {
+                    "evidence_id": str(fact_id),
+                    **assessment.as_persisted_dict(),
+                }
+                for fact_id, assessment in attachment_by_fact_id.items()
+            ],
         }
+    account.evidence_ids = [str(item.id) for item in facts]
+    account.attributes = {
+        **account.attributes,
+        "source_ids": [str(item.id) for item in source_rows],
+    }
     run.budgets = {
         **run.budgets,
         "searches_used": run.searches_used,
@@ -2266,7 +2612,18 @@ async def _score_and_brief(
             workspace_id=run.workspace_id,
             account_id=account.id,
             research_run_id=run.id,
-            summary={"source_claim": facts[0].claim},
+            summary={
+                "source_claim": facts[0].claim,
+                "company_identity": identity_record.as_persisted_dict(),
+                "attachment_audit": [
+                    {
+                        "evidence_id": str(fact_id),
+                        **assessment.as_persisted_dict(),
+                    }
+                    for fact_id, assessment in attachment_by_fact_id.items()
+                ],
+                "rejected_or_ambiguous_evidence": rejected_evidence,
+            },
             source_ids=list(dict.fromkeys(str(item.source_id) for item in facts)),
             evidence_ids=[str(item.id) for item in facts],
             status="completed",
@@ -2278,6 +2635,63 @@ async def _score_and_brief(
     evidence_domains = [repository.evidence_domain(item) for item in facts]
     source_domains = [repository.source_domain(item) for item in source_rows]
     draft_id = uuid.uuid4()
+    unknowns = [
+        reason
+        for reason in _attribute_string_list(
+            account.attributes.get("qualification_reasons", [])
+        )
+        if "unknown" in str(reason).lower()
+        or "unverified" in str(reason).lower()
+        or "remain" in str(reason).lower()
+    ]
+    hypotheses = [
+        EvidenceClaim(
+            statement=(
+                f"{account.name} may benefit from {product.product}; "
+                "this requires discovery validation."
+            ),
+            status=ClaimStatus.HYPOTHESIS,
+            confidence=0.35,
+            evidence_ids=[],
+        )
+    ]
+    reason_not_to_target = (
+        "Entity ownership is unresolved."
+        if brief_state == BriefState.IDENTITY_REVIEW_REQUIRED
+        else "The account is disqualified or has a direct-competitor conflict."
+        if brief_state == BriefState.DO_NOT_TARGET
+        else "No timely, account-specific buying signal is verified."
+        if brief_state == BriefState.MONITOR
+        else None
+    )
+    next_research_step = (
+        "Verify legal ownership and official-domain relationships."
+        if brief_state == BriefState.IDENTITY_REVIEW_REQUIRED
+        else "Verify the missing ICP criteria with bounded first-party research."
+        if brief_state == BriefState.RESEARCH_CANDIDATE
+        else "Watch first-party news, careers, and product announcements."
+        if brief_state == BriefState.MONITOR
+        else None
+    )
+    campaign_subject = (
+        f"Question for {account.name}"
+        if brief_state == BriefState.FOUNDER_READY
+        else f"Research checkpoint for {account.name}"
+    )
+    campaign_body = (
+        (
+            f"Hi {account.name} team,\n\n"
+            f"We reviewed a public source linked in this brief. "
+            f"We help teams explore {product.product}. "
+            "Would a short, human-reviewed discovery conversation be useful?\n\n"
+            "This draft has not been sent."
+        )
+        if brief_state == BriefState.FOUNDER_READY
+        else (
+            "No outreach is recommended. Resolve the identity, qualification, "
+            "or timely-signal gaps documented in this brief first."
+        )
+    )
     brief_payload = AccountOpportunityBrief(
         account=account_domain,
         why_it_fits=[
@@ -2289,19 +2703,13 @@ async def _score_and_brief(
             )
         ],
         why_now=why_now,
-        pain_hypotheses=[
-            EvidenceClaim(
-                statement=(
-                    f"{account.name} may benefit from {product.product}; "
-                    "this requires discovery validation."
-                ),
-                status=ClaimStatus.HYPOTHESIS,
-                confidence=0.35,
-                evidence_ids=[],
-            )
-        ],
+        pain_hypotheses=hypotheses,
         recommended_problem="Validate whether the confirmed target problem is present.",
-        recommended_offer=f"A human-reviewed exploration of {product.product}.",
+        recommended_offer=(
+            f"A human-reviewed exploration of {product.product}."
+            if brief_state == BriefState.FOUNDER_READY
+            else "No outreach offer until the documented evidence gaps are resolved."
+        ),
         recommended_action=str(account.attributes["recommended_action"]),
         risks=[
             (
@@ -2323,29 +2731,31 @@ async def _score_and_brief(
             )
             for item in facts[:5]
         ],
-        unknowns=[
-            reason
-            for reason in _attribute_string_list(
-                account.attributes.get("qualification_reasons", [])
-            )
-            if "unknown" in str(reason).lower()
-            or "unverified" in str(reason).lower()
-            or "remain" in str(reason).lower()
-        ],
+        unknowns=unknowns,
         research_candidate=bool(
             account.attributes.get("research_candidate", True)
         ),
+        brief_state=brief_state.value,
+        verified_identity=identity_record.as_persisted_dict(),
+        verified_icp_facts=[
+            EvidenceClaim(
+                statement=facts[0].claim,
+                status=ClaimStatus.SUPPORTED,
+                confidence=float(facts[0].confidence),
+                evidence_ids=[str(facts[0].id)],
+            )
+        ],
+        unknown_icp_facts=unknowns,
+        current_signals=signal_models,
+        rejected_or_ambiguous_evidence=rejected_evidence,
+        hypotheses=hypotheses,
+        reason_not_to_target=reason_not_to_target,
+        next_research_step=next_research_step,
         campaign=CampaignDraft(
             id=str(draft_id),
             account_id=str(account.id),
-            subject=f"Question for {account.name}",
-            body=(
-                f"Hi {account.name} team,\n\n"
-                f"We reviewed a public source linked in this brief. "
-                f"We help teams explore {product.product}. "
-                "Would a short, human-reviewed discovery conversation be useful?\n\n"
-                "This draft has not been sent."
-            ),
+            subject=campaign_subject,
+            body=campaign_body,
             evidence_ids=[str(item.id) for item in facts],
         ),
     )

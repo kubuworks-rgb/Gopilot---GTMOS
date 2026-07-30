@@ -51,6 +51,24 @@ The conservative extractor stores exact source sentences as both passage and cla
 Before commit, each non-hypothesis fact must reference the same workspace and its
 passage must exist in source text. Findings and brief claims reference those IDs.
 
+Account evidence has a second, account-relative gate after source persistence.
+The gate compares the source registrable domain, canonical company identity,
+evidence-backed aliases and entity relationships, and claim scope. A source can be
+first-party for its own entity without being first-party for the target account.
+Different first-party domains are never merged by name or brand prefix alone.
+Ambiguous facts remain in the attachment audit as
+`UNATTACHED_ENTITY_AMBIGUOUS`; verified related-entity facts with incompatible
+scope remain `RELATED_ENTITY_ONLY`. Neither can affect account signals, scores,
+verified brief claims, or campaigns.
+
+Persisted account identity records include the canonical name/domain, verified
+official domains, evidence-backed aliases and relationships, identity confidence,
+and unresolved warnings. Opportunity briefs expose one of `FOUNDER_READY`,
+`RESEARCH_CANDIDATE`, `MONITOR`, `DO_NOT_TARGET`, or
+`IDENTITY_REVIEW_REQUIRED`. Outreach copy is generated only for
+`FOUNDER_READY`; every other state presents the missing evidence, reason not to
+target when applicable, and next bounded research step.
+
 Fit, Intent, and Confidence keep independent factors. Priority uses the existing
 confidence-gated deterministic policy:
 

@@ -93,8 +93,21 @@ function Invoke-LoggedGate(
     [scriptblock]$Command,
     [hashtable]$Results
 ) {
-    & $Command *>> $gateLog
-    $Results[$Name] = ($LASTEXITCODE -eq 0)
+    # Native tools routinely use stderr for warnings and progress. Under the
+    # runner's global Stop policy, PowerShell turns redirected stderr into a
+    # terminating RemoteException before we can capture the native exit code.
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        & $Command *>> $gateLog
+        $nativeExitCode = $LASTEXITCODE
+    } catch {
+        $_ | Out-String | Add-Content -LiteralPath $gateLog -Encoding UTF8
+        $nativeExitCode = 1
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    $Results[$Name] = ($nativeExitCode -eq 0)
 }
 
 function Invoke-MockWorkflow {

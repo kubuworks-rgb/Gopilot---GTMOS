@@ -134,5 +134,6 @@ def test_phase5_failure_cleanup_preserves_only_redacted_status() -> None:
         assert payload["cleanup_complete"] is True
         assert payload["credential_remaining"] is False
         assert not (ROOT / "tmp" / "phase5-acceptance").exists()
+        assert not list((ROOT / "tmp").glob("phase5-acceptance-mock-*"))
     finally:
         failure_status.unlink(missing_ok=True)

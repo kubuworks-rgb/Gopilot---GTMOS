@@ -91,7 +91,7 @@ function Wait-ForFile([string]$Path, [int]$TimeoutSeconds) {
 function Invoke-LoggedGate(
     [string]$Name,
     [scriptblock]$Command,
-    [hashtable]$Results
+    [System.Collections.IDictionary]$Results
 ) {
     # Native tools routinely use stderr for warnings and progress. Under the
     # runner's global Stop policy, PowerShell turns redirected stderr into a

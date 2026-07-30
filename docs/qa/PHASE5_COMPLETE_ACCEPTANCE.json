@@ -1,0 +1,187 @@
+{
+  "title": "GoPilot Phase 5 - Complete Acceptance",
+  "classification": "B - IMPROVED BUT NOT READY",
+  "completed_at": "2026-07-30",
+  "mode": "LIVE",
+  "secure_runtime": {
+    "python": "C:\\Python313\\python.exe",
+    "tldextract": "5.3.0",
+    "credential_storage": "process-local secure parent only",
+    "credential_remaining": false,
+    "tavily": "NOT_CONFIGURED"
+  },
+  "provider": {
+    "primary": "Exa",
+    "rest": "AUTHENTICATED_PASS",
+    "mcp": "AUTHENTICATED_PASS",
+    "anonymous_mcp_capacity": false,
+    "fixture_fallback": false,
+    "reliability_queries_passed": 5,
+    "reliability_queries_total": 5,
+    "relevant_results": 25,
+    "results_evaluated": 25
+  },
+  "holdout": {
+    "research_run_id": "9c481dc9-9af2-48a2-b5d2-ebd2995373bb",
+    "workspace_id": "d49c8f7a-d7aa-4431-a4f4-2e56abcd440c",
+    "status": "completed",
+    "searches_used": 59,
+    "documents_used": 76,
+    "evidence_facts": 144,
+    "funnel": {
+      "raw_unique_candidates": 62,
+      "prequalified": 62,
+      "rejected_prequalification": 0,
+      "rejected_deep_research": 0,
+      "rejected_qualification": 0,
+      "final_accounts": 7,
+      "qualified": 0,
+      "qualified_with_uncertainty": 6,
+      "disqualified": 1,
+      "insufficient_evidence": 0
+    }
+  },
+  "candidate_quality": {
+    "precision_percent": 92.59,
+    "recall_percent": 100.0,
+    "false_negative_rate_percent": 0.0,
+    "targets_passed": true
+  },
+  "positive_signal_control": {
+    "passed": true,
+    "precision_percent": 100.0,
+    "recall_percent": 100.0
+  },
+  "manual_qa": {
+    "accounts_reviewed": 7,
+    "real_company_rate_percent": 100.0,
+    "canonical_domain_correctness_percent": 100.0,
+    "useful_icp_rate_percent": 71.43,
+    "fully_supported_important_claims_percent": 85.71,
+    "unsupported_important_claims_percent": 14.29,
+    "evidence_link_reachability_percent": 100.0,
+    "duplicate_rate_percent": 0.0,
+    "false_entity_signal_attachment_percent": 14.29,
+    "persisted_signal_precision_percent": 50.0,
+    "mean_brief_usefulness_out_of_3": 1.14,
+    "founder_yes_plus_maybe_percent": 57.14
+  },
+  "accounts": [
+    {
+      "rank": 1,
+      "name": "OpenHR India",
+      "domain": "openhr.tech",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "priority": 63,
+      "signal": "NEW_PRODUCT",
+      "brief_usefulness": 2,
+      "founder_value": "YES"
+    },
+    {
+      "rank": 2,
+      "name": "CloudSEK",
+      "domain": "cloudsek.com",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "priority": 56,
+      "signal": "CUSTOMER_GROWTH_INDICATOR",
+      "brief_usefulness": 2,
+      "founder_value": "MAYBE"
+    },
+    {
+      "rank": 3,
+      "name": "Optivian Cloud",
+      "domain": "optivian.cloud",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "priority": 52,
+      "signal": "PARTNERSHIP",
+      "brief_usefulness": 0,
+      "founder_value": "NO",
+      "qa_issue": "Evidence and signals from the unrelated optivian.ai sales product were attached to optivian.cloud."
+    },
+    {
+      "rank": 4,
+      "name": "Fortifyze",
+      "domain": "fortifyze.com",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "priority": 24,
+      "signal": "NO_SIGNAL",
+      "brief_usefulness": 1,
+      "founder_value": "MAYBE"
+    },
+    {
+      "rank": 5,
+      "name": "ComplyZero",
+      "domain": "complyzero.com",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "priority": 23,
+      "signal": "NO_SIGNAL",
+      "brief_usefulness": 1,
+      "founder_value": "MAYBE"
+    },
+    {
+      "rank": 6,
+      "name": "BiggerWide",
+      "domain": "biggerwide.com",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "priority": 15,
+      "signal": "NO_SIGNAL",
+      "brief_usefulness": 1,
+      "founder_value": "NO",
+      "qa_issue": "Verified 4+ employee evidence is outside the requested 50-500 employee band."
+    },
+    {
+      "rank": 7,
+      "name": "BizBMS",
+      "domain": "bizbms.com",
+      "qualification": "DISQUALIFIED",
+      "priority": 0,
+      "signal": "NO_SIGNAL",
+      "brief_usefulness": 1,
+      "founder_value": "NO"
+    }
+  ],
+  "engineering_gates": {
+    "python_tests": "132 passed, 2 skipped",
+    "postgres_redis_integration": "2 passed",
+    "gateway_security": "12 passed",
+    "frontend_tests": "2 passed",
+    "ruff": "PASS",
+    "mypy": "PASS",
+    "eslint": "PASS",
+    "typescript": "PASS",
+    "next_build": "PASS",
+    "alembic": "0006_intelligence_quality (head)",
+    "docker_compose": "PASS",
+    "powershell_parse": "PASS",
+    "gate_stderr_regression": "7 orchestration tests passed"
+  },
+  "issues": {
+    "P0": [
+      "Prevent evidence and intent signals from crossing registrable company entities, demonstrated by optivian.ai to optivian.cloud."
+    ],
+    "P1": [
+      "Raise persisted signal precision from 50% to at least 90%.",
+      "Raise mean Opportunity Brief usefulness from 1.14/3 to at least 2.0/3.",
+      "Raise founder YES plus MAYBE yield from 57.14% to at least 80%."
+    ],
+    "P2": [
+      "Improve employee-band evidence coverage and suppress accounts proven outside the target band.",
+      "Refine competitor classification where broad product-category overlap is not direct competition."
+    ]
+  },
+  "resumable_state": {
+    "provider_preflight_complete": true,
+    "reliability_complete": true,
+    "discovery_complete": true,
+    "prequalification_complete": true,
+    "account_research_complete": true,
+    "signals_complete": true,
+    "briefs_complete": true,
+    "top10_qa_complete": true,
+    "engineering_gates_complete": true,
+    "report_complete": true,
+    "next_stage": "none",
+    "provider_rerun_required": false
+  },
+  "final_answer": "NO"
+}

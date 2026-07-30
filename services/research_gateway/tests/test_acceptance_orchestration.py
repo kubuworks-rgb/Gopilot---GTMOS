@@ -58,6 +58,65 @@ def test_phase5_runner_normalizes_case_colliding_path_before_children() -> None:
     assert 'Join-Path $root "scripts\\phase5_holdout_export.py"' not in runner
 
 
+def test_phase5_logged_gate_captures_stderr_without_aborting_suite() -> None:
+    runner = (ROOT / "scripts" / "phase5_secure_acceptance.ps1").read_text(
+        encoding="utf-8"
+    )
+    gate_function = runner[
+        runner.index("function Invoke-LoggedGate") :
+        runner.index("function Invoke-MockWorkflow")
+    ]
+
+    assert '$ErrorActionPreference = "Continue"' in gate_function
+    assert "$nativeExitCode = $LASTEXITCODE" in gate_function
+    assert "$Results[$Name] = ($nativeExitCode -eq 0)" in gate_function
+    assert "$ErrorActionPreference = $previousPreference" in gate_function
+
+
+def test_phase5_logged_gate_tolerates_successful_native_stderr(
+    tmp_path: Path,
+) -> None:
+    runner = (ROOT / "scripts" / "phase5_secure_acceptance.ps1").read_text(
+        encoding="utf-8"
+    )
+    gate_function = runner[
+        runner.index("function Invoke-LoggedGate") :
+        runner.index("function Invoke-MockWorkflow")
+    ]
+    probe = tmp_path / "gate-probe.ps1"
+    gate_log = tmp_path / "gate.log"
+    probe.write_text(
+        '$ErrorActionPreference = "Stop"\n'
+        f'$gateLog = "{str(gate_log).replace(chr(92), chr(92) * 2)}"\n'
+        + gate_function
+        + "\n$results = @{}\n"
+        + 'Invoke-LoggedGate "stderr_probe" { '
+        + '& cmd.exe /d /c "echo harmless-warning 1>&2 & exit /b 0" '
+        + "} $results\n"
+        + 'if (-not $results["stderr_probe"]) { exit 9 }\n',
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(probe),
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "harmless-warning" in gate_log.read_text(encoding="utf-16")
+
+
 def test_phase5_mock_orchestration_reaches_every_stage(tmp_path: Path) -> None:
     diagnostics = tmp_path / "phase5-mock.json"
     completed = subprocess.run(

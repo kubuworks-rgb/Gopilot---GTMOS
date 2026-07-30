@@ -67,6 +67,8 @@ EXCLUDED_COMPANY_HOSTS = {
     "github.com",
     "medium.com",
     "substack.com",
+    "greenhouse.io",
+    "jobaaj.com",
 }
 
 NEWS_DOMAINS = {

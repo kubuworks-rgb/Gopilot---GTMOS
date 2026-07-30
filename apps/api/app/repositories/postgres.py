@@ -488,6 +488,12 @@ class PostgresRepository:
         if snapshot is None or row.icp_profile_id is None:
             return None
         scores = AccountScores.model_validate(snapshot.scores)
+        raw_company_identity = row.attributes.get("company_identity")
+        company_identity: dict[str, object] = (
+            {str(key): value for key, value in raw_company_identity.items()}
+            if isinstance(raw_company_identity, dict)
+            else {}
+        )
         return Account(
             id=str(row.id),
             workspace_id=str(row.workspace_id),
@@ -554,6 +560,10 @@ class PostgresRepository:
             research_candidate=bool(
                 row.attributes.get("research_candidate", True)
             ),
+            brief_state=str(
+                row.attributes.get("brief_state") or "RESEARCH_CANDIDATE"
+            ),  # type: ignore[arg-type]
+            company_identity=company_identity,
         )
 
     async def brief(

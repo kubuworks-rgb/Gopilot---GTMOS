@@ -1,0 +1,2451 @@
+{
+  "run_id": "9c481dc9-9af2-48a2-b5d2-ebd2995373bb",
+  "mode": "CREDENTIAL_FREE_REPLAY",
+  "external_search_performed": false,
+  "source_documents": 76,
+  "evidence_facts": 144,
+  "accounts": [
+    {
+      "account": "BizBMS",
+      "domain": "bizbms.com",
+      "qualification": "DISQUALIFIED",
+      "old_evidence_attachments": 14,
+      "new_evidence_attachments": 10,
+      "rejected_or_ambiguous": 4,
+      "old_signals": 0,
+      "new_signals": 0,
+      "old_important_claims": 6,
+      "retained_old_important_claims": 6,
+      "rebuilt_supported_claims": 6,
+      "brief_state": "DO_NOT_TARGET",
+      "brief_usefulness_out_of_3": 2,
+      "identity_warnings": [],
+      "signal_audit": [],
+      "shadow_brief": {
+        "state": "DO_NOT_TARGET",
+        "verified_identity": {
+          "canonical_company_name": "BizBMS",
+          "canonical_registrable_domain": "bizbms.com",
+          "verified_official_domains": [
+            "bizbms.com"
+          ],
+          "known_aliases": [],
+          "legal_name": null,
+          "product_names": [],
+          "product_domains": [],
+          "parent_organization": null,
+          "subsidiaries": [],
+          "relationships": [],
+          "relationship_evidence_ids": [],
+          "identity_confidence": 0.88,
+          "unresolved_identity_warnings": []
+        },
+        "verified_icp_facts": [
+          {
+            "statement": "BizBMS - B2B AI & SaaS Platform Biz BMS BMS Biz AI BMS Go Features Solutions About Book a Demo BMS Biz AI BMS Go Features Solutions About Book a Demo BMS Biz BMS Go Clients Features Solutions Case Studies BizBMS \u00b7 Enterprise B2B SaaS & AI Platform Run Your Business.",
+            "evidence_ids": [
+              "8a78c23c-643f-4172-ad4d-ab71b424e702"
+            ]
+          },
+          {
+            "statement": "Industries Fleet & Logistics Retail Manufacturing CX & Support HR Finance Energy Capabilities Fleet Management CRM Inventory Management Customer Support Employee Management Asset Management Links BMS BMS Go Biz AI Solutions Features About Contact Contact +91-8873-33-8873 contact@bizbms.com New Delhi, India \u00a9 2026 BizBMS Technologies Pvt.",
+            "evidence_ids": [
+              "039ee145-f353-4d52-aa90-5b9087e1e9d4"
+            ]
+          },
+          {
+            "statement": "Industries Fleet & Logistics Retail Manufacturing CX & Support HR Finance Energy Capabilities Fleet Management CRM Inventory Management Customer Support Employee Management Asset Management Links BMS BMS Go Biz AI Solutions Features About Contact Contact +91-8873-33-8873 contact@bizbms.com New Delhi, India \u00a9 2026 BizBMS Technologies Pvt.",
+            "evidence_ids": [
+              "ab696ea8-d168-4cfd-a3b2-a328e64eb5ef"
+            ]
+          },
+          {
+            "statement": "Contact Us - Book a Demo | BizBMS Biz BMS BMS Biz AI BMS Go Features Solutions About Book a Demo BMS Biz AI BMS Go Features Solutions About Book a Demo B2B SaaS & AI Platform Contact Us Biz BMS Have a project in mind or want to explore how BizBMS fits your business?",
+            "evidence_ids": [
+              "c96ee151-9009-49d3-980b-78d9e4935cae"
+            ]
+          },
+          {
+            "statement": "Industries Fleet & Logistics Retail Manufacturing CX & Support HR Finance Energy Capabilities Fleet Management CRM Inventory Management Customer Support Employee Management Asset Management Links BMS BMS Go Biz AI Solutions Features About Contact Contact +91-8873-33-8873 contact@bizbms.com New Delhi, India \u00a9 2026 BizBMS Technologies Pvt.",
+            "evidence_ids": [
+              "3a3ff070-91ab-42ca-a7b5-466fceb5bd10"
+            ]
+          }
+        ],
+        "unknown_icp_facts": [
+          "Company size remains unknown.",
+          "Employee count remains unknown; it is not treated as false."
+        ],
+        "current_signals": [],
+        "rejected_or_ambiguous_evidence": [
+          {
+            "evidence_id": "2c5a294d-d209-445c-ae2e-dda91b1df7d4",
+            "source_id": "b6b64724-8392-4c3d-a52a-939ada036695",
+            "source_domain": "jobaaj.com",
+            "subject": "Apply now in bizbms with Jobaaj and get placed. Explore the Careers at bizbms and take your first step towards your Dream Job.",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Source text identifies a conflicting or unresolved entity."
+          },
+          {
+            "evidence_id": "921d9fba-0284-488e-9fa4-a7fad4ae288c",
+            "source_id": "b6b64724-8392-4c3d-a52a-939ada036695",
+            "source_domain": "jobaaj.com",
+            "subject": "Apply now in bizbms with Jobaaj and get placed. Explore the Careers at bizbms and take your first step towards your Dream Job.",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Source text identifies a conflicting or unresolved entity."
+          },
+          {
+            "evidence_id": "93c65e32-b14b-48ce-82bd-a55d21222c47",
+            "source_id": "6b84c764-6dab-4e08-86ec-42ce020113f4",
+            "source_domain": "jobaaj.com",
+            "subject": "Apply to SaaS Sales Partner",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Source text identifies a conflicting or unresolved entity."
+          },
+          {
+            "evidence_id": "c56c7a54-8fc9-4dd0-a6fa-ec50b7fb5455",
+            "source_id": "6b84c764-6dab-4e08-86ec-42ce020113f4",
+            "source_domain": "jobaaj.com",
+            "subject": "Apply to SaaS Sales Partner",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Source text identifies a conflicting or unresolved entity."
+          }
+        ],
+        "hypotheses": [
+          {
+            "statement": "BizBMS may have the target problem; discovery validation is required.",
+            "status": "hypothesis",
+            "evidence_ids": []
+          }
+        ],
+        "recommended_action": "Do not target.",
+        "reason_not_to_target": "Account is disqualified or conflicts directly with the product.",
+        "next_research_step": null
+      }
+    },
+    {
+      "account": "ComplyZero",
+      "domain": "complyzero.com",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "old_evidence_attachments": 11,
+      "new_evidence_attachments": 10,
+      "rejected_or_ambiguous": 1,
+      "old_signals": 0,
+      "new_signals": 0,
+      "old_important_claims": 6,
+      "retained_old_important_claims": 6,
+      "rebuilt_supported_claims": 6,
+      "brief_state": "MONITOR",
+      "brief_usefulness_out_of_3": 2,
+      "identity_warnings": [],
+      "signal_audit": [],
+      "shadow_brief": {
+        "state": "MONITOR",
+        "verified_identity": {
+          "canonical_company_name": "ComplyZero",
+          "canonical_registrable_domain": "complyzero.com",
+          "verified_official_domains": [
+            "complyzero.com"
+          ],
+          "known_aliases": [],
+          "legal_name": null,
+          "product_names": [],
+          "product_domains": [],
+          "parent_organization": null,
+          "subsidiaries": [],
+          "relationships": [],
+          "relationship_evidence_ids": [],
+          "identity_confidence": 0.88,
+          "unresolved_identity_warnings": []
+        },
+        "verified_icp_facts": [
+          {
+            "statement": "ComplyZero - DPDP Compliance Software for Indian Businesses ComplyZero Pricing Enterprise Blog About Contact Login Get Started Free Pricing Enterprise Blog About Contact Login Get Started Free DPDP Compliance Made Simple for Indian Businesses.",
+            "evidence_ids": [
+              "4cb9ec82-b59d-4c51-b880-bd2136b2ba7f"
+            ]
+          },
+          {
+            "statement": "See Why Indian Businesses Trust ComplyZero \u201c We were worried about DPDP compliance until we found ComplyZero.",
+            "evidence_ids": [
+              "7893db1f-7d55-41dd-8e32-3d3c2affb922"
+            ]
+          },
+          {
+            "statement": "About ComplyZero | India's DPDP Compliance Platform | ComplyZero ComplyZero Pricing Enterprise Blog About Contact Login Get Started Free Pricing Enterprise Blog About Contact Login Get Started Free Our Story We're Building India's Privacy Infrastructure The DPDP Act is here.",
+            "evidence_ids": [
+              "1af890fc-d6ad-43ea-9b8c-bb2971db7a6a"
+            ]
+          },
+          {
+            "statement": "Get Started Free View Pricing ComplyZero India's first self-serve DPDP compliance platform.",
+            "evidence_ids": [
+              "c8e195ae-b528-4e8a-9874-139154da92b4"
+            ]
+          },
+          {
+            "statement": "Enterprise DPDP Compliance | Multi-Brand Privacy Platform | ComplyZero ComplyZero Pricing Enterprise Blog About Contact Login Get Started Free Pricing Enterprise Blog About Contact Login Get Started Free Compliance Infrastructure for India's Largest Organizations Purpose-built DPDP compliance platform with Indian data residency, cryptographic audit trails, and consent infrastructure that scales to millions of interactions.",
+            "evidence_ids": [
+              "90ec7e22-a82e-4e09-9e4a-ab60cfb0df23"
+            ]
+          }
+        ],
+        "unknown_icp_facts": [
+          "Customer-support operations remain unverified.",
+          "Company size remains unknown.",
+          "B2B software model remains unknown.",
+          "Support operations remain unknown.",
+          "Employee count remains unknown; it is not treated as false."
+        ],
+        "current_signals": [],
+        "rejected_or_ambiguous_evidence": [
+          {
+            "evidence_id": "9b8a41a1-7751-49f9-86af-328340466470",
+            "source_id": "4994cb43-1636-481c-bae9-d9c440b671ff",
+            "source_domain": "echai.ventures",
+            "subject": "ComplyZero \u00b7 D2C \u00b7 eChai",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          }
+        ],
+        "hypotheses": [
+          {
+            "statement": "ComplyZero may have the target problem; discovery validation is required.",
+            "status": "hypothesis",
+            "evidence_ids": []
+          }
+        ],
+        "recommended_action": "Monitor for a verified trigger.",
+        "reason_not_to_target": "No timely account-specific signal is verified.",
+        "next_research_step": "Monitor first-party product, careers, and company news."
+      }
+    },
+    {
+      "account": "OpenHR India",
+      "domain": "openhr.tech",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "old_evidence_attachments": 17,
+      "new_evidence_attachments": 17,
+      "rejected_or_ambiguous": 0,
+      "old_signals": 3,
+      "new_signals": 3,
+      "old_important_claims": 9,
+      "retained_old_important_claims": 9,
+      "rebuilt_supported_claims": 9,
+      "brief_state": "RESEARCH_CANDIDATE",
+      "brief_usefulness_out_of_3": 2,
+      "identity_warnings": [],
+      "signal_audit": [
+        {
+          "signal_type": "NEW_PRODUCT",
+          "subject_entity": "OpenHR Free Access | HRMS & Recruitment Software for Companies \u2014 OpenHR",
+          "canonical_subject_domain": "openhr.tech",
+          "event_date": "2026-04-12T16:51:00+00:00",
+          "source_id": "338b03f1-0775-4e78-ab7d-3b6ba0949d86",
+          "source_url": "https://openhr.tech/blog/openhr-free-access-hrms-advanced-recruitment-software",
+          "supporting_passage": "OpenHR Free Access | HRMS & Recruitment Software for Companies \u2014 OpenHR OpenHR Product Pricing Blog About Get started Product Pricing Blog About Get started Home / Blog / Product / OpenHR Launched: Free Access HRMS & Advanced Rec...",
+          "entity_match_confidence": 1.0,
+          "claim_scope": "PRODUCT_LEVEL",
+          "claim_scope_compatible": true,
+          "gopilot_relevance": 0.65,
+          "attachment_decision": "ATTACHED",
+          "rejection_reason": null
+        },
+        {
+          "signal_type": "NEW_PRODUCT",
+          "subject_entity": "OpenHR Free Access | HRMS & Recruitment Software for Companies \u2014 OpenHR",
+          "canonical_subject_domain": "openhr.tech",
+          "event_date": "2026-04-12T16:51:00+00:00",
+          "source_id": "338b03f1-0775-4e78-ab7d-3b6ba0949d86",
+          "source_url": "https://openhr.tech/blog/openhr-free-access-hrms-advanced-recruitment-software",
+          "supporting_passage": "Product OpenHR Launched: Free Access HRMS & Advanced Recruitment Software for Companies OpenHR is now live with free access, offering an all-in-one HRMS and advanced recruitment software that helps companies manage HR operations, hiring, attendance, employee data, and recruitment workflows from one platform without multiple subscriptions April 12, 2026 Rahul Menon 3 min read 720 views In today\u2019s business environment, companies often use multiple tools to manage HR operations and hiring processes.",
+          "entity_match_confidence": 1.0,
+          "claim_scope": "PRODUCT_LEVEL",
+          "claim_scope_compatible": true,
+          "gopilot_relevance": 0.65,
+          "attachment_decision": "ATTACHED",
+          "rejection_reason": null
+        },
+        {
+          "signal_type": "NEW_PRODUCT",
+          "subject_entity": "AI Recruitment Software for Startups in India | OpenHR \u2014 OpenHR",
+          "canonical_subject_domain": "openhr.tech",
+          "event_date": "2026-05-22T18:22:44+00:00",
+          "source_id": "aca2ca79-b206-47f3-a51d-c498deb26260",
+          "source_url": "https://openhr.tech/blog/ai-recruitment-software-for-startups-india",
+          "supporting_passage": "OpenHR India \u2197 Categories Product 2 Recent posts B Best HRMS Software for Startups in India Jul 11, 2026 H How AI is Changing Hiring in India \u2014 And What It Means for Your Startup May 17, 2026 W Why Every Startup Needs an AI-Powered HRMS in 2026 Apr 22, 2026 O OpenHR Launched: Free Access HRMS & Advanced Recruitment Software for Companies Apr 12, 2026 \u2190 All blog posts \u00a9 2026 OpenHR.",
+          "entity_match_confidence": 1.0,
+          "claim_scope": "PRODUCT_LEVEL",
+          "claim_scope_compatible": true,
+          "gopilot_relevance": 0.65,
+          "attachment_decision": "ATTACHED",
+          "rejection_reason": null
+        }
+      ],
+      "shadow_brief": {
+        "state": "RESEARCH_CANDIDATE",
+        "verified_identity": {
+          "canonical_company_name": "OpenHR India",
+          "canonical_registrable_domain": "openhr.tech",
+          "verified_official_domains": [
+            "openhr.tech"
+          ],
+          "known_aliases": [],
+          "legal_name": null,
+          "product_names": [],
+          "product_domains": [],
+          "parent_organization": null,
+          "subsidiaries": [],
+          "relationships": [],
+          "relationship_evidence_ids": [],
+          "identity_confidence": 0.88,
+          "unresolved_identity_warnings": []
+        },
+        "verified_icp_facts": [
+          {
+            "statement": "OpenHR India | AI HRMS, Payroll & ATS Software for Indian Startups OpenHR Product Staffing Pricing Educators Employees FAQ Resources Product Staffing Pricing Educators Employees FAQ Resources Made for Indian startups & growing teams AI-Powered HRMS Software in India.",
+            "evidence_ids": [
+              "55bfcc52-b51b-4039-9567-4458e8835c0d"
+            ]
+          },
+          {
+            "statement": "Hire Now Find Job AI Recruiter Active Applicants this week +142 ATS interviews 32 Payroll processed Rs 2.4 Cr Headcount analytics 184 Retention risk Low Staffing team Sourcing & screening Onboarding workflows Compliance & payroll ops JD MK SR +6 recruiters Human-in-the-loop staffing support HRMS + staffing, built for modern Indian teams Employer Stack For Employers AI-enabled HRMS software with payroll processing, attendance tracking, leave management, ATS, analytics, and complete employee lifecycle workflows.",
+            "evidence_ids": [
+              "f854ec2b-3780-4037-b5a7-c1beaad222a0"
+            ]
+          },
+          {
+            "statement": "About OpenHR \u2014 Our Team & Founders OpenHR HRMS Payroll Staffing Pricing Blog About Start Free HRMS Payroll Staffing Pricing Blog About Start Free Company Building trustworthy HR software for Indian teams OpenHR combines an AI-powered HRMS with optional managed staffing.",
+            "evidence_ids": [
+              "14c99212-2cf0-43d1-aec9-50596f0e2986"
+            ]
+          },
+          {
+            "statement": "Product HRMS Payroll Analytics AI Recruiter Staffing Dedicated HR Recruitment Ops Compliance Onboarding Company About & team Careers Security Resources FAQ Blog Pricing Help Center Cities Bangalore Hyderabad Mumbai \u00a9 2026 OpenHR \u2014 AI-powered HR ecosystem.",
+            "evidence_ids": [
+              "b1f825cc-c57a-4ec2-b4e9-4626a4a0df6e"
+            ]
+          },
+          {
+            "statement": "OpenHR for Employers OpenHR Product Pricing Start Hiring Product Pricing Start Hiring Employers All-in-one HRMS for modern teams Payroll, attendance, hiring, analytics, and employee lifecycle in one place.",
+            "evidence_ids": [
+              "d9c05ca7-8bf6-4dbd-b484-1452fa567762"
+            ]
+          }
+        ],
+        "unknown_icp_facts": [
+          "Company size remains unknown.",
+          "B2B software model remains unknown.",
+          "Employee count remains unknown; it is not treated as false."
+        ],
+        "current_signals": [
+          {
+            "signal_type": "NEW_PRODUCT",
+            "statement": "OpenHR Free Access | HRMS & Recruitment Software for Companies \u2014 OpenHR OpenHR Product Pricing Blog About Get started Product Pricing Blog About Get started Home / Blog / Product / OpenHR Launched: Free Access HRMS & Advanced Rec...",
+            "evidence_ids": [
+              "ed326e44-53ec-49ce-ba23-d7740144da05"
+            ]
+          },
+          {
+            "signal_type": "NEW_PRODUCT",
+            "statement": "Product OpenHR Launched: Free Access HRMS & Advanced Recruitment Software for Companies OpenHR is now live with free access, offering an all-in-one HRMS and advanced recruitment software that helps companies manage HR operations, hiring, attendance, employee data, and recruitment workflows from one platform without multiple subscriptions April 12, 2026 Rahul Menon 3 min read 720 views In today\u2019s business environment, companies often use multiple tools to manage HR operations and hiring processes.",
+            "evidence_ids": [
+              "9a68b885-c460-42e0-b4e6-377232bf5d98"
+            ]
+          },
+          {
+            "signal_type": "NEW_PRODUCT",
+            "statement": "OpenHR India \u2197 Categories Product 2 Recent posts B Best HRMS Software for Startups in India Jul 11, 2026 H How AI is Changing Hiring in India \u2014 And What It Means for Your Startup May 17, 2026 W Why Every Startup Needs an AI-Powered HRMS in 2026 Apr 22, 2026 O OpenHR Launched: Free Access HRMS & Advanced Recruitment Software for Companies Apr 12, 2026 \u2190 All blog posts \u00a9 2026 OpenHR.",
+            "evidence_ids": [
+              "fbb8edad-0d13-4732-ac1b-2e3879102b97"
+            ]
+          }
+        ],
+        "rejected_or_ambiguous_evidence": [],
+        "hypotheses": [
+          {
+            "statement": "OpenHR India may have the target problem; discovery validation is required.",
+            "status": "hypothesis",
+            "evidence_ids": []
+          }
+        ],
+        "recommended_action": "Complete bounded ICP research before outreach.",
+        "reason_not_to_target": null,
+        "next_research_step": "Verify missing ICP criteria using bounded first-party research."
+      }
+    },
+    {
+      "account": "BiggerWide",
+      "domain": "biggerwide.com",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "old_evidence_attachments": 23,
+      "new_evidence_attachments": 21,
+      "rejected_or_ambiguous": 2,
+      "old_signals": 0,
+      "new_signals": 0,
+      "old_important_claims": 6,
+      "retained_old_important_claims": 6,
+      "rebuilt_supported_claims": 6,
+      "brief_state": "IDENTITY_REVIEW_REQUIRED",
+      "brief_usefulness_out_of_3": 2,
+      "identity_warnings": [
+        "One or more sources may belong to another entity."
+      ],
+      "signal_audit": [],
+      "shadow_brief": {
+        "state": "IDENTITY_REVIEW_REQUIRED",
+        "verified_identity": {
+          "canonical_company_name": "BiggerWide",
+          "canonical_registrable_domain": "biggerwide.com",
+          "verified_official_domains": [
+            "biggerwide.com"
+          ],
+          "known_aliases": [],
+          "legal_name": null,
+          "product_names": [],
+          "product_domains": [],
+          "parent_organization": null,
+          "subsidiaries": [],
+          "relationships": [],
+          "relationship_evidence_ids": [],
+          "identity_confidence": 0.88,
+          "unresolved_identity_warnings": [
+            "One or more sources may belong to another entity."
+          ]
+        },
+        "verified_icp_facts": [
+          {
+            "statement": "I've to give that load with our Sai Krish Transport (\u20b950,000) \" 7+ Indian languages 80\u201390% Time saved 3 Active modes Auto Voice training Explore BUJI Assistant arrow_forward Why brokers choose BIGGERWIDE See how we compare to your current methods.",
+            "evidence_ids": [
+              "32bad284-9ef5-4b13-b6ab-d7b40d592dc5"
+            ]
+          },
+          {
+            "statement": "check_circle Everything in Plus check_circle Multi-team logins \u00b7 roles check_circle Your own subdomain: name.biggerwide.com check_circle KYC-OTP verified badge included Upgrade to Pro Per-broker portal Free When a broker invites you, you get a free customer portal under their subdomain.",
+            "evidence_ids": [
+              "4cfde86e-4a76-401a-b612-4c88849ef575"
+            ]
+          },
+          {
+            "statement": "Download free arrow_forward All resources arrow_forward campaign Changelog map Roadmap monitor_heart System status 99.98% uptime \u00b7 30 days Company expand_more About info About Us Built in Indore \u00b7 Bwide Tech India mail Contact Us Get in touch \u2014 fast routes Trust verified_user Trust Center Security, DPDP, audit transparency gavel DPDP Act 2023 How we handle your data handshake Partner With Us NEW CAs, associations, tech, referral Made in Indore Built in India, for India's transport.",
+            "evidence_ids": [
+              "faf5e4c3-6438-47c7-ac2f-941b756429cb"
+            ]
+          },
+          {
+            "statement": "For investors, partners, press, journalists, customers, or anyone curious about what we're building \u2014 we're easy to reach.",
+            "evidence_ids": [
+              "1725ab50-6dbc-4e3b-94f6-84c62b292915"
+            ]
+          },
+          {
+            "statement": "check_circle Everything in Plus check_circle Multi-team logins \u00b7 roles check_circle Your own subdomain: name.biggerwide.com check_circle KYC-OTP verified badge included Upgrade to Pro Per-broker portal Free When a broker invites you, you get a free customer portal under their subdomain.",
+            "evidence_ids": [
+              "725b2c78-576b-44a3-a91e-52c09c64b765"
+            ]
+          }
+        ],
+        "unknown_icp_facts": [],
+        "current_signals": [],
+        "rejected_or_ambiguous_evidence": [
+          {
+            "evidence_id": "1b1e0f37-fa8d-4329-9ffc-d254973e5810",
+            "source_id": "fcabf890-a277-4a9b-9dd8-e91af0c350b9",
+            "source_domain": "biggerwide365.com",
+            "subject": "BIGGERWIDE \u2014 Gateway",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "bfbc2757-41c8-487f-83ce-2f6e1c7fc678",
+            "source_id": "fcabf890-a277-4a9b-9dd8-e91af0c350b9",
+            "source_domain": "biggerwide365.com",
+            "subject": "BIGGERWIDE \u2014 Gateway",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          }
+        ],
+        "hypotheses": [
+          {
+            "statement": "BiggerWide may have the target problem; discovery validation is required.",
+            "status": "hypothesis",
+            "evidence_ids": []
+          }
+        ],
+        "recommended_action": "Resolve identity before use.",
+        "reason_not_to_target": "Resolve account identity before targeting.",
+        "next_research_step": "Verify official-domain ownership and entity relationships."
+      }
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "domain": "optivian.cloud",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "old_evidence_attachments": 18,
+      "new_evidence_attachments": 6,
+      "rejected_or_ambiguous": 12,
+      "old_signals": 4,
+      "new_signals": 0,
+      "old_important_claims": 10,
+      "retained_old_important_claims": 5,
+      "rebuilt_supported_claims": 6,
+      "brief_state": "IDENTITY_REVIEW_REQUIRED",
+      "brief_usefulness_out_of_3": 2,
+      "identity_warnings": [
+        "One or more sources may belong to another entity."
+      ],
+      "signal_audit": [
+        {
+          "signal_type": "PARTNERSHIP",
+          "subject_entity": "How Supermetrics rolled out an AI sales co-worker to 50 sellers, and hit 96% weekly active usage in 30 days",
+          "canonical_subject_domain": "optivian.ai",
+          "event_date": "2026-05-11T00:00:00+00:00",
+          "source_id": "644282f7-f7b0-4791-b202-4027c62ca694",
+          "source_url": "https://optivian.ai/insights/supermetrics",
+          "supporting_passage": "How Supermetrics rolled out an AI sales co-worker to 50 sellers, and hit 96% weekly active usage in 30 days \u2014 Optivian Insights | Optivian How it works Product Deal intelligence The living truth of every deal Ollie Your proactive AI sales co-worker Optivian in Claude Your deals in the AI you already use About Insights Book Demo Back to insights OPTIVIAN \u00d7 SUPERMETRICS How Supermetrics rolled out an AI sales co-worker to 50 sellers, and hit 96% weekly active usage in 30 days The marketing intelligence platform processing 15% of global online ad spend partnered with Optivian.",
+          "entity_match_confidence": 0.0,
+          "claim_scope": "PARTNER_LEVEL",
+          "claim_scope_compatible": false,
+          "gopilot_relevance": 0.65,
+          "attachment_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+          "rejection_reason": "Different first-party domain has no verified account relationship."
+        },
+        {
+          "signal_type": "FUNDING",
+          "subject_entity": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit",
+          "canonical_subject_domain": "optivian.ai",
+          "event_date": "2026-02-03T00:00:00+00:00",
+          "source_id": "05520c14-0076-4dae-a48e-8c72f6d6e030",
+          "source_url": "https://optivian.ai/insights/funding-announcement",
+          "supporting_passage": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit \u2014 Optivian Insights | Optivian How it works Product Deal intelligence The living truth of every deal Ollie Your proactive AI sales co-worker Optivian in Claude Your deals in the AI you already use About Insights Book Demo Back to insights News Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit AI Sales Execution platform launches with $2M pre-seed round led by Failup Ventures and Tero Ojanper\u00e4, former Executive Chair and co-founder of Silo AI.",
+          "entity_match_confidence": 0.0,
+          "claim_scope": "COMPANY_LEVEL",
+          "claim_scope_compatible": false,
+          "gopilot_relevance": 0.65,
+          "attachment_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+          "rejection_reason": "Different first-party domain has no verified account relationship."
+        },
+        {
+          "signal_type": "NEW_PRODUCT",
+          "subject_entity": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit",
+          "canonical_subject_domain": "optivian.ai",
+          "event_date": "2026-02-03T00:00:00+00:00",
+          "source_id": "05520c14-0076-4dae-a48e-8c72f6d6e030",
+          "source_url": "https://optivian.ai/insights/funding-announcement",
+          "supporting_passage": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit \u2014 Optivian Insights | Optivian How it works Product Deal intelligence The living truth of every deal Ollie Your proactive AI sales co-worker Optivian in Claude Your deals in the AI you already use About Insights Book Demo Back to insights News Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit AI Sales Execution platform launches with $2M pre-seed round led by Failup Ventures and Tero Ojanper\u00e4, former Executive Chair and co-founder of Silo AI.",
+          "entity_match_confidence": 0.0,
+          "claim_scope": "COMPANY_LEVEL",
+          "claim_scope_compatible": false,
+          "gopilot_relevance": 0.65,
+          "attachment_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+          "rejection_reason": "Different first-party domain has no verified account relationship."
+        },
+        {
+          "signal_type": "FUNDING",
+          "subject_entity": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit",
+          "canonical_subject_domain": "optivian.ai",
+          "event_date": "2026-02-03T00:00:00+00:00",
+          "source_id": "05520c14-0076-4dae-a48e-8c72f6d6e030",
+          "source_url": "https://optivian.ai/insights/funding-announcement",
+          "supporting_passage": "Optivian is backed by a $2M pre-seed round led by Failup Ventures and Tero Ojanper\u00e4, former Executive Chair and co-founder of Silo AI, which was acquired by AMD in Europe's largest AI exit.",
+          "entity_match_confidence": 0.0,
+          "claim_scope": "COMPANY_LEVEL",
+          "claim_scope_compatible": false,
+          "gopilot_relevance": 0.65,
+          "attachment_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+          "rejection_reason": "Different first-party domain has no verified account relationship."
+        }
+      ],
+      "shadow_brief": {
+        "state": "IDENTITY_REVIEW_REQUIRED",
+        "verified_identity": {
+          "canonical_company_name": "Optivian \u2014 Push code. Deploy globally.",
+          "canonical_registrable_domain": "optivian.cloud",
+          "verified_official_domains": [
+            "optivian.cloud"
+          ],
+          "known_aliases": [],
+          "legal_name": null,
+          "product_names": [],
+          "product_domains": [],
+          "parent_organization": null,
+          "subsidiaries": [],
+          "relationships": [],
+          "relationship_evidence_ids": [],
+          "identity_confidence": 0.88,
+          "unresolved_identity_warnings": [
+            "One or more sources may belong to another entity."
+          ]
+        },
+        "verified_icp_facts": [
+          {
+            "statement": "Read the deploy guide \u2192 deploy logs env $ optivian login \u2713 Authenticated as [email protected] $ optivian link \u2713 Connected to project acme-web $ git push origin main \u2192 Deploy started \u00b7 build #214 \u2192 Image built \u00b7 38.2s \u2192 Health checks passed \u2713 Live at https://acme-web.optivian.app $ Preview deploys Every PR gets a unique URL.",
+            "evidence_ids": [
+              "108c4798-a541-4a32-97b1-d44ad39717ad"
+            ]
+          },
+          {
+            "statement": "Start deploying \u2192 See pricing Optivian Push code from GitHub.",
+            "evidence_ids": [
+              "d5c453a4-6001-4f8d-a87a-3a20563342fd"
+            ]
+          },
+          {
+            "statement": "\u2192 All solutions \u2192 Comparisons \u2192 Pricing Docs Blog Company About Mission and team Contact Get in touch Trust Security, compliance, sub-processors Status System health All systems operational Log in Start Deploying Solutions / Migrate from Heroku Migration playbook Heroku \u2192 Optivian If you grew up on Heroku, Optivian will feel familiar \u2014 but on bare-metal pricing, with India-first billing, and without the platform stagnation.",
+            "evidence_ids": [
+              "97f6cecd-9628-4a64-b484-3e4218fb7200"
+            ]
+          },
+          {
+            "statement": "Migrate from Heroku | Optivian | Optivian Skip to content Optivian Products Compute Web Services Long-running apps in any language.",
+            "evidence_ids": [
+              "17943a2e-ffdd-4832-8e27-ee8d59272ed0"
+            ]
+          },
+          {
+            "statement": "Pci DSS - Optivian Startup Docs Introduction Getting started Welcome!",
+            "evidence_ids": [
+              "d867ee63-2413-4c6b-b23e-74d2f2ce6f55"
+            ]
+          }
+        ],
+        "unknown_icp_facts": [
+          "Company size remains unknown.",
+          "Employee count remains unknown; it is not treated as false."
+        ],
+        "current_signals": [],
+        "rejected_or_ambiguous_evidence": [
+          {
+            "evidence_id": "fbfde98f-1079-47d8-8e3c-b633e3753146",
+            "source_id": "de283e13-cb28-43cb-83e7-496d4d1c69e4",
+            "source_domain": "optivian.ai",
+            "subject": "Support | Optivian",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "3cc15b62-dad0-4ade-be79-4f099589319f",
+            "source_id": "de283e13-cb28-43cb-83e7-496d4d1c69e4",
+            "source_domain": "optivian.ai",
+            "subject": "Support | Optivian",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "b786f8fd-a233-4858-bf75-b8ad3822b01a",
+            "source_id": "644282f7-f7b0-4791-b202-4027c62ca694",
+            "source_domain": "optivian.ai",
+            "subject": "How Supermetrics rolled out an AI sales co-worker to 50 sellers, and hit 96% weekly active usage in 30 days",
+            "relation": "UNKNOWN",
+            "scope": "PARTNER_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "0b046941-4209-41fc-864f-64f97918a38a",
+            "source_id": "644282f7-f7b0-4791-b202-4027c62ca694",
+            "source_domain": "optivian.ai",
+            "subject": "How Supermetrics rolled out an AI sales co-worker to 50 sellers, and hit 96% weekly active usage in 30 days",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "ee9b8a2b-7aa0-40da-a360-3e8f5abc6b03",
+            "source_id": "e0c92748-7b57-44be-bbe1-2fb09c7f55b1",
+            "source_domain": "einpresswire.com",
+            "subject": "Optivian Solutions Oy Press Releases - EIN Presswire - Press Release Distribution Service",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "ac4d75e7-50b3-4a98-b777-f560728312a2",
+            "source_id": "e0c92748-7b57-44be-bbe1-2fb09c7f55b1",
+            "source_domain": "einpresswire.com",
+            "subject": "Optivian Solutions Oy Press Releases - EIN Presswire - Press Release Distribution Service",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "cdaeceaa-0148-4e0b-bcd5-2a72c60720ce",
+            "source_id": "05520c14-0076-4dae-a48e-8c72f6d6e030",
+            "source_domain": "optivian.ai",
+            "subject": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "abf1fcbe-a112-4dc4-9364-c6e0af0d9a5c",
+            "source_id": "05520c14-0076-4dae-a48e-8c72f6d6e030",
+            "source_domain": "optivian.ai",
+            "subject": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "499cfcf1-7bbd-4290-bf08-679f3bcceb68",
+            "source_id": "96a488de-451b-43a3-97c5-06507c5dc9d7",
+            "source_domain": "optivian.ai",
+            "subject": "AI sales insights & resources",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "2b53a4fe-a6d7-4328-a47c-25e5ae0a7708",
+            "source_id": "96a488de-451b-43a3-97c5-06507c5dc9d7",
+            "source_domain": "optivian.ai",
+            "subject": "AI sales insights & resources",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "212b7a44-eacb-4454-95dc-5c25b0dc89dc",
+            "source_id": "5166e58d-b7b9-4727-9044-58784f02f364",
+            "source_domain": "einpresswire.com",
+            "subject": "Optivian Solutions Oy Press Releases - EIN Presswire - Press Release Distribution Service",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          },
+          {
+            "evidence_id": "70c8f817-11ac-4e7a-ad58-48ece79d45c4",
+            "source_id": "5166e58d-b7b9-4727-9044-58784f02f364",
+            "source_domain": "einpresswire.com",
+            "subject": "Optivian Solutions Oy Press Releases - EIN Presswire - Press Release Distribution Service",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Different first-party domain has no verified account relationship."
+          }
+        ],
+        "hypotheses": [
+          {
+            "statement": "Optivian \u2014 Push code. Deploy globally. may have the target problem; discovery validation is required.",
+            "status": "hypothesis",
+            "evidence_ids": []
+          }
+        ],
+        "recommended_action": "Resolve identity before use.",
+        "reason_not_to_target": "Resolve account identity before targeting.",
+        "next_research_step": "Verify official-domain ownership and entity relationships."
+      }
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "domain": "cloudsek.com",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "old_evidence_attachments": 18,
+      "new_evidence_attachments": 14,
+      "rejected_or_ambiguous": 4,
+      "old_signals": 1,
+      "new_signals": 1,
+      "old_important_claims": 7,
+      "retained_old_important_claims": 7,
+      "rebuilt_supported_claims": 7,
+      "brief_state": "RESEARCH_CANDIDATE",
+      "brief_usefulness_out_of_3": 2,
+      "identity_warnings": [],
+      "signal_audit": [
+        {
+          "signal_type": "CUSTOMER_GROWTH_INDICATOR",
+          "subject_entity": "Trusted by 100+ Customers | CloudSEK",
+          "canonical_subject_domain": "cloudsek.com",
+          "event_date": "2026-07-30T04:45:09.023685+00:00",
+          "source_id": "595c66fd-1520-4db9-a122-e968eccf074e",
+          "source_url": "https://www.cloudsek.com/customers",
+          "supporting_passage": "Trusted by 100+ Customers | CloudSEK \ud83d\ude80 Introducing the CloudSEK MCP Server!",
+          "entity_match_confidence": 1.0,
+          "claim_scope": "COMPANY_LEVEL",
+          "claim_scope_compatible": true,
+          "gopilot_relevance": 0.95,
+          "attachment_decision": "ATTACHED",
+          "rejection_reason": null
+        }
+      ],
+      "shadow_brief": {
+        "state": "RESEARCH_CANDIDATE",
+        "verified_identity": {
+          "canonical_company_name": "CloudSEK: Predictive Attack Path Intelligence",
+          "canonical_registrable_domain": "cloudsek.com",
+          "verified_official_domains": [
+            "cloudsek.com"
+          ],
+          "known_aliases": [],
+          "legal_name": null,
+          "product_names": [],
+          "product_domains": [],
+          "parent_organization": null,
+          "subsidiaries": [],
+          "relationships": [],
+          "relationship_evidence_ids": [],
+          "identity_confidence": 0.88,
+          "unresolved_identity_warnings": []
+        },
+        "verified_icp_facts": [
+          {
+            "statement": "CloudSEK: Predictive Attack Path Intelligence \ud83d\ude80 Introducing the CloudSEK MCP Server!",
+            "evidence_ids": [
+              "0f760db1-3b81-49d4-837d-c7bb60a9603f"
+            ]
+          },
+          {
+            "statement": "Latest Whitepaper Adversary Intelligence 24 Mar 26 CloudSEK: Global Threat Landscape Report 2025 Free Tools URL Analyser Scan for malicious links and phishing threats Deepfake Analyser Spot manipulated videos and deepfake scams ThreatLens A live feed of scams, phishing, and brand abuse Mobile App Analyser Detect security flaws in mobile apps Asset Explorer Gain insights on digital assets and subdomains Data Exposure Checker See if your organization's data is on the Dark Web BeVigil Asset Explorer Threat Monitoring Across the Hidden Web Log in Schedule a Demo Schedule a Demo Predictive Attack Graph Platform for the AI Era Attackers don\u2019t exploit one vulnerability.",
+            "evidence_ids": [
+              "46ecd2ce-1ebd-4fdf-9909-0a00eaa74a9c"
+            ]
+          },
+          {
+            "statement": "Explore all Integrations Partners 100s of partners and one Shared goal; Secure future for all us About us Learn about our story and our mission statement Life at CloudSEK A sneak peek at the awesome life at CloudSEK Careers We're hiring!",
+            "evidence_ids": [
+              "10937ee9-8283-42b3-812c-4e5a559fefc8"
+            ]
+          },
+          {
+            "statement": "10 The Dawn of a New Era CloudSEK launched Nexus, an AI-powered cybersecurity command center that unifies threat intelligence, integrates attack surface insights, and translates complex cyber risks into clear, actionable business impact.",
+            "evidence_ids": [
+              "360103fe-bc80-41bf-9e79-8b03c457d5b0"
+            ]
+          },
+          {
+            "statement": "\u200d With the help of predictive technologies such as Artificial Intelligence and CloudSEK\u2019s proprietary ThreatMeter, XVigil augments our customers\u2019 security posture, by helping them anticipate and mitigate threats in a timely manner.",
+            "evidence_ids": [
+              "6f0c77a9-97cd-4f50-889f-cd1a569d25e2"
+            ]
+          }
+        ],
+        "unknown_icp_facts": [
+          "Customer-support operations remain unverified.",
+          "Company size remains unknown.",
+          "Support operations remain unknown.",
+          "Employee count remains unknown; it is not treated as false."
+        ],
+        "current_signals": [
+          {
+            "signal_type": "CUSTOMER_GROWTH_INDICATOR",
+            "statement": "Trusted by 100+ Customers | CloudSEK \ud83d\ude80 Introducing the CloudSEK MCP Server!",
+            "evidence_ids": [
+              "aa335c61-1286-4632-8b78-21de9cffe642"
+            ]
+          }
+        ],
+        "rejected_or_ambiguous_evidence": [
+          {
+            "evidence_id": "f06e3498-05c9-4803-af62-7726faed2091",
+            "source_id": "a255bd92-81a3-4301-99e3-eea9c3e68a9b",
+            "source_domain": "greenhouse.io",
+            "subject": "Cybersecurity Customer Success Associate",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Source text identifies a conflicting or unresolved entity."
+          },
+          {
+            "evidence_id": "7f54d6bf-ef1a-4c09-a5db-0d6143120734",
+            "source_id": "a255bd92-81a3-4301-99e3-eea9c3e68a9b",
+            "source_domain": "greenhouse.io",
+            "subject": "Cybersecurity Customer Success Associate",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Source text identifies a conflicting or unresolved entity."
+          },
+          {
+            "evidence_id": "50ea626b-459b-4ded-b89f-7671fee4db34",
+            "source_id": "ae9a5c45-a810-4ace-9fe7-724b77a94ea8",
+            "source_domain": "greenhouse.io",
+            "subject": "Customer Success Manager",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Source text identifies a conflicting or unresolved entity."
+          },
+          {
+            "evidence_id": "3642f45c-07a6-41f9-a0cd-60ebbced9751",
+            "source_id": "ae9a5c45-a810-4ace-9fe7-724b77a94ea8",
+            "source_domain": "greenhouse.io",
+            "subject": "Customer Success Manager",
+            "relation": "UNKNOWN",
+            "scope": "COMPANY_LEVEL",
+            "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+            "reason": "Source text identifies a conflicting or unresolved entity."
+          }
+        ],
+        "hypotheses": [
+          {
+            "statement": "CloudSEK: Predictive Attack Path Intelligence may have the target problem; discovery validation is required.",
+            "status": "hypothesis",
+            "evidence_ids": []
+          }
+        ],
+        "recommended_action": "Complete bounded ICP research before outreach.",
+        "reason_not_to_target": null,
+        "next_research_step": "Verify missing ICP criteria using bounded first-party research."
+      }
+    },
+    {
+      "account": "Fortifyze",
+      "domain": "fortifyze.com",
+      "qualification": "QUALIFIED_WITH_UNCERTAINTY",
+      "old_evidence_attachments": 8,
+      "new_evidence_attachments": 8,
+      "rejected_or_ambiguous": 0,
+      "old_signals": 0,
+      "new_signals": 0,
+      "old_important_claims": 6,
+      "retained_old_important_claims": 6,
+      "rebuilt_supported_claims": 6,
+      "brief_state": "MONITOR",
+      "brief_usefulness_out_of_3": 2,
+      "identity_warnings": [],
+      "signal_audit": [],
+      "shadow_brief": {
+        "state": "MONITOR",
+        "verified_identity": {
+          "canonical_company_name": "Fortifyze",
+          "canonical_registrable_domain": "fortifyze.com",
+          "verified_official_domains": [
+            "fortifyze.com"
+          ],
+          "known_aliases": [],
+          "legal_name": null,
+          "product_names": [],
+          "product_domains": [],
+          "parent_organization": null,
+          "subsidiaries": [],
+          "relationships": [],
+          "relationship_evidence_ids": [],
+          "identity_confidence": 0.88,
+          "unresolved_identity_warnings": []
+        },
+        "verified_icp_facts": [
+          {
+            "statement": "Fortifyze Platform Solutions Security Resources DPDPA Resource Center The complete guide to India's DPDPA Blog & Insights Practical privacy & compliance guidance Whitepapers In-depth, downloadable guides Glossary Plain-English DPDPA terms FAQ Common questions, answered About Log in Get started DPDPA-ready \u00b7 Data protection platform Know your personal data.",
+            "evidence_ids": [
+              "351763d6-0070-42b3-a16e-57e7ce404ccc"
+            ]
+          },
+          {
+            "statement": "Fortifyze \u2014 DPDPA Compliance & Data Protection Platform \u00b7 Fortifyze",
+            "evidence_ids": [
+              "5ef1b01f-f636-4b97-b8f5-ac452059aba1"
+            ]
+          },
+          {
+            "statement": "Fortifyze Platform Solutions Security Resources DPDPA Resource Center The complete guide to India's DPDPA Blog & Insights Practical privacy & compliance guidance Whitepapers In-depth, downloadable guides Glossary Plain-English DPDPA terms FAQ Common questions, answered About Log in Get started About Making data protection operational and provable Fortifyze is a proprietary product of Trufe \u2014 purpose-built to help organisations discover personal data, govern it, and prove compliance under India's DPDPA.",
+            "evidence_ids": [
+              "6d50fea4-164a-4862-8765-93e79b55c689"
+            ]
+          },
+          {
+            "statement": "A Trufe product Fortifyze is designed, built and operated by Trufe .",
+            "evidence_ids": [
+              "94fc58ed-ddeb-41d0-a577-b3da96049b35"
+            ]
+          },
+          {
+            "statement": "Fortifyze Platform Solutions Security Resources DPDPA Resource Center The complete guide to India's DPDPA Blog & Insights Practical privacy & compliance guidance Whitepapers In-depth, downloadable guides Glossary Plain-English DPDPA terms FAQ Common questions, answered About Log in Get started \u2190 Back to blog Guide \u00b7 2 min read What is the DPDPA?",
+            "evidence_ids": [
+              "c894c2ab-27ef-48af-a6ff-e810ef750b28"
+            ]
+          }
+        ],
+        "unknown_icp_facts": [
+          "Customer-support operations remain unverified.",
+          "Company size remains unknown.",
+          "B2B software model remains unknown.",
+          "Support operations remain unknown.",
+          "Employee count remains unknown; it is not treated as false."
+        ],
+        "current_signals": [],
+        "rejected_or_ambiguous_evidence": [],
+        "hypotheses": [
+          {
+            "statement": "Fortifyze may have the target problem; discovery validation is required.",
+            "status": "hypothesis",
+            "evidence_ids": []
+          }
+        ],
+        "recommended_action": "Monitor for a verified trigger.",
+        "reason_not_to_target": "No timely account-specific signal is verified.",
+        "next_research_step": "Monitor first-party product, careers, and company news."
+      }
+    }
+  ],
+  "attachments": [
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/",
+      "subject": "BizBMS - B2B AI & SaaS Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "8a78c23c-643f-4172-ad4d-ab71b424e702"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/",
+      "subject": "BizBMS - B2B AI & SaaS Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "039ee145-f353-4d52-aa90-5b9087e1e9d4"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/contact-us",
+      "subject": "BizBMS - B2B AI & SaaS Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "ab696ea8-d168-4cfd-a3b2-a328e64eb5ef"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/contact-us",
+      "subject": "BizBMS - B2B AI & SaaS Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "c96ee151-9009-49d3-980b-78d9e4935cae"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/solutions/fleet-management",
+      "subject": "Fleet Management Software for Logistics & Fleet Owners | BizBMS",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "3a3ff070-91ab-42ca-a7b5-466fceb5bd10"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/solutions/fleet-management",
+      "subject": "Fleet Management Software for Logistics & Fleet Owners | BizBMS",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "83fe5e50-5977-4e49-a73e-62feaa48e7a5"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/solutions/customer-relationship-management-crm",
+      "subject": "BizBMS - B2B AI & SaaS Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "c0482245-4fea-4d87-b1aa-1136fd4c3f7b"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/solutions/customer-relationship-management-crm",
+      "subject": "BizBMS - B2B AI & SaaS Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "c4341292-b559-414c-aa6a-ee52b278cd33"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "jobaaj.com",
+      "source_url": "https://www.jobaaj.com/company/bizbms-careers",
+      "subject": "Apply now in bizbms with Jobaaj and get placed. Explore the Careers at bizbms and take your first step towards your Dream Job.",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Source text identifies a conflicting or unresolved entity.",
+      "evidence_id": "2c5a294d-d209-445c-ae2e-dda91b1df7d4"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "jobaaj.com",
+      "source_url": "https://www.jobaaj.com/company/bizbms-careers",
+      "subject": "Apply now in bizbms with Jobaaj and get placed. Explore the Careers at bizbms and take your first step towards your Dream Job.",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Source text identifies a conflicting or unresolved entity.",
+      "evidence_id": "921d9fba-0284-488e-9fa4-a7fad4ae288c"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "jobaaj.com",
+      "source_url": "https://www.jobaaj.com/job/bizbms-saas-sales-partner-commission-only-india-5-to-7-years-1410210",
+      "subject": "Apply to SaaS Sales Partner",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Source text identifies a conflicting or unresolved entity.",
+      "evidence_id": "93c65e32-b14b-48ce-82bd-a55d21222c47"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "jobaaj.com",
+      "source_url": "https://www.jobaaj.com/job/bizbms-saas-sales-partner-commission-only-india-5-to-7-years-1410210",
+      "subject": "Apply to SaaS Sales Partner",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Source text identifies a conflicting or unresolved entity.",
+      "evidence_id": "c56c7a54-8fc9-4dd0-a6fa-ec50b7fb5455"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/solutions/contract-management",
+      "subject": "BizBMS - B2B AI & SaaS Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "4ce2a807-1316-4d68-bf36-63f006a83d95"
+    },
+    {
+      "account": "BizBMS",
+      "account_domain": "bizbms.com",
+      "source_domain": "bizbms.com",
+      "source_url": "https://bizbms.com/solutions/contract-management",
+      "subject": "BizBMS - B2B AI & SaaS Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "8986e16f-8afb-4f34-beb5-91cacbd5f75e"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/",
+      "subject": "ComplyZero - DPDP Compliance Software for Indian Businesses",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "4cb9ec82-b59d-4c51-b880-bd2136b2ba7f"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/",
+      "subject": "ComplyZero - DPDP Compliance Software for Indian Businesses",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "7893db1f-7d55-41dd-8e32-3d3c2affb922"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/about",
+      "subject": "About ComplyZero - Our Story",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "1af890fc-d6ad-43ea-9b8c-bb2971db7a6a"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/about",
+      "subject": "About ComplyZero - Our Story",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "c8e195ae-b528-4e8a-9874-139154da92b4"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/enterprise",
+      "subject": "Enterprise DPDP Compliance | ComplyZero",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "90ec7e22-a82e-4e09-9e4a-ab60cfb0df23"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/enterprise",
+      "subject": "Enterprise DPDP Compliance | ComplyZero",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "665b9fa6-bcd5-4978-b8e5-8340b095f51e"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/blog",
+      "subject": "ComplyZero Blog - DPDP Insights & Compliance Guides",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "39167da9-0f6f-46ae-9d19-5eba390435c6"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/blog",
+      "subject": "ComplyZero Blog - DPDP Insights & Compliance Guides",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "63051a58-5e1b-40be-93fd-2fc2485a69fe"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "echai.ventures",
+      "source_url": "https://echai.ventures/d2c/from/complyzero",
+      "subject": "ComplyZero \u00b7 D2C \u00b7 eChai",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "9b8a41a1-7751-49f9-86af-328340466470"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/pricing",
+      "subject": "DPDP Compliance Pricing | ComplyZero",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "abb3ddc9-b58e-4790-9889-9f17de98fd82"
+    },
+    {
+      "account": "ComplyZero",
+      "account_domain": "complyzero.com",
+      "source_domain": "complyzero.com",
+      "source_url": "https://www.complyzero.com/pricing",
+      "subject": "DPDP Compliance Pricing | ComplyZero",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "f80443ba-5793-44d7-b1b0-4904b441d5f4"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/",
+      "subject": "OpenHR India | AI HRMS, Payroll & ATS Software for Indian Startups",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "55bfcc52-b51b-4039-9567-4458e8835c0d"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/",
+      "subject": "OpenHR India | AI HRMS, Payroll & ATS Software for Indian Startups",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "f854ec2b-3780-4037-b5a7-c1beaad222a0"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/about",
+      "subject": "About OpenHR \u2014 Our Team & Founders",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "14c99212-2cf0-43d1-aec9-50596f0e2986"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/about",
+      "subject": "About OpenHR \u2014 Our Team & Founders",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "b1f825cc-c57a-4ec2-b4e9-4626a4a0df6e"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/employers",
+      "subject": "OpenHR for Employers",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "d9c05ca7-8bf6-4dbd-b484-1452fa567762"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/employers",
+      "subject": "OpenHR for Employers",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "15dffa8d-8b71-4859-a140-5afbba9e8632"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog",
+      "subject": "HR & Payroll Blog India | OpenHR \u2014 Tips for Startups & HR Teams",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "86fb1c01-3995-49b8-9775-02732c7348fd"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog",
+      "subject": "HR & Payroll Blog India | OpenHR \u2014 Tips for Startups & HR Teams",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "639894e3-9ba4-4747-8eea-73abff1fb829"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog/best-hrms-software-for-startups-in-india",
+      "subject": "Best HRMS Software for Startups in India \u2014 OpenHR",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "25713704-5c4d-4e78-87ea-9843232f9fe7"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog/best-hrms-software-for-startups-in-india",
+      "subject": "Best HRMS Software for Startups in India \u2014 OpenHR",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "b96dcd57-dac2-450c-8b8e-ef0f437ad3de"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog/best-hrms-software-for-startups-in-india",
+      "subject": "Best HRMS Software for Startups in India \u2014 OpenHR",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "7576f39c-d974-418b-974e-7cdf7988ba8b"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog/best-hrms-software-for-startups-in-india",
+      "subject": "Best HRMS Software for Startups in India \u2014 OpenHR",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "88664d80-ce56-4155-931f-462263859328"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog/openhr-free-access-hrms-advanced-recruitment-software",
+      "subject": "OpenHR Free Access | HRMS & Recruitment Software for Companies \u2014 OpenHR",
+      "relation": "SAME_ENTITY",
+      "scope": "PRODUCT_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "ed326e44-53ec-49ce-ba23-d7740144da05"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog/openhr-free-access-hrms-advanced-recruitment-software",
+      "subject": "OpenHR Free Access | HRMS & Recruitment Software for Companies \u2014 OpenHR",
+      "relation": "SAME_ENTITY",
+      "scope": "PRODUCT_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "9a68b885-c460-42e0-b4e6-377232bf5d98"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/staffing-solution",
+      "subject": "OpenHR Staffing Solution",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "c09ea4d1-3e5b-4bc5-b704-4ae3f067f9e4"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog/ai-recruitment-software-for-startups-india",
+      "subject": "AI Recruitment Software for Startups in India | OpenHR \u2014 OpenHR",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "0813cff4-4b72-4681-ac90-40a19327bb00"
+    },
+    {
+      "account": "OpenHR India",
+      "account_domain": "openhr.tech",
+      "source_domain": "openhr.tech",
+      "source_url": "https://openhr.tech/blog/ai-recruitment-software-for-startups-india",
+      "subject": "AI Recruitment Software for Startups in India | OpenHR \u2014 OpenHR",
+      "relation": "SAME_ENTITY",
+      "scope": "PRODUCT_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "fbb8edad-0d13-4732-ac1b-2e3879102b97"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/",
+      "subject": "BiggerWide \u2014 The Broker OS for Indian Transport",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "32bad284-9ef5-4b13-b6ab-d7b40d592dc5"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/",
+      "subject": "BiggerWide \u2014 The Broker OS for Indian Transport",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "4cfde86e-4a76-401a-b612-4c88849ef575"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/about",
+      "subject": "Solving India's Transport Brokerage Challenges",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "faf5e4c3-6438-47c7-ac2f-941b756429cb"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/about",
+      "subject": "Solving India's Transport Brokerage Challenges",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "1725ab50-6dbc-4e3b-94f6-84c62b292915"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/",
+      "subject": "BiggerWide \u2014 The Broker OS for Indian Transport",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "725b2c78-576b-44a3-a91e-52c09c64b765"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/",
+      "subject": "BiggerWide \u2014 The Broker OS for Indian Transport",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "fb2c53f3-5299-41a0-aecc-6d55aa51ea8e"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/contact",
+      "subject": "Contact Us - Get In Touch With BiggerWide | BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "PARTNER_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "5b029e68-59a0-47fb-a7f2-2923a937f164"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/contact",
+      "subject": "Contact Us - Get In Touch With BiggerWide | BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "94c4dab9-95b3-4e09-b8e8-72bc837dcfa2"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/knowledge-base",
+      "subject": "Help Center \u2014 BIGGERWIDE",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "0d853ca4-f388-4d97-afb2-e57e86e7b46b"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide365.com",
+      "source_url": "https://www.biggerwide365.com/",
+      "subject": "BIGGERWIDE \u2014 Gateway",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "1b1e0f37-fa8d-4329-9ffc-d254973e5810"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide365.com",
+      "source_url": "https://www.biggerwide365.com/",
+      "subject": "BIGGERWIDE \u2014 Gateway",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "bfbc2757-41c8-487f-83ce-2f6e1c7fc678"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/driver-pricing",
+      "subject": "Driver App Pricing \u2014 Free Forever",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "9fabf8a5-a042-4f94-a1a0-0bad50f62e1d"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/driver-pricing",
+      "subject": "Driver App Pricing \u2014 Free Forever",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "19a96171-11a6-4e27-9216-fe9cf0436a31"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/customer-pricing",
+      "subject": "Customer Pricing \u2014 Track / Shipper Plus / Pro",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "7db13520-c201-41ff-94b0-1baaa9e0c22b"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/customer-pricing",
+      "subject": "Customer Pricing \u2014 Track / Shipper Plus / Pro",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "5da4b414-19cf-4576-b159-7fec14c22ce5"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/solutions/for-customers",
+      "subject": "For Customers - BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "13ea27b8-c973-433f-8dfc-f4147679c6b2"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/solutions/for-customers",
+      "subject": "For Customers - BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "ffa103db-3027-4490-aaa3-7c82ae335ebf"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/partner-with-us",
+      "subject": "Partner With Us - BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "88e1685e-9f83-4c87-8e3a-95c50cdef43a"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://www.biggerwide.com/partner-with-us",
+      "subject": "Partner With Us - BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "PARTNER_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "309c6bdc-097e-42ab-97bd-8dc99cb26e4e"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/partner-with-us",
+      "subject": "Partner With Us - BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "PARTNER_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "058d1ce7-1e5d-4ef1-bce2-265b93c03ebf"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/partner-with-us",
+      "subject": "Partner With Us - BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "77b84d97-d06c-47d9-a97d-fc153d178fe3"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/faq",
+      "subject": "Help Center & FAQ - Get Answers Fast | BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "62e13c7a-d284-439e-84e0-f30265f55b3a"
+    },
+    {
+      "account": "BiggerWide",
+      "account_domain": "biggerwide.com",
+      "source_domain": "biggerwide.com",
+      "source_url": "https://biggerwide.com/faq",
+      "subject": "Help Center & FAQ - Get Answers Fast | BiggerWide",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "b57f8954-5027-4d4d-bb7b-c6cdc395e149"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.cloud",
+      "source_url": "https://optivian.cloud/",
+      "subject": "Optivian \u2014 Push code. Deploy globally. | Optivian",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "108c4798-a541-4a32-97b1-d44ad39717ad"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.cloud",
+      "source_url": "https://optivian.cloud/",
+      "subject": "Optivian \u2014 Push code. Deploy globally. | Optivian",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "d5c453a4-6001-4f8d-a87a-3a20563342fd"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.cloud",
+      "source_url": "https://optivian.cloud/solutions/migrate-from-heroku",
+      "subject": "Migrate from Heroku | Optivian",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "97f6cecd-9628-4a64-b484-3e4218fb7200"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.cloud",
+      "source_url": "https://optivian.cloud/solutions/migrate-from-heroku",
+      "subject": "Migrate from Heroku | Optivian",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "17943a2e-ffdd-4832-8e27-ee8d59272ed0"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.ai",
+      "source_url": "https://optivian.ai/support",
+      "subject": "Support | Optivian",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "fbfde98f-1079-47d8-8e3c-b633e3753146"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.ai",
+      "source_url": "https://optivian.ai/support",
+      "subject": "Support | Optivian",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "3cc15b62-dad0-4ade-be79-4f099589319f"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.ai",
+      "source_url": "https://optivian.ai/insights/supermetrics",
+      "subject": "How Supermetrics rolled out an AI sales co-worker to 50 sellers, and hit 96% weekly active usage in 30 days",
+      "relation": "UNKNOWN",
+      "scope": "PARTNER_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "b786f8fd-a233-4858-bf75-b8ad3822b01a"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.ai",
+      "source_url": "https://optivian.ai/insights/supermetrics",
+      "subject": "How Supermetrics rolled out an AI sales co-worker to 50 sellers, and hit 96% weekly active usage in 30 days",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "0b046941-4209-41fc-864f-64f97918a38a"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "einpresswire.com",
+      "source_url": "https://www.einpresswire.com/sources/u674253",
+      "subject": "Optivian Solutions Oy Press Releases - EIN Presswire - Press Release Distribution Service",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "ee9b8a2b-7aa0-40da-a360-3e8f5abc6b03"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "einpresswire.com",
+      "source_url": "https://www.einpresswire.com/sources/u674253",
+      "subject": "Optivian Solutions Oy Press Releases - EIN Presswire - Press Release Distribution Service",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "ac4d75e7-50b3-4a98-b777-f560728312a2"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.ai",
+      "source_url": "https://optivian.ai/insights/funding-announcement",
+      "subject": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "cdaeceaa-0148-4e0b-bcd5-2a72c60720ce"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.ai",
+      "source_url": "https://optivian.ai/insights/funding-announcement",
+      "subject": "Optivian emerges from stealth to decouple revenue growth from sales headcount - backed by architect of Europe's largest AI exit",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "abf1fcbe-a112-4dc4-9364-c6e0af0d9a5c"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.ai",
+      "source_url": "https://optivian.ai/insights",
+      "subject": "AI sales insights & resources",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "499cfcf1-7bbd-4290-bf08-679f3bcceb68"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.ai",
+      "source_url": "https://optivian.ai/insights",
+      "subject": "AI sales insights & resources",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "2b53a4fe-a6d7-4328-a47c-25e5ae0a7708"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "einpresswire.com",
+      "source_url": "https://www.einpresswire.com/sources/u674253",
+      "subject": "Optivian Solutions Oy Press Releases - EIN Presswire - Press Release Distribution Service",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "212b7a44-eacb-4454-95dc-5c25b0dc89dc"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "einpresswire.com",
+      "source_url": "https://www.einpresswire.com/sources/u674253",
+      "subject": "Optivian Solutions Oy Press Releases - EIN Presswire - Press Release Distribution Service",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Different first-party domain has no verified account relationship.",
+      "evidence_id": "70c8f817-11ac-4e7a-ad58-48ece79d45c4"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.cloud",
+      "source_url": "https://docs.optivian.cloud/pci",
+      "subject": "Pci DSS - Optivian Startup Docs",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "d867ee63-2413-4c6b-b23e-74d2f2ce6f55"
+    },
+    {
+      "account": "Optivian \u2014 Push code. Deploy globally.",
+      "account_domain": "optivian.cloud",
+      "source_domain": "optivian.cloud",
+      "source_url": "https://docs.optivian.cloud/pci",
+      "subject": "Pci DSS - Optivian Startup Docs",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "3da5e66e-e0a2-4a95-be8a-6a33208fc22d"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/",
+      "subject": "CloudSEK: Predictive Attack Path Intelligence",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "0f760db1-3b81-49d4-837d-c7bb60a9603f"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/",
+      "subject": "CloudSEK: Predictive Attack Path Intelligence",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "46ecd2ce-1ebd-4fdf-9909-0a00eaa74a9c"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/about-us",
+      "subject": "About Us | CloudSEK",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "10937ee9-8283-42b3-812c-4e5a559fefc8"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/about-us",
+      "subject": "About Us | CloudSEK",
+      "relation": "SAME_ENTITY",
+      "scope": "PRODUCT_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "360103fe-bc80-41bf-9e79-8b03c457d5b0"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/customers",
+      "subject": "Trusted by 100+ Customers | CloudSEK",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "6f0c77a9-97cd-4f50-889f-cd1a569d25e2"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/customers",
+      "subject": "Trusted by 100+ Customers | CloudSEK",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "aa335c61-1286-4632-8b78-21de9cffe642"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/blog",
+      "subject": "CloudSEK Blog - Cybersecurity Insights",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "9e325b6b-9779-465e-be73-8e725da685a2"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/blog",
+      "subject": "CloudSEK Blog - Cybersecurity Insights",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "af4c53d6-b796-4ef2-8ce2-0785720c7590"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "greenhouse.io",
+      "source_url": "https://job-boards.greenhouse.io/cloudsek/jobs/4879997004",
+      "subject": "Cybersecurity Customer Success Associate",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Source text identifies a conflicting or unresolved entity.",
+      "evidence_id": "f06e3498-05c9-4803-af62-7726faed2091"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "greenhouse.io",
+      "source_url": "https://job-boards.greenhouse.io/cloudsek/jobs/4879997004",
+      "subject": "Cybersecurity Customer Success Associate",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Source text identifies a conflicting or unresolved entity.",
+      "evidence_id": "7f54d6bf-ef1a-4c09-a5db-0d6143120734"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "greenhouse.io",
+      "source_url": "https://job-boards.greenhouse.io/cloudsek/jobs/5812575004",
+      "subject": "Customer Success Manager",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Source text identifies a conflicting or unresolved entity.",
+      "evidence_id": "50ea626b-459b-4ded-b89f-7671fee4db34"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "greenhouse.io",
+      "source_url": "https://job-boards.greenhouse.io/cloudsek/jobs/5812575004",
+      "subject": "Customer Success Manager",
+      "relation": "UNKNOWN",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "reason": "Source text identifies a conflicting or unresolved entity.",
+      "evidence_id": "3642f45c-07a6-41f9-a0cd-60ebbced9751"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/work-life",
+      "subject": "Life at CloudSEK | CloudSEK Careers",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "a498cb1a-d850-4134-a1f3-70ef67802e0a"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/work-life",
+      "subject": "Life at CloudSEK | CloudSEK Careers",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "a29b9e2a-992f-4dc5-bdb8-63f398d0d1a5"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/blog/cloudsek-raises-19-million-in-series-b1-funding-to-scale-predictive-cybersecurity-platform",
+      "subject": "CloudSEK Raises $19 Million in Series B1 Funding to Scale Predictive Cybersecurity Platform | CloudSEK",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "6826cdd1-14fb-423c-a93f-a55545d5d991"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/blog/cloudsek-raises-19-million-in-series-b1-funding-to-scale-predictive-cybersecurity-platform",
+      "subject": "CloudSEK Raises $19 Million in Series B1 Funding to Scale Predictive Cybersecurity Platform | CloudSEK",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "5d45f1ce-ba5a-40eb-a7e4-7a39067c2de1"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/ancmt/cloudsek-becomes-first-indian-origin-cybersecurity-company-to-receive-investment-from-a-u-s-state-fund",
+      "subject": "CloudSEK Becomes First Indian-Origin Cybersecurity Company to Receive Investment from a U.S. State Fund | CloudSEK",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "f56eed3e-3774-4f8f-b813-919dbf9d8074"
+    },
+    {
+      "account": "CloudSEK: Predictive Attack Path Intelligence",
+      "account_domain": "cloudsek.com",
+      "source_domain": "cloudsek.com",
+      "source_url": "https://www.cloudsek.com/ancmt/cloudsek-becomes-first-indian-origin-cybersecurity-company-to-receive-investment-from-a-u-s-state-fund",
+      "subject": "CloudSEK Becomes First Indian-Origin Cybersecurity Company to Receive Investment from a U.S. State Fund | CloudSEK",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "d85c5515-cb3e-4ad0-b6f3-586d399080d4"
+    },
+    {
+      "account": "Fortifyze",
+      "account_domain": "fortifyze.com",
+      "source_domain": "fortifyze.com",
+      "source_url": "https://fortifyze.com/",
+      "subject": "Fortifyze \u2014 DPDPA Compliance & Data Protection Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "351763d6-0070-42b3-a16e-57e7ce404ccc"
+    },
+    {
+      "account": "Fortifyze",
+      "account_domain": "fortifyze.com",
+      "source_domain": "fortifyze.com",
+      "source_url": "https://fortifyze.com/",
+      "subject": "Fortifyze \u2014 DPDPA Compliance & Data Protection Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "5ef1b01f-f636-4b97-b8f5-ac452059aba1"
+    },
+    {
+      "account": "Fortifyze",
+      "account_domain": "fortifyze.com",
+      "source_domain": "fortifyze.com",
+      "source_url": "https://fortifyze.com/about",
+      "subject": "Fortifyze \u2014 DPDPA Compliance & Data Protection Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "6d50fea4-164a-4862-8765-93e79b55c689"
+    },
+    {
+      "account": "Fortifyze",
+      "account_domain": "fortifyze.com",
+      "source_domain": "fortifyze.com",
+      "source_url": "https://fortifyze.com/about",
+      "subject": "Fortifyze \u2014 DPDPA Compliance & Data Protection Platform",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "94fc58ed-ddeb-41d0-a577-b3da96049b35"
+    },
+    {
+      "account": "Fortifyze",
+      "account_domain": "fortifyze.com",
+      "source_domain": "fortifyze.com",
+      "source_url": "https://fortifyze.com/blog/what-is-dpdpa-guide-for-indian-businesses",
+      "subject": "What is the DPDPA? A practical guide for Indian businesses",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "c894c2ab-27ef-48af-a6ff-e810ef750b28"
+    },
+    {
+      "account": "Fortifyze",
+      "account_domain": "fortifyze.com",
+      "source_domain": "fortifyze.com",
+      "source_url": "https://fortifyze.com/blog/what-is-dpdpa-guide-for-indian-businesses",
+      "subject": "What is the DPDPA? A practical guide for Indian businesses",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "f821dca1-97e8-43c3-94d6-90b9771f70ee"
+    },
+    {
+      "account": "Fortifyze",
+      "account_domain": "fortifyze.com",
+      "source_domain": "fortifyze.com",
+      "source_url": "https://fortifyze.com/blog/consent-management-under-dpdpa",
+      "subject": "Consent under the DPDPA \u2014 building a compliant consent programme",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "da3f2e8e-1769-4083-a621-ed15a55a7ade"
+    },
+    {
+      "account": "Fortifyze",
+      "account_domain": "fortifyze.com",
+      "source_domain": "fortifyze.com",
+      "source_url": "https://fortifyze.com/blog/consent-management-under-dpdpa",
+      "subject": "Consent under the DPDPA \u2014 building a compliant consent programme",
+      "relation": "SAME_ENTITY",
+      "scope": "COMPANY_LEVEL",
+      "old_decision": "ATTACHED",
+      "new_decision": "ATTACHED",
+      "reason": "Source domain is a verified official account domain.",
+      "evidence_id": "f093da65-c71a-4d16-b323-a0a952f04fcb"
+    }
+  ],
+  "metrics": {
+    "total_old_attachments": 109,
+    "unique_old_account_facts": 109,
+    "run_level_unattached_facts": 35,
+    "correct_new_attachments": 86,
+    "ambiguous_or_related_only": 23,
+    "rejected_cross_entity_attachments": 23,
+    "false_attachments_after_replay": 0,
+    "old_persisted_signals": 8,
+    "new_persisted_signals": 4,
+    "signal_precision_percent": 100.0,
+    "supported_important_claims_percent": 100.0,
+    "unsupported_important_claims_percent": 0.0,
+    "mean_structural_brief_usefulness_out_of_3": 2.0
+  },
+  "prequalification_distribution": {
+    "PREQUALIFIED": 7,
+    "PREQUALIFIED_WITH_UNCERTAINTY": 31,
+    "REVIEW_REQUIRED": 24,
+    "REJECTED": 0
+  },
+  "persisted_candidate_stages": {
+    "ACCEPTED": 7,
+    "PREQUALIFIED_WITH_UNCERTAINTY": 31,
+    "REVIEW_REQUIRED": 24
+  }
+}

@@ -185,6 +185,15 @@ class Signal(BaseModel):
     event_confidence: float = Field(default=0, ge=0, le=1)
     relevance: float = Field(default=0, ge=0, le=1)
     source_role: str = "OTHER"
+    subject_entity: str | None = None
+    canonical_subject_domain: str | None = None
+    event_date: datetime | None = None
+    source_id: str | None = None
+    supporting_passage: str | None = None
+    claim_scope: str = "COMPANY_LEVEL"
+    claim_scope_compatible: bool = False
+    attachment_decision: str = "UNATTACHED_ENTITY_AMBIGUOUS"
+    rejection_reason: str | None = None
 
 
 class ScoreComponent(BaseModel):
@@ -236,6 +245,14 @@ class Account(BaseModel):
     qualification_coverage: float = Field(default=0, ge=0, le=1)
     priority_band: Literal["HIGH", "MEDIUM", "LOW", "MONITOR"] = "MONITOR"
     research_candidate: bool = True
+    brief_state: Literal[
+        "FOUNDER_READY",
+        "RESEARCH_CANDIDATE",
+        "MONITOR",
+        "DO_NOT_TARGET",
+        "IDENTITY_REVIEW_REQUIRED",
+    ] = "RESEARCH_CANDIDATE"
+    company_identity: dict[str, object] = Field(default_factory=dict)
 
 
 class EvidenceClaim(BaseModel):
@@ -271,6 +288,23 @@ class AccountOpportunityBrief(BaseModel):
     verified_facts: list[EvidenceClaim] = Field(default_factory=list)
     unknowns: list[str] = Field(default_factory=list)
     research_candidate: bool = True
+    brief_state: Literal[
+        "FOUNDER_READY",
+        "RESEARCH_CANDIDATE",
+        "MONITOR",
+        "DO_NOT_TARGET",
+        "IDENTITY_REVIEW_REQUIRED",
+    ] = "RESEARCH_CANDIDATE"
+    verified_identity: dict[str, object] = Field(default_factory=dict)
+    verified_icp_facts: list[EvidenceClaim] = Field(default_factory=list)
+    unknown_icp_facts: list[str] = Field(default_factory=list)
+    current_signals: list[Signal] = Field(default_factory=list)
+    rejected_or_ambiguous_evidence: list[dict[str, object]] = Field(
+        default_factory=list
+    )
+    hypotheses: list[EvidenceClaim] = Field(default_factory=list)
+    reason_not_to_target: str | None = None
+    next_research_step: str | None = None
     generated_at: datetime = Field(default_factory=utc_now)
 
 

@@ -9,7 +9,11 @@ $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $python = "C:\Python313\python.exe"
-$phaseDir = Join-Path $root "tmp\phase5-acceptance"
+$phaseDir = if ($Mode -eq "Mock") {
+    Join-Path $root "tmp\phase5-acceptance-mock-$PID"
+} else {
+    Join-Path $root "tmp\phase5-acceptance"
+}
 $statusPath = Join-Path $phaseDir "status.json"
 $failureStatusPath = Join-Path $root "tmp\phase5-acceptance-last-status.json"
 $controlsPath = Join-Path $phaseDir "controls.json"

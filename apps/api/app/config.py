@@ -30,8 +30,14 @@ class Settings:
         "FIRMOGRAPHIC_PROVIDER", "public_evidence"
     )
     firmographic_api_key: str | None = os.getenv("FIRMOGRAPHIC_API_KEY") or None
-    candidate_prequalification_floor: int = int(
-        os.getenv("CANDIDATE_PREQUALIFICATION_FLOOR", "45")
+    candidate_prequalification_high_threshold: int = int(
+        os.getenv("CANDIDATE_PREQUALIFICATION_HIGH_THRESHOLD", "35")
+    )
+    candidate_prequalification_middle_threshold: int = int(
+        os.getenv("CANDIDATE_PREQUALIFICATION_MIDDLE_THRESHOLD", "30")
+    )
+    candidate_prequalification_low_threshold: int = int(
+        os.getenv("CANDIDATE_PREQUALIFICATION_LOW_THRESHOLD", "25")
     )
     max_research_searches: int = int(os.getenv("MAX_RESEARCH_SEARCHES", "60"))
     max_research_documents: int = int(os.getenv("MAX_RESEARCH_DOCUMENTS", "100"))
@@ -70,10 +76,30 @@ class Settings:
             ("MAX_ACCOUNT_CANDIDATES", self.max_account_candidates),
             ("MAX_ACCOUNTS_RESEARCHED", self.max_accounts_researched),
             ("MAX_RESEARCH_ELAPSED_SECONDS", self.max_elapsed_seconds),
-            ("CANDIDATE_PREQUALIFICATION_FLOOR", self.candidate_prequalification_floor),
+            (
+                "CANDIDATE_PREQUALIFICATION_HIGH_THRESHOLD",
+                self.candidate_prequalification_high_threshold,
+            ),
+            (
+                "CANDIDATE_PREQUALIFICATION_MIDDLE_THRESHOLD",
+                self.candidate_prequalification_middle_threshold,
+            ),
+            (
+                "CANDIDATE_PREQUALIFICATION_LOW_THRESHOLD",
+                self.candidate_prequalification_low_threshold,
+            ),
         ):
             if value <= 0:
                 raise RuntimeError(f"{name} must be positive")
+        if not (
+            self.candidate_prequalification_low_threshold
+            <= self.candidate_prequalification_middle_threshold
+            <= self.candidate_prequalification_high_threshold
+        ):
+            raise RuntimeError(
+                "Candidate prequalification thresholds must satisfy low <= middle "
+                "<= high"
+            )
 
 
 settings = Settings()

@@ -1,6 +1,6 @@
 # Intelligence Quality Improvement
 
-Last updated: 2026-07-25
+Last updated: 2026-07-30
 
 ## Objective
 
@@ -77,3 +77,46 @@ ran. Tavily is optional and `NOT_CONFIGURED`; no anonymous result was accepted.
 Only `A — QUALITY PASS` may merge to `develop`, followed by final verification
 and `main`. B, C, D, or a configuration blocker remains on the feature branch.
 No public deployment occurs in this phase.
+
+## Phase 5: prequalification recall recovery
+
+The preserved credentialed baseline was:
+
+```text
+60 raw -> 1 prequalified -> 1 disqualified -> 0 founder-usable
+```
+
+The exact candidate-level trace found that 59/60 candidates failed only the
+single 45-point cutoff. All provider relevance scores were unavailable, 59/60
+candidates had one query hit, all had one provider, and all had an official
+root/subdomain role with identity confidence of at least 0.80.
+
+Phase 5 separates candidate relevance, identity confidence, evidence coverage,
+and research worthiness. It introduces explicit match states, three evidence
+stages, structured competitor classifications, and these calibrated outcomes:
+
+- `PREQUALIFIED`
+- `PREQUALIFIED_WITH_UNCERTAINTY`
+- `REVIEW_REQUIRED`
+- `REJECTED`
+
+The first-30 labelled development replay improved recall from 4.00% to 100.00%,
+kept precision at 92.59%, and reduced the false-negative rate from 96.00% to
+0.00%. The 60-row shadow replay produced 5 prequalified, 30
+prequalified-with-uncertainty, and 25 review-required candidates. The automatic
+research pool is therefore 35, still bounded by the existing 20-account deep
+research limit.
+
+Credential-free Phase 5 gates:
+
+- prequalification regressions: 25 passed
+- full Python/API/gateway suite: 125 passed, 2 skipped
+- PostgreSQL/Redis integration: 2 passed
+- gateway security: 10 passed
+- web tests: 2 passed
+- Ruff, Mypy, ESLint, TypeScript, Next.js build: passed
+- Alembic: `0006_intelligence_quality (head)`
+- Docker Compose validation, secret scan, and `git diff --check`: passed
+
+No fresh holdout has been used for calibration. Final classification remains
+pending one fresh credentialed SupportPilot V2 holdout.

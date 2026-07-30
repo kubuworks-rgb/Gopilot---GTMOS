@@ -53,12 +53,20 @@ from apps.api.app.services.company_identity import (
 )
 from apps.api.app.services.firmographics import PublicEvidenceFirmographicProvider
 from apps.api.app.services.intelligence_quality import (
+    CandidatePrequalificationDecision,
+    CandidatePrequalificationInput,
+    CompetitorAssessment,
+    CompetitorClassification,
     CriterionEvaluation,
     CriterionRequirement,
     CriterionState,
+    EvidenceStage,
+    MatchState,
+    PrequalificationOutcome,
     SourceRole,
-    candidate_relevance_score,
+    candidate_relevance_breakdown,
     decide_qualification,
+    evaluate_prequalification,
     source_quality_score,
 )
 from services.research_gateway.app.schemas import SearchResult, SourceDocumentInput
@@ -157,6 +165,8 @@ class DiscoveryCandidate:
     queries: set[str]
     providers: set[str]
     score: int = 0
+    prequalification: CandidatePrequalificationDecision | None = None
+    score_diagnostics: dict[str, object] | None = None
 
 
 def _now() -> datetime:
@@ -936,6 +946,83 @@ def _is_candidate_company_page(result: SearchResult) -> bool:
     )
 
 
+def _discovery_prequalification_input(
+    candidate: DiscoveryCandidate,
+) -> CandidatePrequalificationInput:
+    discovery_text = " ".join(
+        [
+            candidate.result.title,
+            candidate.result.snippet,
+            *sorted(candidate.queries),
+        ]
+    ).lower()
+    plausible_software = any(
+        term in discovery_text
+        for term in (
+            "b2b",
+            "saas",
+            "software",
+            "cloud",
+            "platform",
+            "developer tools",
+            "product analytics",
+        )
+    )
+    plausible_saas = any(
+        term in discovery_text for term in ("saas", "cloud", "software platform")
+    )
+    plausible_india = any(
+        term in discovery_text
+        for term in (
+            "india",
+            "bengaluru",
+            "bangalore",
+            "hyderabad",
+            "pune",
+            "mumbai",
+            "gurugram",
+            "gurgaon",
+            "chennai",
+            "noida",
+        )
+    )
+    identity_state = (
+        MatchState.VERIFIED_MATCH
+        if (
+            candidate.identity.page_role == ResultPageRole.OFFICIAL_ROOT
+            and candidate.identity.confidence >= 0.85
+        )
+        else MatchState.ESTIMATED_MATCH
+    )
+    domain_state = (
+        MatchState.VERIFIED_MATCH
+        if candidate.identity.confidence >= 0.85
+        else MatchState.ESTIMATED_MATCH
+    )
+    return CandidatePrequalificationInput(
+        page_role=candidate.identity.page_role.value,
+        duplicate=False,
+        identity_state=identity_state,
+        identity_confidence=candidate.identity.confidence,
+        domain_state=domain_state,
+        b2b_software_state=(
+            MatchState.ESTIMATED_MATCH if plausible_software else MatchState.UNKNOWN
+        ),
+        saas_state=(
+            MatchState.ESTIMATED_MATCH if plausible_saas else MatchState.UNKNOWN
+        ),
+        india_state=(
+            MatchState.ESTIMATED_MATCH if plausible_india else MatchState.UNKNOWN
+        ),
+        employee_size_state=MatchState.UNKNOWN,
+        support_operations_state=MatchState.UNKNOWN,
+        category_relevance=candidate.score,
+        evidence_stage=EvidenceStage.DISCOVERY_HINT,
+        evidence_coverage=0,
+        competitor=CompetitorAssessment(CompetitorClassification.UNKNOWN),
+    )
+
+
 def _company_size_from_text(text: str) -> tuple[str | None, str, bool | None]:
     patterns = (
         (
@@ -962,11 +1049,89 @@ def _company_size_from_text(text: str) -> tuple[str | None, str, bool | None]:
     return None, "UNKNOWN", None
 
 
+def _competitor_assessment_from_text(
+    text: str,
+    *,
+    evidence_ids: tuple[str, ...] = (),
+) -> CompetitorAssessment:
+    lowered = text.lower()
+    dimensions: list[str] = []
+    product_overlap = (
+        any(term in lowered for term in ("customer support", "customer service"))
+        and any(term in lowered for term in ("ai", "automation", "agent"))
+        and any(term in lowered for term in ("platform", "software", "solution"))
+    )
+    buyer_overlap = any(
+        term in lowered
+        for term in (
+            "support teams",
+            "customer service teams",
+            "customer experience teams",
+            "b2b saas",
+            "enterprise teams",
+        )
+    )
+    use_case_overlap = any(
+        term in lowered
+        for term in (
+            "resolve tickets",
+            "ticket resolution",
+            "automate customer support",
+            "support automation",
+            "answer customer queries",
+        )
+    )
+    commercial_substitution = any(
+        term in lowered
+        for term in (
+            "replace your helpdesk",
+            "customer support platform",
+            "ai support platform",
+            "support automation platform",
+        )
+    )
+    for present, dimension in (
+        (product_overlap, "product"),
+        (buyer_overlap, "buyer"),
+        (use_case_overlap, "use_case"),
+        (commercial_substitution, "commercial_substitution"),
+    ):
+        if present:
+            dimensions.append(dimension)
+    if len(dimensions) == 4:
+        classification = CompetitorClassification.DIRECT_COMPETITOR
+        confidence = 0.9
+    elif product_overlap and use_case_overlap:
+        classification = CompetitorClassification.ADJACENT_VENDOR
+        confidence = 0.68
+    elif product_overlap:
+        classification = (
+            CompetitorClassification.POTENTIAL_BUYER_WITH_OVERLAPPING_FEATURES
+        )
+        confidence = 0.52
+    elif any(
+        term in lowered
+        for term in ("customer support", "customer service", "customer success")
+    ):
+        classification = CompetitorClassification.NOT_COMPETITOR
+        confidence = 0.55
+    else:
+        classification = CompetitorClassification.UNKNOWN
+        confidence = 0.2
+    return CompetitorAssessment(
+        classification=classification,
+        confidence=confidence,
+        evidence_ids=evidence_ids,
+        overlap_dimensions=tuple(dimensions),
+    )
+
+
 def _qualify_account(
     text: str,
     *,
     domain_validated: bool,
     size_in_range: bool | None,
+    competitor_evidence_ids: tuple[str, ...] = (),
 ) -> tuple[str, list[str]]:
     lowered = text.lower()
     reasons: list[str] = []
@@ -998,13 +1163,8 @@ def _qualify_account(
             "noida",
         )
     )
-    direct_competitor = any(
-        term in lowered
-        for term in (
-            "ai customer support platform",
-            "customer support automation platform",
-            "automate customer support with ai",
-        )
+    competitor = _competitor_assessment_from_text(
+        text, evidence_ids=competitor_evidence_ids
     )
     has_support_operations = any(
         term in lowered
@@ -1068,10 +1228,28 @@ def _qualify_account(
         CriterionEvaluation(
             "not_direct_competitor",
             CriterionRequirement.HARD,
-            CriterionState.FALSE if direct_competitor else CriterionState.TRUE,
+            (
+                CriterionState.FALSE
+                if competitor.automatic_rejection_eligible
+                else CriterionState.UNKNOWN
+                if competitor.classification
+                in {
+                    CompetitorClassification.UNKNOWN,
+                    CompetitorClassification.ADJACENT_VENDOR,
+                    CompetitorClassification.POTENTIAL_BUYER_WITH_OVERLAPPING_FEATURES,
+                }
+                else CriterionState.TRUE
+            ),
             reason=(
-                "Direct support-automation competitor evidence found."
-                if direct_competitor
+                "High-confidence direct support-automation competitor evidence found."
+                if competitor.automatic_rejection_eligible
+                else "Competitor overlap requires research; no automatic rejection."
+                if competitor.classification
+                in {
+                    CompetitorClassification.UNKNOWN,
+                    CompetitorClassification.ADJACENT_VENDOR,
+                    CompetitorClassification.POTENTIAL_BUYER_WITH_OVERLAPPING_FEATURES,
+                }
                 else "No direct-competitor evidence found."
             ),
         ),
@@ -1284,7 +1462,7 @@ async def discover_accounts(
             "provider_fallbacks": 0,
             "fetch_failures": 0,
             "no_evidence": 0,
-            "preliminary_rejections": 0,
+            "preliminary_research_required": 0,
             "final_rejections": 0,
         }
         for query in queries:
@@ -1331,7 +1509,7 @@ async def discover_accounts(
             except GatewayProviderError:
                 continue
         for domain, candidate in candidates.items():
-            candidate.score = candidate_relevance_score(
+            score_breakdown = candidate_relevance_breakdown(
                 title=candidate.result.title,
                 snippet=candidate.result.snippet,
                 target_terms=target_terms,
@@ -1340,11 +1518,30 @@ async def discover_accounts(
                 query_hits=len(candidate.queries),
                 provider_hits=len(candidate.providers),
             )
-            stage = (
-                "PREQUALIFIED"
-                if candidate.score >= settings.candidate_prequalification_floor
-                else "REJECTED_PREQUALIFICATION"
+            candidate.score = score_breakdown.total
+            candidate.score_diagnostics = {
+                "term_coverage": score_breakdown.term_coverage,
+                "term_coverage_points": score_breakdown.term_coverage_points,
+                "official_page_points": score_breakdown.official_page_points,
+                "provider_relevance_points": (
+                    score_breakdown.provider_relevance_points
+                ),
+                "query_agreement_points": score_breakdown.query_agreement_points,
+                "provider_agreement_points": (
+                    score_breakdown.provider_agreement_points
+                ),
+            }
+            candidate.prequalification = evaluate_prequalification(
+                _discovery_prequalification_input(candidate),
+                high_threshold=(
+                    settings.candidate_prequalification_high_threshold
+                ),
+                middle_threshold=(
+                    settings.candidate_prequalification_middle_threshold
+                ),
+                low_threshold=settings.candidate_prequalification_low_threshold,
             )
+            stage = candidate.prequalification.outcome.value
             session.add(
                 ResearchCandidateRow(
                     workspace_id=run.workspace_id,
@@ -1363,6 +1560,25 @@ async def discover_accounts(
                         "provider_relevance_score": (
                             candidate.result.provider_relevance_score
                         ),
+                        "evidence_stage": EvidenceStage.DISCOVERY_HINT.value,
+                        "candidate_relevance": candidate.score,
+                        "identity_confidence": candidate.identity.confidence,
+                        "evidence_coverage": 0,
+                        "research_worthiness": (
+                            candidate.prequalification.research_worthiness
+                        ),
+                        "score_contributions": candidate.score_diagnostics,
+                        "research_requirements": list(
+                            candidate.prequalification.research_requirements
+                        ),
+                        "rejection_reasons": list(
+                            candidate.prequalification.rejection_reasons
+                        ),
+                        "thresholds": {
+                            "high": candidate.prequalification.high_threshold,
+                            "middle": candidate.prequalification.middle_threshold,
+                            "low": candidate.prequalification.low_threshold,
+                        },
                     },
                 )
             )
@@ -1371,9 +1587,19 @@ async def discover_accounts(
             (
                 (domain, candidate)
                 for domain, candidate in candidates.items()
-                if candidate.score >= settings.candidate_prequalification_floor
+                if candidate.prequalification is not None
+                and candidate.prequalification.outcome
+                in {
+                    PrequalificationOutcome.PREQUALIFIED,
+                    PrequalificationOutcome.PREQUALIFIED_WITH_UNCERTAINTY,
+                }
             ),
-            key=lambda item: item[1].score,
+            key=lambda item: (
+                item[1].prequalification.research_worthiness
+                if item[1].prequalification is not None
+                else 0,
+                item[1].score,
+            ),
             reverse=True,
         )
         discovery_diagnostics["prequalified_candidates"] = len(shortlisted)
@@ -1404,24 +1630,37 @@ async def discover_accounts(
                 continue
             canonical_domain = _normalized_company_domain(source.canonical_url)
             domain_validated = canonical_domain == domain
-            preliminary_text = f"{result.snippet} {source.cleaned_text}"
+            preliminary_text = source.cleaned_text
             _, _, preliminary_size_in_range = _company_size_from_text(preliminary_text)
+            candidate_row = await session.scalar(
+                select(ResearchCandidateRow).where(
+                    ResearchCandidateRow.research_run_id == run.id,
+                    ResearchCandidateRow.registrable_domain == domain,
+                )
+            )
+            if candidate_row is not None:
+                candidate_row.diagnostics = {
+                    **candidate_row.diagnostics,
+                    "evidence_stage": EvidenceStage.PREQUALIFICATION_EVIDENCE.value,
+                    "evidence_coverage": round(min(1.0, len(facts) / 4), 4),
+                }
             preliminary_qualification, _ = _qualify_account(
                 preliminary_text,
                 domain_validated=domain_validated,
                 size_in_range=preliminary_size_in_range,
             )
             if preliminary_qualification == "INSUFFICIENT_EVIDENCE":
-                discovery_diagnostics["preliminary_rejections"] += 1
-                candidate_row = await session.scalar(
-                    select(ResearchCandidateRow).where(
-                        ResearchCandidateRow.research_run_id == run.id,
-                        ResearchCandidateRow.registrable_domain == domain,
-                    )
-                )
+                discovery_diagnostics["preliminary_research_required"] += 1
                 if candidate_row is not None:
-                    candidate_row.stage = "REJECTED_DEEP_RESEARCH"
-                continue
+                    candidate_row.stage = (
+                        PrequalificationOutcome.PREQUALIFIED_WITH_UNCERTAINTY.value
+                    )
+                    candidate_row.diagnostics = {
+                        **candidate_row.diagnostics,
+                        "preliminary_qualification": (
+                            "INSUFFICIENT_EVIDENCE_RESEARCH_CONTINUES"
+                        ),
+                    }
             sources, facts = await _research_account_sources(
                 session,
                 run,
@@ -1437,15 +1676,20 @@ async def discover_accounts(
                 if _normalized_company_domain(item.canonical_url) == domain
             ]
             combined_text = " ".join(
-                [result.snippet, *(item.cleaned_text for item in official_sources)]
+                item.cleaned_text for item in official_sources
             )
             employee_band, size_status, size_in_range = _company_size_from_text(
                 combined_text
+            )
+            official_source_ids = {item.id for item in official_sources}
+            official_fact_ids = tuple(
+                str(item.id) for item in facts if item.source_id in official_source_ids
             )
             qualification, qualification_reasons = _qualify_account(
                 combined_text,
                 domain_validated=domain_validated,
                 size_in_range=size_in_range,
+                competitor_evidence_ids=official_fact_ids,
             )
             if qualification == "INSUFFICIENT_EVIDENCE":
                 discovery_diagnostics["final_rejections"] += 1
@@ -1467,6 +1711,37 @@ async def discover_accounts(
             qualification_coverage = (
                 1.0 if qualification == "QUALIFIED" else 0.75
             )
+            competitor_assessment = _competitor_assessment_from_text(
+                combined_text,
+                evidence_ids=official_fact_ids,
+            )
+            candidate_row = await session.scalar(
+                select(ResearchCandidateRow).where(
+                    ResearchCandidateRow.research_run_id == run.id,
+                    ResearchCandidateRow.registrable_domain == domain,
+                )
+            )
+            if candidate_row is not None:
+                candidate_row.diagnostics = {
+                    **candidate_row.diagnostics,
+                    "evidence_stage": EvidenceStage.VERIFIED_ACCOUNT_EVIDENCE.value,
+                    "evidence_coverage": round(
+                        min(1.0, len(official_fact_ids) / 4), 4
+                    ),
+                    "competitor": {
+                        "classification": (
+                            competitor_assessment.classification.value
+                        ),
+                        "confidence": competitor_assessment.confidence,
+                        "evidence_ids": list(competitor_assessment.evidence_ids),
+                        "overlap_dimensions": list(
+                            competitor_assessment.overlap_dimensions
+                        ),
+                        "automatic_rejection_eligible": (
+                            competitor_assessment.automatic_rejection_eligible
+                        ),
+                    },
+                }
             firmographic_payload = {
                 "provider": firmographics.provider,
                 "employee_count": {
@@ -1559,6 +1834,21 @@ async def discover_accounts(
                         "provider_provenance": sorted(candidate.providers),
                         "qualification_coverage": qualification_coverage,
                         "firmographics": firmographic_payload,
+                        "competitor": {
+                            "classification": (
+                                competitor_assessment.classification.value
+                            ),
+                            "confidence": competitor_assessment.confidence,
+                            "evidence_ids": list(
+                                competitor_assessment.evidence_ids
+                            ),
+                            "overlap_dimensions": list(
+                                competitor_assessment.overlap_dimensions
+                            ),
+                            "automatic_rejection_eligible": (
+                                competitor_assessment.automatic_rejection_eligible
+                            ),
+                        },
                         "domain_validation": (
                             "VALIDATED" if domain_validated else "MISMATCH"
                         ),
@@ -1593,6 +1883,17 @@ async def discover_accounts(
                     "query_provenance": sorted(candidate.queries),
                     "provider_provenance": sorted(candidate.providers),
                     "qualification_coverage": qualification_coverage,
+                    "competitor": {
+                        "classification": competitor_assessment.classification.value,
+                        "confidence": competitor_assessment.confidence,
+                        "evidence_ids": list(competitor_assessment.evidence_ids),
+                        "overlap_dimensions": list(
+                            competitor_assessment.overlap_dimensions
+                        ),
+                        "automatic_rejection_eligible": (
+                            competitor_assessment.automatic_rejection_eligible
+                        ),
+                    },
                     "firmographics": firmographic_payload,
                     "domain_validation": (
                         "VALIDATED" if domain_validated else "MISMATCH"

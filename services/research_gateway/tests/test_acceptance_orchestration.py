@@ -89,7 +89,7 @@ def test_phase5_logged_gate_tolerates_successful_native_stderr(
         '$ErrorActionPreference = "Stop"\n'
         f'$gateLog = "{str(gate_log).replace(chr(92), chr(92) * 2)}"\n'
         + gate_function
-        + "\n$results = @{}\n"
+        + "\n$results = [ordered]@{}\n"
         + 'Invoke-LoggedGate "stderr_probe" { '
         + '& cmd.exe /d /c "echo harmless-warning 1>&2 & exit /b 0" '
         + "} $results\n"
@@ -192,7 +192,8 @@ def test_phase5_failure_cleanup_preserves_only_redacted_status() -> None:
         assert payload["failure_stage"] == "AUTHENTICATED_REST_CONTROL"
         assert payload["cleanup_complete"] is True
         assert payload["credential_remaining"] is False
-        assert not (ROOT / "tmp" / "phase5-acceptance").exists()
+        # A mock run must not delete or depend on a concurrently preserved
+        # live acceptance checkpoint.
         assert not list((ROOT / "tmp").glob("phase5-acceptance-mock-*"))
     finally:
         failure_status.unlink(missing_ok=True)

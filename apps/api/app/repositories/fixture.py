@@ -8,6 +8,8 @@ from pydantic import HttpUrl
 
 from apps.api.app.domain.models import (
     Account,
+    AccountImportRecord,
+    AccountImportSource,
     AccountOpportunityBrief,
     AuditEvent,
     CampaignDraft,
@@ -17,6 +19,8 @@ from apps.api.app.domain.models import (
     Finding,
     ICP,
     ProductProfile,
+    ProductMode,
+    QualificationStatus,
     ResearchRun,
     Signal,
     SourceDocument,
@@ -79,12 +83,17 @@ class FixtureRepository:
         self.products[profile.id] = profile
         return profile
 
-    def create_research(self, workspace_id: str, product_id: str) -> ResearchRun:
+    def create_research(
+        self,
+        workspace_id: str,
+        product_id: str,
+        product_mode: ProductMode = ProductMode.BYOA_CORE,
+    ) -> ResearchRun:
         if self.products.get(product_id, None) is None or self.products[product_id].workspace_id != workspace_id:
             raise KeyError("Product not found")
         run = ResearchRun(
             id=_id("run"), workspace_id=workspace_id, product_id=product_id,
-            status="queued", current_stage="research_plan",
+            status="queued", current_stage="research_plan", product_mode=product_mode,
         )
         self.runs[run.id] = run
         return run
@@ -157,11 +166,112 @@ class FixtureRepository:
             intent_fact = EvidenceFact(id=intent_ev, workspace_id=icp.workspace_id, source_id=source_id, passage=f"Demo public update: {signal_text}.", claim=signal_text, confidence=.86, status=ClaimStatus.SUPPORTED, observed_at=observed)
             signal = Signal(id=_id("sig"), signal_type="growth", description=signal_text, observed_at=observed, strength=strength / 100, evidence_ids=[intent_ev])
             scores = score_account(industry_match=industry_match, size_match=size_match, geography_match=geo, signal_strength=strength, signal_recency=signal_decay(observed) * 100, evidence_coverage=92 - idx, source_quality=88, fit_evidence=[fit_ev], signal_evidence=[intent_ev])
-            account = Account(id=_id("acct"), workspace_id=icp.workspace_id, icp_id=icp.id, name=name, domain=domain, industry=industry, location=location, employee_band=band, scores=scores, top_signal=signal_text, recommended_action="Review the opportunity brief and tailor a founder-led research pilot offer.", last_researched_at=now)
+            account = Account(id=_id("acct"), workspace_id=icp.workspace_id, icp_id=icp.id, name=name, domain=domain, industry=industry, location=location, employee_band=band, scores=scores, top_signal=signal_text, recommended_action="Review the opportunity brief and tailor a founder-led research pilot offer.", last_researched_at=now, qualification_status=QualificationStatus.QUALIFIED, brief_state="FOUNDER_READY")
             campaign = CampaignDraft(id=_id("camp"), account_id=account.id, subject=f"A more defensible GTM shortlist for {name}", body=f"Hi {name} team,\n\nYour recent public update suggests a timely GTM planning moment. Kubu Works helps small teams rank accounts with inspectable evidence before committing to outbound.\n\nWould a short, human-reviewed pilot around your next segment be useful?\n\nThis draft is based only on the linked demo evidence and has not been sent.", evidence_ids=[intent_ev])
-            brief = AccountOpportunityBrief(account=account, why_it_fits=[EvidenceClaim(statement=f"Matches the selected {icp.name} firmographics.", status=ClaimStatus.SUPPORTED, confidence=.91, evidence_ids=[fit_ev])], why_now=[EvidenceClaim(statement=signal_text, status=ClaimStatus.SUPPORTED, confidence=.86, evidence_ids=[intent_ev])], pain_hypotheses=[EvidenceClaim(statement="The team may need a repeatable way to validate account priorities as GTM activity grows.", status=ClaimStatus.HYPOTHESIS, confidence=.62, evidence_ids=[])], recommended_problem="Turn scattered public signals into a defensible account-priority decision.", recommended_offer="A human-reviewed evidence-backed account research pilot.", recommended_action=account.recommended_action, risks=["Fixture source: confirm against live public sources before external use.", "Pain remains a hypothesis until discovery."], evidence=[fit_fact, intent_fact], sources=[source], signals=[signal], campaign=campaign)
+            brief = AccountOpportunityBrief(account=account, why_it_fits=[EvidenceClaim(statement=f"Matches the selected {icp.name} firmographics.", status=ClaimStatus.SUPPORTED, confidence=.91, evidence_ids=[fit_ev])], why_now=[EvidenceClaim(statement=signal_text, status=ClaimStatus.SUPPORTED, confidence=.86, evidence_ids=[intent_ev])], pain_hypotheses=[EvidenceClaim(statement="The team may need a repeatable way to validate account priorities as GTM activity grows.", status=ClaimStatus.HYPOTHESIS, confidence=.62, evidence_ids=[])], recommended_problem="Turn scattered public signals into a defensible account-priority decision.", recommended_offer="A human-reviewed evidence-backed account research pilot.", recommended_action=account.recommended_action, risks=["Fixture source: confirm against live public sources before external use.", "Pain remains a hypothesis until discovery."], evidence=[fit_fact, intent_fact], sources=[source], signals=[signal], campaign=campaign, brief_state="FOUNDER_READY")
             self.accounts[account.id] = account
             self.briefs[account.id] = brief
+
+    def import_accounts(
+        self,
+        workspace_id: str,
+        icp_id: str,
+        records: list[AccountImportRecord],
+        import_source: AccountImportSource,
+    ) -> tuple[list[Account], list[str]]:
+        icp = self.icps.get(icp_id)
+        if icp is None or icp.workspace_id != workspace_id or not icp.selected:
+            raise KeyError("Select an ICP before importing accounts")
+        existing = {
+            item.domain
+            for item in self.accounts.values()
+            if item.workspace_id == workspace_id
+        }
+        imported: list[Account] = []
+        duplicates: list[str] = []
+        now = datetime.now(UTC)
+        for record in records:
+            if record.domain in existing:
+                duplicates.append(record.domain)
+                continue
+            scores = score_account(
+                industry_match=0,
+                size_match=None,
+                geography_match=0,
+                signal_strength=0,
+                signal_recency=0,
+                evidence_coverage=0,
+                source_quality=0,
+                fit_evidence=[],
+                signal_evidence=[],
+            )
+            account = Account(
+                id=_id("acct"),
+                workspace_id=workspace_id,
+                icp_id=icp_id,
+                name=record.company_name,
+                domain=record.domain,
+                industry=record.industry or "Unverified",
+                location=record.country or "Unverified",
+                employee_band=record.employee_band or "Unverified",
+                scores=scores,
+                top_signal="No verified current signal",
+                recommended_action="Research official sources before changing status.",
+                last_researched_at=now,
+                discovery_source=f"import:{import_source.value.lower()}",
+                domain_validation="CANONICALIZED_UNVERIFIED",
+                registrable_domain=record.domain,
+                domain_confidence=0.55,
+                priority_band="MONITOR",
+                brief_state="RESEARCH_CANDIDATE",
+                company_identity={
+                    "canonical_company_name": record.company_name,
+                    "canonical_registrable_domain": record.domain,
+                    "verified_official_domains": [],
+                    "identity_confidence": 0.55,
+                    "unresolved_identity_warnings": [
+                        "User-supplied domain has not yet been verified."
+                    ],
+                },
+                product_mode=ProductMode.BYOA_CORE,
+                import_source=import_source,
+                provenance="IMPORTED",
+            )
+            campaign = CampaignDraft(
+                id=_id("camp"),
+                account_id=account.id,
+                subject="",
+                body="",
+                status="draft",
+                evidence_ids=[],
+            )
+            brief = AccountOpportunityBrief(
+                account=account,
+                why_it_fits=[],
+                why_now=[],
+                pain_hypotheses=[],
+                recommended_problem="Official company evidence has not been collected yet.",
+                recommended_offer="No outreach recommendation",
+                recommended_action=account.recommended_action,
+                risks=["Identity and ICP criteria remain unverified."],
+                evidence=[],
+                sources=[],
+                signals=[],
+                campaign=campaign,
+                unknowns=[
+                    "Official company identity",
+                    "ICP fit",
+                    "Current supported signal",
+                ],
+                brief_state="RESEARCH_CANDIDATE",
+                verified_identity=account.company_identity,
+                next_research_step="Fetch and verify the supplied official domain.",
+            )
+            self.accounts[account.id] = account
+            self.briefs[account.id] = brief
+            existing.add(record.domain)
+            imported.append(account)
+        return imported, sorted(set(duplicates))
 
     def record(self, workspace_id: str, actor_id: str, event: str, target_type: str, target_id: str, metadata: dict[str, str] | None = None) -> None:
         self.audit.append(AuditEvent(id=_id("audit"), workspace_id=workspace_id, actor_id=actor_id, event_type=event, target_type=target_type, target_id=target_id, metadata=metadata or {}))

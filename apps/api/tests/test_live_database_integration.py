@@ -5,16 +5,27 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
+import pytest_asyncio
 from pydantic import HttpUrl
 from sqlalchemy import select
 
 from apps.api.app.db.models import EvidenceFactRow, SourceDocumentRow
-from apps.api.app.db.session import SessionFactory
-from apps.api.app.domain.models import FeedbackInput, QAEvaluationInput
+from apps.api.app.db.session import SessionFactory, dispose_engine
+from apps.api.app.domain.models import (
+    AccountImportRecord,
+    AccountImportSource,
+    FeedbackInput,
+    ProductMode,
+    QAEvaluationInput,
+)
 from apps.api.app.jobs.queue import ResearchJob, decode_job, enqueue_job
 from apps.api.app.providers.live import LiveResearchProvider
 from apps.api.app.repositories.postgres import repository
-from apps.api.app.services.live_research import discover_accounts, execute_research
+from apps.api.app.services.live_research import (
+    discover_accounts,
+    execute_research,
+    research_account,
+)
 from services.research_gateway.app.schemas import (
     SearchResponse,
     SearchResult,
@@ -27,6 +38,12 @@ pytestmark = pytest.mark.skipif(
     os.getenv("RUN_LIVE_DB_TESTS") != "1",
     reason="Set RUN_LIVE_DB_TESTS=1 with migrated PostgreSQL to run",
 )
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def isolate_async_database_pool() -> None:
+    yield
+    await dispose_engine()
 
 
 class ControlledPublicTransport(LiveResearchProvider):
@@ -134,6 +151,16 @@ class EmptyPublicTransport(LiveResearchProvider):
         )
 
 
+class ProviderIndependentByoaTransport(ControlledPublicTransport):
+    async def search(
+        self,
+        *args: object,
+        **kwargs: object,
+    ) -> SearchResponse:
+        del args, kwargs
+        raise AssertionError("BYOA official-domain research must not call search")
+
+
 @pytest.mark.asyncio
 async def test_redis_job_contract_round_trip() -> None:
     redis = Redis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
@@ -152,6 +179,73 @@ async def test_redis_job_contract_round_trip() -> None:
     finally:
         await redis.delete("gtm:research-jobs")
         await redis.aclose()
+
+
+@pytest.mark.asyncio
+async def test_byoa_import_to_brief_without_search_provider() -> None:
+    user_id = f"byoa-integration-{uuid4().hex}"
+    async with SessionFactory() as session:
+        workspace = await repository.create_workspace(
+            session, user_id, "BYOA integration workspace"
+        )
+        product = await repository.create_product(
+            session,
+            workspace.id,
+            user_id,
+            company_name="BYOA Control",
+            website="https://byoa-control.com",
+            product="Evidence-backed GTM intelligence",
+            target_market="Founder-led B2B SaaS teams in India",
+        )
+        run = await repository.create_run(
+            session,
+            workspace.id,
+            user_id,
+            product.id,
+            {"max_searches": 0, "max_documents": 8},
+            ProductMode.BYOA_CORE,
+        )
+        icp = await repository.initialize_byoa_run(
+            session,
+            run.id,
+            workspace.id,
+            user_id,
+        )
+        imported, duplicates = await repository.import_accounts(
+            session,
+            workspace_id=workspace.id,
+            actor_id=user_id,
+            icp_id=icp.id,
+            records=[
+                AccountImportRecord(
+                    company_name="Verified Software Company",
+                    domain="verified-software.com",
+                )
+            ],
+            import_source=AccountImportSource.API,
+        )
+        assert len(imported) == 1
+        assert duplicates == []
+        account_id = str(imported[0].id)
+
+    await research_account(account_id, ProviderIndependentByoaTransport())
+
+    async with SessionFactory() as session:
+        accounts = await repository.list_accounts(session, workspace.id)
+        account = next(item for item in accounts if item.id == account_id)
+        assert account.product_mode == ProductMode.BYOA_CORE
+        assert account.provenance == "IMPORTED"
+        assert account.import_source == AccountImportSource.API
+        assert account.domain == "verified-software.com"
+        assert account.evidence_ids
+        brief = await repository.brief(session, workspace.id, account_id)
+        assert brief is not None
+        assert brief.verified_identity["canonical_registrable_domain"] == (
+            "verified-software.com"
+        )
+        assert brief.sources
+        assert brief.verified_facts
+        assert all(not source.demo_data for source in brief.sources)
 
 
 @pytest.mark.asyncio

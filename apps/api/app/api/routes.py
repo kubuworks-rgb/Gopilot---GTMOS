@@ -11,6 +11,12 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, 
 from apps.api.app.api.dependencies import Principal, get_principal
 from apps.api.app.domain.models import (
     Account,
+    AccountImportIssue,
+    AccountImportPayload,
+    AccountImportResult,
+    AccountImportValidation,
+    AccountReviewStatus,
+    AccountReviewUpdate,
     AccountOpportunityBrief,
     AuditEvent,
     CampaignDraft,
@@ -20,13 +26,21 @@ from apps.api.app.domain.models import (
     ICP,
     ProductProfile,
     ProductProfileInput,
+    ProductMode,
+    ProductModeAvailability,
     ResearchRun,
     Workspace,
     WorkspaceCreate,
+    ImportedAccountResult,
     utc_now,
 )
 from apps.api.app.config import settings
 from apps.api.app.repositories.fixture import repository
+from apps.api.app.services.byoa import (
+    neutralize_formula,
+    product_mode_availability,
+    validate_account_import,
+)
 
 
 router = APIRouter(prefix="/api/v1")
@@ -53,6 +67,14 @@ def bootstrap(principal: Current) -> dict[str, object]:
     return {
         "mode": "fixture",
         "demo_data": True,
+        "product_mode": (
+            runs[-1].product_mode if runs else ProductMode.BYOA_CORE
+        ),
+        "mode_availability": product_mode_availability(),
+        "provider_message": (
+            "Account research is available. Automatic account discovery requires "
+            "a configured search provider."
+        ),
         "workspace": workspace,
         "product": products[-1] if products else None,
         "research_run": runs[-1] if runs else None,
@@ -69,6 +91,12 @@ def bootstrap(principal: Current) -> dict[str, object]:
             and b.campaign.status == "draft"
         ),
     }
+
+
+@router.get("/product-modes", response_model=ProductModeAvailability)
+def product_modes(principal: Current) -> ProductModeAvailability:
+    del principal
+    return product_mode_availability()
 
 
 @router.post("/workspaces", response_model=Workspace, status_code=201)
@@ -105,10 +133,27 @@ def create_product(payload: ProductProfileInput, principal: Current) -> ProductP
 
 @router.post("/research-runs", response_model=ResearchRun, status_code=202)
 def create_research(
-    product_id: str, background_tasks: BackgroundTasks, principal: Current
+    product_id: str,
+    background_tasks: BackgroundTasks,
+    principal: Current,
+    product_mode: ProductMode = ProductMode.BYOA_CORE,
 ) -> ResearchRun:
+    availability = product_mode_availability()
+    if (
+        product_mode == ProductMode.AUTONOMOUS_DISCOVERY_EXPERIMENTAL
+        and not availability.search_provider_configured
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "CONFIGURATION_REQUIRED",
+                "message": availability.message,
+            },
+        )
     try:
-        run = repository.create_research(principal.workspace_id, product_id)
+        run = repository.create_research(
+            principal.workspace_id, product_id, product_mode
+        )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     background_tasks.add_task(repository.complete_research, run.id)
@@ -158,6 +203,75 @@ def list_accounts(principal: Current, min_priority: int = 0) -> list[Account]:
     )
 
 
+@router.post(
+    "/account-imports/validate",
+    response_model=AccountImportValidation,
+)
+def validate_import(
+    payload: AccountImportPayload,
+    principal: Current,
+) -> AccountImportValidation:
+    del principal
+    return validate_account_import(payload)
+
+
+@router.post("/accounts/import", response_model=AccountImportResult, status_code=201)
+def import_accounts(
+    payload: AccountImportPayload,
+    principal: Current,
+) -> AccountImportResult:
+    validation = validate_account_import(payload)
+    if not validation.accepted:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "NO_VALID_ACCOUNTS",
+                "issues": [item.model_dump() for item in validation.issues],
+            },
+        )
+    selected = next(
+        (
+            item
+            for item in repository.list_icps(principal.workspace_id)
+            if item.selected
+        ),
+        None,
+    )
+    if selected is None:
+        raise HTTPException(status_code=409, detail="Select an ICP before importing")
+    imported, existing_duplicates = repository.import_accounts(
+        principal.workspace_id,
+        selected.id,
+        validation.accepted,
+        validation.import_source,
+    )
+    issues = list(validation.issues)
+    issues.extend(
+        AccountImportIssue(
+            row=0,
+            field="domain",
+            code="WORKSPACE_DUPLICATE",
+            message=f"{domain} already exists in this workspace",
+        )
+        for domain in existing_duplicates
+    )
+    return AccountImportResult(
+        imported=[
+            ImportedAccountResult(
+                id=item.id,
+                company_name=item.name,
+                canonical_domain=item.domain,
+                import_source=validation.import_source,
+            )
+            for item in imported
+        ],
+        issues=issues,
+        duplicate_domains=sorted(
+            set(validation.duplicate_domains) | set(existing_duplicates)
+        ),
+    )
+
+
 @router.get(
     "/accounts/{account_id}/opportunity-brief", response_model=AccountOpportunityBrief
 )
@@ -191,6 +305,17 @@ def update_campaign(
     if brief is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
     campaign = brief.campaign
+    if (
+        payload.action in {"edit", "approve"}
+        and brief.brief_state != "FOUNDER_READY"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Outreach drafts are available only for evidence-gated "
+                "FOUNDER_READY accounts"
+            ),
+        )
     if payload.action == "edit":
         if payload.subject is not None:
             campaign.subject = payload.subject
@@ -199,6 +324,7 @@ def update_campaign(
         event = "campaign_draft_edited"
     elif payload.action == "approve":
         campaign.status = "approved"
+        brief.account.review_status = AccountReviewStatus.APPROVED
         event = "campaign_draft_approved"
     else:
         campaign.status = "rejected"
@@ -210,11 +336,45 @@ def update_campaign(
     return campaign
 
 
+@router.patch("/accounts/{account_id}/review", response_model=Account)
+def review_account(
+    account_id: str,
+    payload: AccountReviewUpdate,
+    principal: Current,
+) -> Account:
+    account = repository.accounts.get(account_id)
+    if account is None or account.workspace_id != principal.workspace_id:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if (
+        payload.brief_state == "FOUNDER_READY"
+        and account.brief_state != "FOUNDER_READY"
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="FOUNDER_READY is evidence-gated and cannot be manually promoted",
+        )
+    account.review_status = payload.review_status
+    if payload.brief_state is not None:
+        account.brief_state = payload.brief_state
+        brief = repository.briefs.get(account_id)
+        if brief is not None:
+            brief.brief_state = payload.brief_state
+    repository.record(
+        principal.workspace_id,
+        principal.user_id,
+        "account_review_updated",
+        "account",
+        account_id,
+        {
+            "review_status": payload.review_status.value,
+            "brief_state": account.brief_state,
+        },
+    )
+    return account
+
+
 def _csv_safe(value: object) -> str:
-    text = str(value)
-    if text.startswith(("=", "+", "-", "@", "\t", "\r")):
-        return "'" + text
-    return text
+    return neutralize_formula(value)
 
 
 @router.get("/exports/accounts.csv")
@@ -223,20 +383,26 @@ def export_accounts(principal: Current) -> Response:
         b
         for b in repository.briefs.values()
         if b.account.workspace_id == principal.workspace_id
-        and b.campaign.status == "approved"
+        and b.account.review_status == AccountReviewStatus.APPROVED
     ]
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow(
         [
-            "company",
-            "domain",
-            "fit",
-            "intent",
-            "confidence",
-            "priority",
-            "top_signal",
+            "company_name",
+            "canonical_domain",
+            "identity_status",
+            "qualification_status",
+            "fit_score",
+            "intent_score",
+            "confidence_score",
+            "priority_score",
+            "brief_state",
             "recommended_action",
+            "primary_evidence_url",
+            "unknowns",
+            "review_status",
+            "import_source",
         ]
     )
     for brief in approved:
@@ -245,12 +411,22 @@ def export_accounts(principal: Current) -> Response:
             [
                 _csv_safe(account.name),
                 _csv_safe(account.domain),
+                _csv_safe(account.domain_validation),
+                _csv_safe(account.qualification_status.value),
                 account.scores.fit.score,
                 account.scores.intent.score,
                 account.scores.confidence.score,
                 account.scores.priority,
-                _csv_safe(account.top_signal),
+                _csv_safe(account.brief_state),
                 _csv_safe(account.recommended_action),
+                _csv_safe(
+                    str(brief.sources[0].canonical_url) if brief.sources else ""
+                ),
+                _csv_safe(" | ".join(brief.unknowns)),
+                _csv_safe(account.review_status.value),
+                _csv_safe(
+                    account.import_source.value if account.import_source else ""
+                ),
             ]
         )
         repository.record(

@@ -26,8 +26,11 @@ from apps.api.app.db.models import (
 )
 from apps.api.app.domain.models import (
     Account,
+    AccountImportRecord,
+    AccountImportSource,
     AccountOpportunityBrief,
     AccountScores,
+    AccountReviewStatus,
     AuditEvent,
     CampaignDraft,
     ClaimStatus,
@@ -37,6 +40,7 @@ from apps.api.app.domain.models import (
     Finding,
     ICP,
     ProductProfile,
+    ProductMode,
     ProfileClaim,
     ProvenanceStatus,
     QualificationStatus,
@@ -47,6 +51,7 @@ from apps.api.app.domain.models import (
     SourceDocument,
     Workspace,
 )
+from apps.api.app.services.scoring import score_account
 from pydantic import HttpUrl
 
 
@@ -325,6 +330,7 @@ class PostgresRepository:
         actor_id: str,
         product_id: str,
         budgets: dict[str, object],
+        product_mode: ProductMode = ProductMode.BYOA_CORE,
     ) -> ResearchRun:
         product = await session.get(ProductProfileRow, _uuid(product_id))
         if product is None or str(product.workspace_id) != workspace_id:
@@ -334,7 +340,7 @@ class PostgresRepository:
             product_id=product.id,
             status="queued",
             current_stage="research_plan",
-            budgets=budgets,
+            budgets={**budgets, "product_mode": product_mode.value},
             error=None,
             trace_id=uuid.uuid4().hex,
             searches_used=0,
@@ -354,6 +360,73 @@ class PostgresRepository:
         await session.commit()
         await session.refresh(row)
         return await self.run_domain(session, row)
+
+    async def initialize_byoa_run(
+        self,
+        session: AsyncSession,
+        run_id: str,
+        workspace_id: str,
+        actor_id: str,
+    ) -> ICP:
+        run = await self.run_row(session, run_id, workspace_id)
+        if run is None:
+            raise KeyError("Research run not found")
+        product = await session.get(ProductProfileRow, run.product_id)
+        if product is None:
+            raise KeyError("Product not found")
+        existing = await session.scalar(
+            select(ICPProfileRow)
+            .where(
+                ICPProfileRow.research_run_id == run.id,
+                ICPProfileRow.workspace_id == run.workspace_id,
+            )
+            .order_by(ICPProfileRow.created_at)
+            .limit(1)
+        )
+        if existing is None:
+            existing = ICPProfileRow(
+                workspace_id=run.workspace_id,
+                research_run_id=run.id,
+                name="Imported account target",
+                description=product.target_market,
+                definition={
+                    "firmographics": [product.target_market],
+                    "pains": [],
+                    "triggers": [],
+                    "rationale": (
+                        "User-confirmed target profile for supplied-account research."
+                    ),
+                    "recommended": True,
+                    "qualification_logic": [
+                        "Verify identity before scoring",
+                        "Unknown criteria remain unknown",
+                        "Human approval is required before outbound activity",
+                    ],
+                    "criteria_version": "byoa-v1",
+                    "criteria": [],
+                },
+                confidence=0.65,
+                evidence_ids=[],
+                selected_at=_now(),
+            )
+            session.add(existing)
+            await session.flush()
+        run.status = "completed"
+        run.current_stage = "accounts_import_ready"
+        run.completed_at = _now()
+        run.updated_at = _now()
+        await self.record(
+            session,
+            run.workspace_id,
+            actor_id,
+            "byoa_run_ready",
+            "research_run",
+            str(run.id),
+            {"product_mode": ProductMode.BYOA_CORE.value},
+        )
+        await session.commit()
+        await session.refresh(existing)
+        return self.icp_domain(existing)
 
     async def run_row(
         self, session: AsyncSession, run_id: str, workspace_id: str | None = None
@@ -397,6 +470,12 @@ class PostgresRepository:
             error=row.error,
             searches_used=row.searches_used,
             documents_used=row.documents_used,
+            product_mode=ProductMode(
+                str(
+                    row.budgets.get("product_mode")
+                    or ProductMode.BYOA_CORE.value
+                )
+            ),
             findings=[
                 Finding(
                     id=str(item.id),
@@ -564,7 +643,243 @@ class PostgresRepository:
                 row.attributes.get("brief_state") or "RESEARCH_CANDIDATE"
             ),  # type: ignore[arg-type]
             company_identity=company_identity,
+            product_mode=ProductMode(
+                str(
+                    row.attributes.get("product_mode")
+                    or ProductMode.BYOA_CORE.value
+                )
+            ),
+            import_source=(
+                AccountImportSource(str(row.attributes["import_source"]))
+                if row.attributes.get("import_source")
+                else None
+            ),
+            provenance=str(
+                row.attributes.get("provenance") or "DISCOVERED"
+            ),  # type: ignore[arg-type]
+            review_status=AccountReviewStatus(
+                str(
+                    row.attributes.get("review_status")
+                    or AccountReviewStatus.PENDING.value
+                )
+            ),
         )
+
+    async def import_accounts(
+        self,
+        session: AsyncSession,
+        *,
+        workspace_id: str,
+        actor_id: str,
+        icp_id: str,
+        records: list[AccountImportRecord],
+        import_source: AccountImportSource,
+    ) -> tuple[list[AccountRow], list[str]]:
+        icp = await self.icp_row(session, icp_id, workspace_id)
+        if icp is None or icp.selected_at is None:
+            raise KeyError("Select an ICP before importing accounts")
+        workspace_uuid = _uuid(workspace_id)
+        existing_domains = set(
+            (
+                await session.scalars(
+                    select(AccountRow.domain).where(
+                        AccountRow.workspace_id == workspace_uuid,
+                        AccountRow.domain.in_([record.domain for record in records]),
+                    )
+                )
+            ).all()
+        )
+        imported: list[AccountRow] = []
+        duplicates: list[str] = []
+        empty_scores = score_account(
+            industry_match=0,
+            size_match=None,
+            geography_match=0,
+            signal_strength=0,
+            signal_recency=0,
+            evidence_coverage=0,
+            source_quality=0,
+            fit_evidence=[],
+            signal_evidence=[],
+        )
+        for record in records:
+            if record.domain in existing_domains:
+                duplicates.append(record.domain)
+                continue
+            row = AccountRow(
+                workspace_id=workspace_uuid,
+                icp_id=None,
+                icp_profile_id=icp.id,
+                name=record.company_name,
+                domain=record.domain,
+                description=record.notes,
+                industry=record.industry,
+                location=record.country,
+                employee_band=record.employee_band,
+                business_model=None,
+                attributes={
+                    "product_mode": ProductMode.BYOA_CORE.value,
+                    "import_source": import_source.value,
+                    "provenance": "IMPORTED",
+                    "review_status": AccountReviewStatus.PENDING.value,
+                    "qualification_status": (
+                        QualificationStatus.INSUFFICIENT_EVIDENCE.value
+                    ),
+                    "qualification_reasons": [
+                        "Imported account awaits official-site research."
+                    ],
+                    "company_size_status": CompanySizeStatus.UNKNOWN.value,
+                    "domain_validation": "CANONICALIZED_UNVERIFIED",
+                    "registrable_domain": record.domain,
+                    "domain_confidence": 0.55,
+                    "qualification_coverage": 0.0,
+                    "priority_band": "MONITOR",
+                    "research_candidate": True,
+                    "brief_state": "RESEARCH_CANDIDATE",
+                    "source_ids": [],
+                    "top_signal": "No verified current signal",
+                    "recommended_action": (
+                        "Research official sources before changing status."
+                    ),
+                    "input_metadata": {
+                        "industry": record.industry,
+                        "country": record.country,
+                        "employee_band": record.employee_band,
+                        "notes": record.notes,
+                        "crm_id": record.crm_id,
+                        "owner": record.owner,
+                        "tags": record.tags,
+                    },
+                    "company_identity": {
+                        "canonical_company_name": record.company_name,
+                        "canonical_registrable_domain": record.domain,
+                        "verified_official_domains": [],
+                        "known_aliases": [],
+                        "legal_name": None,
+                        "product_names": [],
+                        "product_domains": [],
+                        "parent_organization": None,
+                        "subsidiaries": [],
+                        "relationship_evidence_ids": [],
+                        "identity_confidence": 0.55,
+                        "unresolved_identity_warnings": [
+                            "User-supplied domain has not yet been verified."
+                        ],
+                    },
+                },
+                evidence_ids=[],
+                last_researched_at=_now(),
+            )
+            session.add(row)
+            await session.flush()
+            session.add(
+                AccountScoreSnapshotRow(
+                    workspace_id=workspace_uuid,
+                    account_id=row.id,
+                    research_run_id=icp.research_run_id,
+                    scoring_version="byoa-import-v1",
+                    scores=empty_scores.model_dump(mode="json"),
+                    weights={},
+                    inputs={"status": "awaiting_official_research"},
+                )
+            )
+            await session.flush()
+            account_domain = await self.account_domain(session, row)
+            if account_domain is None:
+                raise RuntimeError("Imported account score snapshot was not persisted")
+            raw_identity = row.attributes.get("company_identity")
+            verified_identity = (
+                {str(key): value for key, value in raw_identity.items()}
+                if isinstance(raw_identity, dict)
+                else {}
+            )
+            draft_id = uuid.uuid4()
+            placeholder_brief = AccountOpportunityBrief(
+                account=account_domain,
+                why_it_fits=[],
+                why_now=[],
+                pain_hypotheses=[],
+                recommended_problem=(
+                    "Official company evidence has not been collected yet."
+                ),
+                recommended_offer="No outreach recommendation",
+                recommended_action="Research official sources before changing status.",
+                risks=["Identity and ICP criteria remain unverified."],
+                evidence=[],
+                sources=[],
+                signals=[],
+                campaign=CampaignDraft(
+                    id=str(draft_id),
+                    account_id=str(row.id),
+                    subject="",
+                    body="",
+                    status="draft",
+                    evidence_ids=[],
+                ),
+                verified_facts=[],
+                unknowns=[
+                    "Official company identity",
+                    "ICP fit",
+                    "Current supported signal",
+                ],
+                research_candidate=True,
+                brief_state="RESEARCH_CANDIDATE",
+                verified_identity=verified_identity,
+                verified_icp_facts=[],
+                unknown_icp_facts=[
+                    "Industry",
+                    "Geography",
+                    "Employee size",
+                    "Business model",
+                ],
+                current_signals=[],
+                rejected_or_ambiguous_evidence=[],
+                hypotheses=[],
+                reason_not_to_target=None,
+                next_research_step="Fetch and verify the supplied official domain.",
+            )
+            brief_row = OpportunityBriefRow(
+                workspace_id=workspace_uuid,
+                account_id=row.id,
+                research_run_id=icp.research_run_id,
+                payload=placeholder_brief.model_dump(mode="json"),
+                evidence_ids=[],
+                version=1,
+            )
+            session.add(brief_row)
+            await session.flush()
+            session.add(
+                CampaignDraftRow(
+                    id=draft_id,
+                    workspace_id=workspace_uuid,
+                    account_id=row.id,
+                    opportunity_brief_id=brief_row.id,
+                    subject="",
+                    body="",
+                    status="draft",
+                    evidence_ids=[],
+                    risk_flags=placeholder_brief.risks,
+                    updated_at=_now(),
+                )
+            )
+            await self.record(
+                session,
+                workspace_uuid,
+                actor_id,
+                "account_imported",
+                "account",
+                str(row.id),
+                {
+                    "import_source": import_source.value,
+                    "canonical_domain": record.domain,
+                },
+            )
+            existing_domains.add(record.domain)
+            imported.append(row)
+        await session.commit()
+        for row in imported:
+            await session.refresh(row)
+        return imported, sorted(set(duplicates))
 
     async def brief(
         self, session: AsyncSession, workspace_id: str, account_id: str

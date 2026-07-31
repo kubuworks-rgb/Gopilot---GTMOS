@@ -39,6 +39,24 @@ class CompanySizeStatus(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class ProductMode(StrEnum):
+    BYOA_CORE = "BYOA_CORE"
+    AUTONOMOUS_DISCOVERY_EXPERIMENTAL = "AUTONOMOUS_DISCOVERY_EXPERIMENTAL"
+
+
+class AccountImportSource(StrEnum):
+    SINGLE = "SINGLE"
+    PASTED_DOMAINS = "PASTED_DOMAINS"
+    CSV_UPLOAD = "CSV_UPLOAD"
+    API = "API"
+
+
+class AccountReviewStatus(StrEnum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    CHANGES_REQUESTED = "CHANGES_REQUESTED"
+
+
 class ProfileClaim(BaseModel):
     field: str
     value: str | None
@@ -146,6 +164,7 @@ class ResearchRun(BaseModel):
     searches_used: int = 0
     documents_used: int = 0
     findings: list[Finding] = Field(default_factory=list)
+    product_mode: ProductMode = ProductMode.BYOA_CORE
 
 
 class ResearchEvidence(BaseModel):
@@ -253,6 +272,10 @@ class Account(BaseModel):
         "IDENTITY_REVIEW_REQUIRED",
     ] = "RESEARCH_CANDIDATE"
     company_identity: dict[str, object] = Field(default_factory=dict)
+    product_mode: ProductMode = ProductMode.BYOA_CORE
+    import_source: AccountImportSource | None = None
+    provenance: Literal["IMPORTED", "DISCOVERED"] = "DISCOVERED"
+    review_status: AccountReviewStatus = AccountReviewStatus.PENDING
 
 
 class EvidenceClaim(BaseModel):
@@ -297,6 +320,7 @@ class AccountOpportunityBrief(BaseModel):
     ] = "RESEARCH_CANDIDATE"
     verified_identity: dict[str, object] = Field(default_factory=dict)
     verified_icp_facts: list[EvidenceClaim] = Field(default_factory=list)
+    icp_mismatches: list[str] = Field(default_factory=list)
     unknown_icp_facts: list[str] = Field(default_factory=list)
     current_signals: list[Signal] = Field(default_factory=list)
     rejected_or_ambiguous_evidence: list[dict[str, object]] = Field(
@@ -321,6 +345,91 @@ class AuditEvent(BaseModel):
 
 class WorkspaceCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
+
+
+class AccountImportRecord(BaseModel):
+    company_name: str = Field(min_length=2, max_length=180)
+    domain: str = Field(min_length=3, max_length=500)
+    industry: str | None = Field(default=None, max_length=120)
+    country: str | None = Field(default=None, max_length=120)
+    employee_band: str | None = Field(default=None, max_length=64)
+    notes: str | None = Field(default=None, max_length=2000)
+    crm_id: str | None = Field(default=None, max_length=255)
+    owner: str | None = Field(default=None, max_length=255)
+    tags: list[str] = Field(default_factory=list, max_length=50)
+
+
+class AccountImportPayload(BaseModel):
+    accounts: list[AccountImportRecord] = Field(default_factory=list, max_length=500)
+    pasted_domains: str | None = Field(default=None, max_length=100_000)
+    csv_text: str | None = Field(default=None, max_length=1_000_000)
+    import_source: AccountImportSource = AccountImportSource.API
+
+    @model_validator(mode="after")
+    def exactly_one_input_shape(self) -> "AccountImportPayload":
+        supplied = sum(
+            (
+                bool(self.accounts),
+                bool((self.pasted_domains or "").strip()),
+                bool((self.csv_text or "").strip()),
+            )
+        )
+        if supplied != 1:
+            raise ValueError(
+                "Provide exactly one of accounts, pasted_domains, or csv_text"
+            )
+        return self
+
+
+class AccountImportIssue(BaseModel):
+    row: int
+    field: str
+    code: str
+    message: str
+
+
+class AccountImportValidation(BaseModel):
+    import_source: AccountImportSource
+    accepted: list[AccountImportRecord]
+    issues: list[AccountImportIssue] = Field(default_factory=list)
+    duplicate_domains: list[str] = Field(default_factory=list)
+
+
+class ImportedAccountResult(BaseModel):
+    id: str
+    company_name: str
+    canonical_domain: str
+    import_source: AccountImportSource
+    provenance: Literal["IMPORTED"] = "IMPORTED"
+    queued_for_research: bool = False
+
+
+class AccountImportResult(BaseModel):
+    imported: list[ImportedAccountResult]
+    issues: list[AccountImportIssue] = Field(default_factory=list)
+    duplicate_domains: list[str] = Field(default_factory=list)
+
+
+class ProductModeAvailability(BaseModel):
+    default_mode: ProductMode = ProductMode.BYOA_CORE
+    byoa_core: Literal["AVAILABLE"] = "AVAILABLE"
+    autonomous_discovery_experimental: Literal[
+        "AVAILABLE", "CONFIGURATION_REQUIRED"
+    ]
+    search_provider_configured: bool
+    primary_provider: Literal["EXA", "TAVILY", "NONE"]
+    message: str
+
+
+class AccountReviewUpdate(BaseModel):
+    review_status: AccountReviewStatus
+    brief_state: Literal[
+        "FOUNDER_READY",
+        "RESEARCH_CANDIDATE",
+        "MONITOR",
+        "DO_NOT_TARGET",
+        "IDENTITY_REVIEW_REQUIRED",
+    ] | None = None
 
 
 class CampaignUpdate(BaseModel):

@@ -51,6 +51,7 @@ from apps.api.app.services.company_identity import (
     classify_result_page,
     resolve_company_identity,
 )
+from apps.api.app.services.byoa import search_provider_configured
 from apps.api.app.services.firmographics import PublicEvidenceFirmographicProvider
 from apps.api.app.services.entity_resolution import (
     AttachmentDecision,
@@ -1426,9 +1427,87 @@ async def _research_account_sources(
     return sources, facts
 
 
+async def _fetch_supplied_official_sources(
+    session: AsyncSession,
+    run: ResearchRunRow,
+    provider: LiveResearchProvider,
+    *,
+    company_name: str,
+    domain: str,
+) -> tuple[list[SourceDocumentRow], list[EvidenceFactRow]]:
+    sources: list[SourceDocumentRow] = []
+    facts: list[EvidenceFactRow] = []
+    seen_source_ids: set[uuid.UUID] = set()
+    paths = ("", "about", "product", "products", "customers", "careers", "blog", "news")
+    for path in paths:
+        if run.documents_used >= settings.max_research_documents:
+            break
+        url = f"https://{domain}/" + (path if path else "")
+        task = ResearchTaskRow(
+            workspace_id=run.workspace_id,
+            research_run_id=run.id,
+            task_type="BYOA_OFFICIAL_URL_FETCH",
+            query=url,
+            status="running",
+            source_strategy={
+                "adapter": "fetch",
+                "purpose": "byoa_official_research",
+                "search_provider_required": False,
+            },
+            result_summary={},
+            error=None,
+            started_at=_now(),
+            completed_at=None,
+        )
+        session.add(task)
+        try:
+            source_input = await provider.fetch(
+                workspace_id=str(run.workspace_id),
+                research_run_id=str(run.id),
+                url=url,
+            )
+            canonical_source_domain = _normalized_company_domain(
+                str(source_input.canonical_url)
+            )
+            if canonical_source_domain != domain:
+                task.status = "failed"
+                task.error = {
+                    "category": "CROSS_DOMAIN_REDIRECT_REJECTED",
+                    "message": (
+                        "Official URL redirected to a different registrable domain"
+                    ),
+                    "retryable": False,
+                }
+            else:
+                source, new_facts = await _persist_source(
+                    session,
+                    run,
+                    source_input,
+                    f"{company_name} official company facts",
+                )
+                if source.id not in seen_source_ids:
+                    seen_source_ids.add(source.id)
+                    sources.append(source)
+                    facts.extend(new_facts)
+                    run.documents_used += 1
+                task.status = "completed"
+                task.result_summary = {
+                    "documents": 1,
+                    "facts": len(new_facts),
+                    "canonical_domain": canonical_source_domain,
+                }
+        except GatewayProviderError as exc:
+            task.status = "failed"
+            task.error = _error_payload(exc)
+        task.completed_at = _now()
+        await session.flush()
+    return sources, facts
+
+
 async def discover_accounts(
     icp_id: str, provider: LiveResearchProvider | None = None
 ) -> None:
+    production_provider = provider is None
     provider = provider or LiveResearchProvider()
     async with SessionFactory() as session:
         icp = await session.get(ICPProfileRow, uuid.UUID(icp_id))
@@ -1436,6 +1515,20 @@ async def discover_accounts(
             return
         run = await session.get(ResearchRunRow, icp.research_run_id)
         if run is None:
+            return
+        if production_provider and not search_provider_configured():
+            run.status = "failed"
+            run.current_stage = "configuration_required"
+            run.error = {
+                "category": "CONFIGURATION_REQUIRED",
+                "message": (
+                    "Account research is available. Automatic account discovery "
+                    "requires a configured search provider."
+                ),
+                "retryable": True,
+            }
+            run.updated_at = _now()
+            await session.commit()
             return
         product = await session.get(ProductProfileRow, run.product_id)
         if product is None:
@@ -1833,6 +1926,9 @@ async def discover_accounts(
                     employee_band=employee_band,
                     business_model=None,
                     attributes={
+                        "product_mode": "AUTONOMOUS_DISCOVERY_EXPERIMENTAL",
+                        "provenance": "DISCOVERED",
+                        "review_status": "PENDING",
                         "qualification_status": qualification,
                         "qualification_reasons": qualification_reasons,
                         "company_size_status": size_status,
@@ -1883,6 +1979,8 @@ async def discover_accounts(
                 account.employee_band = employee_band
                 account.attributes = {
                     **account.attributes,
+                    "product_mode": "AUTONOMOUS_DISCOVERY_EXPERIMENTAL",
+                    "provenance": "DISCOVERED",
                     "qualification_status": qualification,
                     "qualification_reasons": qualification_reasons,
                     "company_size_status": size_status,
@@ -2644,6 +2742,16 @@ async def _score_and_brief(
         or "unverified" in str(reason).lower()
         or "remain" in str(reason).lower()
     ]
+    icp_mismatches = [
+        reason
+        for reason in _attribute_string_list(
+            account.attributes.get("qualification_reasons", [])
+        )
+        if any(
+            marker in str(reason).lower()
+            for marker in ("outside", "mismatch", "competitor", "disqualif")
+        )
+    ]
     hypotheses = [
         EvidenceClaim(
             statement=(
@@ -2745,6 +2853,7 @@ async def _score_and_brief(
                 evidence_ids=[str(facts[0].id)],
             )
         ],
+        icp_mismatches=icp_mismatches,
         unknown_icp_facts=unknowns,
         current_signals=signal_models,
         rejected_or_ambiguous_evidence=rejected_evidence,
@@ -2831,47 +2940,91 @@ async def research_account(
         product = await session.get(ProductProfileRow, run.product_id)
         if product is None:
             return
-        try:
-            response = await provider.search(
-                workspace_id=str(run.workspace_id),
-                research_run_id=str(run.id),
-                query=(
-                    f"site:{account.domain} {account.name} about product careers "
-                    "customer success support"
-                ),
-                limit=5,
-                purpose="account_research",
-            )
-            same_domain = next(
-                (
-                    result
-                    for result in response.results
-                    if _normalized_company_domain(str(result.url))
-                    == account.domain.lower()
-                ),
-                response.results[0] if response.results else None,
-            )
-            if same_domain is None:
-                return
-            source_input = await provider.fetch(
-                workspace_id=str(run.workspace_id),
-                research_run_id=str(run.id),
-                url=str(same_domain.url),
-            )
-        except GatewayProviderError:
-            return
-        source, facts = await _persist_source(session, run, source_input)
-        if not facts:
-            return
-        sources, facts = await _research_account_sources(
+        direct_sources, direct_facts = await _fetch_supplied_official_sources(
             session,
             run,
             provider,
             company_name=account.name,
             domain=account.domain,
-            initial_source=source,
-            initial_facts=facts,
         )
+        if not direct_sources or not direct_facts:
+            raw_identity = account.attributes.get("company_identity")
+            identity = (
+                {str(key): value for key, value in raw_identity.items()}
+                if isinstance(raw_identity, dict)
+                else {}
+            )
+            identity["unresolved_identity_warnings"] = [
+                "The supplied official domain could not be verified."
+            ]
+            identity["identity_confidence"] = 0.0
+            account.attributes = {
+                **account.attributes,
+                "company_identity": identity,
+                "domain_validation": "UNVERIFIED",
+                "domain_confidence": 0.0,
+                "brief_state": "IDENTITY_REVIEW_REQUIRED",
+                "recommended_action": "Resolve company identity before research.",
+            }
+            account.last_researched_at = _now()
+            brief_row = await session.scalar(
+                select(OpportunityBriefRow)
+                .where(OpportunityBriefRow.account_id == account.id)
+                .order_by(desc(OpportunityBriefRow.version))
+                .limit(1)
+            )
+            if brief_row is not None:
+                brief_row.payload = {
+                    **brief_row.payload,
+                    "brief_state": "IDENTITY_REVIEW_REQUIRED",
+                    "verified_identity": identity,
+                    "verified_facts": [],
+                    "verified_icp_facts": [],
+                    "icp_mismatches": [],
+                    "unknowns": [
+                        "Official company identity",
+                        "ICP fit",
+                        "Current supported signal",
+                    ],
+                    "unknown_icp_facts": [
+                        "Industry",
+                        "Geography",
+                        "Employee size",
+                        "Business model",
+                    ],
+                    "current_signals": [],
+                    "rejected_or_ambiguous_evidence": [],
+                    "recommended_problem": (
+                        "The supplied official domain could not be verified."
+                    ),
+                    "recommended_offer": "No outreach recommendation",
+                    "recommended_action": (
+                        "Resolve company identity before research."
+                    ),
+                    "reason_not_to_target": "Entity ownership is unresolved.",
+                    "next_research_step": (
+                        "Verify legal ownership and official-domain relationships."
+                    ),
+                }
+            await session.commit()
+            return
+        source = direct_sources[0]
+        sources = list(direct_sources)
+        facts = list(direct_facts)
+        if search_provider_configured():
+            enriched_sources, enriched_facts = await _research_account_sources(
+                session,
+                run,
+                provider,
+                company_name=account.name,
+                domain=account.domain,
+                initial_source=source,
+                initial_facts=facts,
+            )
+            source_by_id = {item.id: item for item in [*sources, *enriched_sources]}
+            fact_by_id = {item.id: item for item in [*facts, *enriched_facts]}
+            sources = list(source_by_id.values())
+            facts = list(fact_by_id.values())
         official_sources = [
             item
             for item in sources

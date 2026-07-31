@@ -1,9 +1,18 @@
 # GoPilot — GTM OS
 
 GoPilot is an evidence-backed GTM research and account-intelligence operating
-system for founder-led B2B teams. A confirmed product profile becomes a bounded
-research run, three inspectable ICP choices, researched accounts, deterministic
-scores, opportunity briefs, and human-reviewed campaign drafts.
+system for founder-led B2B teams. Its core MVP is **Bring Your Own Accounts
+(BYOA)**: import known company domains, validate their identity, research allowed
+official sources, calculate deterministic scores, inspect opportunity briefs,
+review the result, and export approved records.
+
+GoPilot exposes two product modes:
+
+- `BYOA_CORE` is the default and works without Exa, Tavily, or another search
+  provider.
+- `AUTONOMOUS_DISCOVERY_EXPERIMENTAL` is a separate, secondary workflow. It
+  requires a configured search provider, is explicitly labelled Experimental,
+  and requires human review of every discovered account.
 
 The repository has two deliberately separate modes:
 
@@ -16,6 +25,10 @@ Live mode never converts an upstream failure into demo output. A run records a
 typed failed or partial state instead. A successful search with no relevant
 articles completes explicitly at `no_relevant_results`.
 
+Runtime data mode (`fixture` or `live`) is separate from product mode
+(`BYOA_CORE` or `AUTONOMOUS_DISCOVERY_EXPERIMENTAL`). Live BYOA uses the supplied
+official domains directly and never substitutes fixture accounts.
+
 ## Product contract
 
 The primary unit of value is an `AccountOpportunityBrief`, not a scraped lead.
@@ -27,7 +40,14 @@ Each brief contains:
 - current signals only when a persisted source passage supports them;
 - source URLs, retrieval timestamps, hashes, and provenance;
 - explicit hypotheses where evidence is absent;
-- an editable draft that cannot be sent autonomously.
+- explicit ICP matches, mismatches, and unknown criteria;
+- ambiguous or rejected evidence that cannot affect scoring;
+- one of `FOUNDER_READY`, `RESEARCH_CANDIDATE`, `MONITOR`,
+  `IDENTITY_REVIEW_REQUIRED`, or `DO_NOT_TARGET`;
+- an editable draft only when the brief is `FOUNDER_READY`.
+
+Human approval is mandatory before outbound use. GoPilot does not autonomously
+send outreach.
 
 ## Architecture
 
@@ -113,9 +133,18 @@ python -m services.worker.app.main
 npm.cmd run dev --workspace apps/web
 ```
 
-The UI can create a local workspace, save a confirmed product profile, start a
-research run, select an ICP, refresh accounts, research an account, regenerate a
-brief, inspect capability health, and review campaign drafts.
+The primary UI workflow is:
+
+```text
+Import Accounts -> Validate Accounts -> Research Accounts ->
+Review Priorities -> Inspect Opportunity Briefs ->
+Approve or Change Status -> Export
+```
+
+Single-company, pasted-domain-list, and CSV imports are supported. Imported and
+discovered provenance are displayed separately. When no search provider is
+configured, the UI states: “Account research is available. Automatic account
+discovery requires a configured search provider.”
 
 The public-source smoke harness sends the confirmed product and target-market query
 to the configured search provider and fetches returned public URLs:
@@ -126,27 +155,29 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/live_smoke.ps1
 
 Review that egress before running it in a controlled environment.
 
-Search transports are configured explicitly. `exa_mcp` is the default reviewed
-general-web transport and uses Exa's official remote MCP endpoint. Its bounded
-free tier does not require a key; `EXA_API_KEY` can be configured for production
-rate limits. Bing RSS remains an explicit fallback. Requests with the `news`
-purpose route to GDELT for time-sensitive company events. GDELT is never used as
-a replacement for official-site, pricing, careers, product, or technical-
-documentation discovery.
+Search transports are configured explicitly and are optional for BYOA enrichment.
+Automatic discovery requires `EXA_API_KEY` or `TAVILY_API_KEY`; Exa is primary
+when both are configured. The production path does not depend on anonymous MCP
+capacity. Requests with the `news` purpose may route to GDELT for time-sensitive
+company events. GDELT is never used as a replacement for official-site, pricing,
+careers, product, or technical-documentation discovery.
 
 ## Research lifecycle
 
 1. Store a user-confirmed product profile.
-2. Create a bounded run and enqueue a typed Redis job.
-3. Build deterministic market, company, signal, and competitor queries.
-4. Search and fetch only through the gateway.
+2. Create a `BYOA_CORE` run and select the user-confirmed ICP.
+3. Import and validate company names and public official domains.
+4. Fetch bounded, allowed official pages through the gateway without web search.
 5. Canonicalize URLs, normalize text, hash and deduplicate documents, and chunk
    durable content.
-6. Persist claims only when their exact passage exists in the source document.
-7. Generate exactly three ICP candidates, then pause for human selection.
-8. Discover public company candidates and persist account research snapshots.
-9. Detect intent only from evidence text and calculate deterministic scores.
-10. Generate a brief and a campaign draft behind an approval request.
+6. Attach claims only when exact evidence belongs to the supplied company.
+7. Separate verified facts, unknowns, hypotheses, and rejected evidence.
+8. Detect current signals only when supported and dated.
+9. Calculate deterministic Fit, Intent, Confidence, and Priority scores.
+10. Generate a stateful opportunity brief for human review and safe export.
+
+The separate Experimental workflow adds provider-backed account discovery before
+steps 4-10. It never implies that discovered accounts are founder-ready.
 
 Every run persists counters, stage, errors, agent runs, tool calls, and audit events.
 
@@ -218,6 +249,8 @@ It does not claim that a public-web smoke occurred.
   explicitly enabled demo principal.
 - The current extraction and brief generator are deterministic and conservative;
   no live LLM or embedding provider is required.
+- Automatic discovery is unavailable until an authenticated search provider is
+  configured; BYOA import, research, review, and export remain available.
 - Account identity, industry, geography, and employee size remain `Unverified`
   unless source text proves them.
 - Public search availability and result quality depend on the configured upstream.

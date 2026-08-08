@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -170,11 +171,13 @@ class SourceChunkRow(TenantRecord):
     token_estimate: Mapped[int] = mapped_column(Integer)
     embedding: Mapped[list[float] | None] = mapped_column(JSONB)
     __table_args__ = (
-        Index(
-            "uq_source_chunk_ordinal",
-            "source_document_id",
-            "ordinal",
-            unique=True,
+        # A UniqueConstraint, matching migration 0002, which creates it inline in
+        # create_table. PostgreSQL backs it with a unique index of the same name,
+        # so this is equivalent to Index(..., unique=True) at runtime -- but
+        # `alembic check` compares object kinds, and declaring the index form
+        # made it report drift against a database that was already correct.
+        UniqueConstraint(
+            "source_document_id", "ordinal", name="uq_source_chunk_ordinal"
         ),
     )
 

@@ -2,11 +2,23 @@ from __future__ import annotations
 
 import importlib
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[3]
+
+# Three tests below execute the historical Phase 5 PowerShell acceptance harness.
+# They exercise the QA orchestration scripts, not the product, and cannot run where
+# PowerShell is absent — Linux CI, for one. Skipping is honest; deleting would
+# discard preserved QA evidence, and pretending they ran would be worse than both.
+requires_powershell = pytest.mark.skipif(
+    shutil.which("powershell.exe") is None and shutil.which("pwsh") is None,
+    reason="PowerShell is unavailable; the Phase 5 acceptance harness is Windows-only",
+)
 
 
 def test_positive_control_entity_match_helper_comes_from_live_research() -> None:
@@ -73,6 +85,7 @@ def test_phase5_logged_gate_captures_stderr_without_aborting_suite() -> None:
     assert "$ErrorActionPreference = $previousPreference" in gate_function
 
 
+@requires_powershell
 def test_phase5_logged_gate_tolerates_successful_native_stderr(
     tmp_path: Path,
 ) -> None:
@@ -117,6 +130,7 @@ def test_phase5_logged_gate_tolerates_successful_native_stderr(
     assert "harmless-warning" in gate_log.read_text(encoding="utf-16")
 
 
+@requires_powershell
 def test_phase5_mock_orchestration_reaches_every_stage(tmp_path: Path) -> None:
     diagnostics = tmp_path / "phase5-mock.json"
     completed = subprocess.run(
@@ -163,6 +177,7 @@ def test_phase5_mock_orchestration_reaches_every_stage(tmp_path: Path) -> None:
     ]
 
 
+@requires_powershell
 def test_phase5_failure_cleanup_preserves_only_redacted_status() -> None:
     failure_status = ROOT / "tmp" / "phase5-acceptance-last-status.json"
     failure_status.unlink(missing_ok=True)

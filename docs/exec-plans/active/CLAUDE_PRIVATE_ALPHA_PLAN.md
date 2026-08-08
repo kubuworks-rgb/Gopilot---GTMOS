@@ -3,6 +3,25 @@
 **Owner:** Claude (lead engineer)
 **Opened:** 2026-08-08
 **Baseline commit:** `ef2467c` (`feature/byoa-core-product`)
+**This branch:** `feature/private-alpha-hardening`
+
+## Branch split
+
+Work is separated by scope so PR #1 stays focused on the verified BYOA core.
+
+| Branch | Contains | State |
+|---|---|---|
+| `feature/byoa-core-product` (PR #1, draft) | Signal-honesty fix, takeover audit, credential-free CI | pushed — awaiting CI + review |
+| `feature/private-alpha-hardening` | OIDC authentication, migration `0007`, migration-parity tests, CI's `alembic check` and auth steps, and all later hardening | branched from PR #1 |
+| `backup/takeover-20260808` + tag `takeover-checkpoint-20260808` | The unsplit original three commits | retained; nothing lost |
+
+Two CI steps are deliberately absent from PR #1 because they depend on work that is
+not part of the BYOA core, and would fail there for reasons that PR does not
+introduce: `alembic check` (needs `0007`) and the authentication tests.
+
+**Sequencing:** hold PR #1 open and draft until its CI passes and it is reviewed.
+After it merges into `develop`, rebase this branch onto the updated `develop` and
+continue. Nothing merges automatically.
 **Source audit:** [CLAUDE_PROJECT_TAKEOVER_AUDIT.md](../../qa/CLAUDE_PROJECT_TAKEOVER_AUDIT.md)
 **Target:** Limited private alpha of `BYOA_CORE`. Not a public launch. Not an
 autonomous-discovery release.
@@ -25,8 +44,17 @@ autonomous-discovery release.
 | CI | **absent** — no `.github/` |
 | Deployable artifact | **absent** — compose has infra only |
 
-¹ Environmental: `PermissionError [WinError 5]` on the `tmp_path` fixture directory.
-Not code defects. Accounts for the historical "174 passed" figure.
+¹ **Now resolved.** The cause was a corrupted `C:\Users\LENOVO\AppData\Local\Temp\
+pytest-of-LENOVO` directory whose ACL could not even be read, left behind by an
+earlier run. It cannot be deleted without elevation, but pointing pytest elsewhere
+clears it:
+
+```powershell
+$env:PYTEST_DEBUG_TEMPROOT="<any writable directory>"
+```
+
+With that set the suite reports **0 errors**. This also explains the historical
+"174 passed" figure — it was 172 plus these two. CI on Linux is unaffected.
 
 ---
 
@@ -37,8 +65,8 @@ Not code defects. Accounts for the historical "174 passed" figure.
 | 0 | Forensic audit + baseline | — | **DONE** |
 | 1 | P0-2 signal honesty | alpha | **DONE** |
 | 2 | P0-1 authentication | alpha | **DONE** (backend); login UI outstanding |
-| 3 | P1-4 migration `0007` | deployability | TODO |
-| 4 | P1-1 CI | deployability | TODO |
+| 3 | P1-4 migration `0007` | deployability | **DONE** |
+| 4 | P1-1 CI | deployability | **DONE** |
 | 5 | P1-2 / P1-6 gateway hardening | deployability | TODO |
 | 6 | P1-3 worker reliability | deployability | TODO |
 | 7 | P1-8 alpha limits + observability | deployability | TODO |
@@ -153,14 +181,53 @@ tokens correctly, but the browser has no way to obtain one. Tracked in Stage 9.
 
 ---
 
-## Stages 3–10
+## Stage 3 — Migration `0007` (P1-4) — DONE
+
+Additive only: 21 model-declared performance indexes, `if_not_exists=True`, no rows
+touched.
+
+**Diagnosis corrected twice during this work, both times because the verification
+method was too weak:**
+
+1. Parsing `downgrade()` alongside `upgrade()` invented two schema defects. Neither
+   was real; `0005` already widens `uq_source_run_hash` correctly.
+2. Source pattern-matching cannot see constraints declared inline in `create_table`,
+   so `uq_source_chunk_ordinal` looked like an unenforced uniqueness invariant. It is
+   not — migration `0002` creates it as a `UniqueConstraint`, which PostgreSQL backs
+   with a unique index of the same name. The models declare it as a unique `Index`;
+   the two differ in kind, not in effect. `0007` deliberately leaves it alone, and the
+   row-deduplication statement drafted on the false premise was removed.
+
+Replaced the throwaway parser with `apps/api/tests/test_migration_index_parity.py`,
+which **executes** every `upgrade()` against a recording stub of `alembic.op`. That
+captures every call style — literal, helper, loop, inline constraint — and needs no
+database. Nine tests now assert index, column, and table parity plus a linear
+revision chain. Verified to fail without `0007` and pass with it.
+
+Column and table parity are clean, which is what gives confidence that CI's
+`alembic check` step (which needs a live database) will pass on first run.
+
+## Stage 4 — CI (P1-1) — DONE
+
+`.github/workflows/ci.yml`, four jobs, no provider credentials anywhere
+(`EXA_API_KEY` and `TAVILY_API_KEY` are pinned empty at workflow level):
+
+- **backend** — ruff, mypy, pytest
+- **frontend** — eslint, tsc, tests, Next.js build
+- **database** — Postgres 17 + Redis, `alembic upgrade head`, `current`, offline SQL,
+  a downgrade/upgrade round trip, `alembic check`, and the live DB integration tests
+- **security** — gateway security tests, authentication tests, whitespace, secret scan
+
+Added `scripts/secret_scan.py`: reports only file and line, **never the matched
+value**, so a leak is not compounded into CI logs. It is itself tested
+(`test_secret_scan.py`) against planted synthetic credentials — a scanner that never
+fires is worse than none, because it looks like coverage. Those tests caught a
+malformed AWS key in my own fixture.
+
+## Stages 5–10
 
 See audit §29. Summary of intent:
 
-- **3** Additive migration `0007` for 22 model-declared indexes. Defensive creation for
-  the one unique index (`uq_source_chunk_ordinal`). No migration needs *correcting* —
-  the drift is one-directional and additive.
-- **4** Credential-free CI. All checks already pass locally; this is workflow authoring.
 - **5** Gateway token required outside local dev (currently a no-op when unset); pin the
   validated IP to close the DNS-rebinding TOCTOU.
 - **6** Worker: reliable claim, failure recorded on the row, `workspace_id` / `actor_id`

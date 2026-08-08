@@ -116,16 +116,29 @@ def _migrated_indexes() -> dict[str, tuple[str, tuple[str, ...], bool]]:
 
 
 def _model_indexes() -> dict[str, tuple[str, tuple[str, ...], bool]]:
-    return {
-        index.name: (
-            table.name,
-            tuple(sorted(column.name for column in index.columns)),
-            bool(index.unique),
-        )
-        for table in Base.metadata.sorted_tables
-        for index in table.indexes
-        if index.name
-    }
+    """Indexes plus unique constraints.
+
+    PostgreSQL backs a UNIQUE constraint with a unique index of the same name, so
+    both forms express the same invariant and either satisfies the other.
+    """
+
+    declared: dict[str, tuple[str, tuple[str, ...], bool]] = {}
+    for table in Base.metadata.sorted_tables:
+        for index in table.indexes:
+            if index.name:
+                declared[str(index.name)] = (
+                    table.name,
+                    tuple(sorted(column.name for column in index.columns)),
+                    bool(index.unique),
+                )
+        for constraint in table.constraints:
+            if isinstance(constraint, sa.UniqueConstraint) and constraint.name:
+                declared[str(constraint.name)] = (
+                    table.name,
+                    tuple(sorted(column.name for column in constraint.columns)),
+                    True,
+                )
+    return declared
 
 
 def test_migration_chain_is_linear_and_complete() -> None:

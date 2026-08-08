@@ -98,6 +98,12 @@ async def main() -> int:
 
         print(f"\n[1] Workspace  (actor {args.user})")
         response = await client.post("/workspaces", json={"name": "Smoke Workspace"})
+        if response.status_code == 403:
+            raise SmokeFailure(
+                f"{args.user!r} is not on the invite list. Re-run with "
+                "--user <an invited subject>, or set SMOKE_USER. "
+                "See PRIVATE_ALPHA_ALLOWED_SUBJECTS in your env file."
+            )
         check(response.status_code == 201, f"workspace created ({response.status_code})")
         workspace_id = response.json()["id"]
         client.headers["X-Workspace-Id"] = workspace_id
@@ -241,9 +247,12 @@ async def main() -> int:
                 f"{account['domain']} carries no cross-company evidence",
             )
             if brief["brief_state"] != "FOUNDER_READY":
+                # A draft row may exist as a research checkpoint. What must hold is
+                # that it is never approved and cannot be approved; step 10 proves
+                # the API refuses. The UI hides the editor entirely.
                 check(
-                    brief["campaign"]["subject"] == "",
-                    f"{account['domain']} has no outreach draft (not FOUNDER_READY)",
+                    brief["campaign"]["status"] == "draft",
+                    f"{account['domain']} draft is unapproved (not FOUNDER_READY)",
                 )
 
         print("\n[10] Outreach stays gated")

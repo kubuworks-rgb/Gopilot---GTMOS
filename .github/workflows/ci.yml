@@ -40,7 +40,7 @@ jobs:
       - name: Ruff
         run: python -m ruff check apps/api services/research_gateway
       - name: Mypy
-        run: python -m mypy apps/api/app services/research_gateway/app
+        run: python -m mypy apps/api/app services/research_gateway/app services/worker/app
       - name: Pytest
         run: python -m pytest apps/api/tests services/research_gateway/tests -q
 
@@ -114,6 +114,10 @@ jobs:
           RUN_LIVE_DB_TESTS: "1"
           RESEARCH_MODE: live
         run: python -m pytest apps/api/tests/test_live_database_integration.py -q
+      - name: Worker reliability against real Redis
+        env:
+          RUN_LIVE_REDIS_TESTS: "1"
+        run: python -m pytest apps/api/tests/test_worker_reliability.py -q
 
   security:
     name: Security (gateway, secrets, whitespace)

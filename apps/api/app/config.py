@@ -62,6 +62,37 @@ class Settings:
     max_account_candidates: int = int(os.getenv("MAX_ACCOUNT_CANDIDATES", "40"))
     max_accounts_researched: int = int(os.getenv("MAX_ACCOUNTS_RESEARCHED", "15"))
     max_elapsed_seconds: int = int(os.getenv("MAX_RESEARCH_ELAPSED_SECONDS", "900"))
+    # --- Private alpha -----------------------------------------------------
+    # Invite-only access and bounded usage. Every limit is configurable rather
+    # than hard-coded, and every one returns an explicit error instead of
+    # silently truncating the user's input.
+    private_alpha_enabled: bool = (
+        os.getenv("PRIVATE_ALPHA_ENABLED", "false").lower() == "true"
+    )
+    private_alpha_allowed_subjects: tuple[str, ...] = tuple(
+        item.strip()
+        for item in os.getenv("PRIVATE_ALPHA_ALLOWED_SUBJECTS", "").split(",")
+        if item.strip()
+    )
+    private_alpha_allowed_emails: tuple[str, ...] = tuple(
+        item.strip().lower()
+        for item in os.getenv("PRIVATE_ALPHA_ALLOWED_EMAILS", "").split(",")
+        if item.strip()
+    )
+    allow_experimental_discovery: bool = (
+        os.getenv("ALLOW_EXPERIMENTAL_DISCOVERY", "false").lower() == "true"
+    )
+    max_accounts_per_import: int = int(os.getenv("MAX_ACCOUNTS_PER_IMPORT", "100"))
+    max_accounts_per_workspace: int = int(
+        os.getenv("MAX_ACCOUNTS_PER_WORKSPACE", "500")
+    )
+    max_imports_per_day: int = int(os.getenv("MAX_IMPORTS_PER_DAY", "20"))
+    max_concurrent_research_runs: int = int(
+        os.getenv("MAX_CONCURRENT_RESEARCH_RUNS", "2")
+    )
+    max_workspaces_per_user: int = int(os.getenv("MAX_WORKSPACES_PER_USER", "3"))
+    max_export_rows: int = int(os.getenv("MAX_EXPORT_ROWS", "1000"))
+    max_pages_per_account: int = int(os.getenv("MAX_PAGES_PER_ACCOUNT", "8"))
     cors_origins: tuple[str, ...] = tuple(
         item.strip()
         for item in os.getenv(
@@ -112,6 +143,25 @@ class Settings:
                 )
             if self.jwks_cache_ttl_seconds <= 0:
                 raise RuntimeError("JWKS_CACHE_TTL_SECONDS must be positive")
+        if self.private_alpha_enabled and not (
+            self.private_alpha_allowed_subjects or self.private_alpha_allowed_emails
+        ):
+            raise RuntimeError(
+                "PRIVATE_ALPHA_ENABLED requires PRIVATE_ALPHA_ALLOWED_SUBJECTS or "
+                "PRIVATE_ALPHA_ALLOWED_EMAILS; an empty invite list would admit no "
+                "one and is more likely a misconfiguration than an intent"
+            )
+        for name, value in (
+            ("MAX_ACCOUNTS_PER_IMPORT", self.max_accounts_per_import),
+            ("MAX_ACCOUNTS_PER_WORKSPACE", self.max_accounts_per_workspace),
+            ("MAX_IMPORTS_PER_DAY", self.max_imports_per_day),
+            ("MAX_CONCURRENT_RESEARCH_RUNS", self.max_concurrent_research_runs),
+            ("MAX_WORKSPACES_PER_USER", self.max_workspaces_per_user),
+            ("MAX_EXPORT_ROWS", self.max_export_rows),
+            ("MAX_PAGES_PER_ACCOUNT", self.max_pages_per_account),
+        ):
+            if value <= 0:
+                raise RuntimeError(f"{name} must be positive")
         if self.research_mode == "live":
             if not self.database_url.startswith(
                 ("postgresql+asyncpg://", "postgresql://")

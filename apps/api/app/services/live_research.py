@@ -60,6 +60,7 @@ from apps.api.app.services.entity_resolution import (
     CompanyIdentityRecord,
     EntityRelation,
     EvidenceAttachmentAssessment,
+    IMPORT_PENDING_IDENTITY_WARNING,
     VerifiedAlias,
     VerifiedEntityRelationship,
     assess_evidence_attachment,
@@ -200,11 +201,27 @@ def _tokens(value: str) -> set[str]:
 
 
 def _sentences(text: str) -> list[str]:
-    return [
-        value.strip()
-        for value in SENTENCE_PATTERN.split(text)
-        if 45 <= len(value.strip()) <= 700
-    ]
+    """Split into passage-sized candidates.
+
+    Segments longer than the cap are clamped at a word boundary rather than
+    discarded. Plenty of real company pages carry very little sentence
+    punctuation, and dropping their whole body left the account with no evidence
+    at all -- which then read as "the domain could not be verified" even though it
+    had been fetched successfully.
+    """
+
+    passages: list[str] = []
+    for raw in SENTENCE_PATTERN.split(text):
+        value = raw.strip()
+        if len(value) < 45:
+            continue
+        if len(value) <= 700:
+            passages.append(value)
+            continue
+        clipped = value[:700]
+        boundary = clipped.rfind(" ")
+        passages.append(clipped[:boundary] if boundary > 45 else clipped)
+    return passages
 
 
 def _evidence_passages(text: str, context: str) -> list[str]:
@@ -385,7 +402,13 @@ async def _persist_source(
         if evidence_context
         else _sentences(source.text)[:2]
     )
-    if not evidence_context and not candidates and source.text.strip():
+    # A first-party page that matched no context tokens is still the company
+    # describing itself. Falling back to its leading passages beats recording no
+    # evidence at all; the entity and claim-scope gates still decide what may
+    # attach to the account.
+    if not candidates:
+        candidates = _sentences(source.text)[:2]
+    if not candidates and source.text.strip():
         candidates = [source.text.strip()[:700]]
     facts: list[EvidenceFactRow] = []
     for passage in candidates:
@@ -2160,6 +2183,21 @@ def _identity_record_for_account(account: AccountRow) -> CompanyIdentityRecord:
         )
         if value
     )
+    # Import records a pending marker because the supplied domain has not been
+    # checked yet. Once research verifies that domain the marker is stale, and
+    # leaving it in place pinned every BYOA account to IDENTITY_REVIEW_REQUIRED
+    # forever -- no imported account could ever reach another state.
+    #
+    # The signal is `domain_validation`, which research sets to VALIDATED only
+    # after a fetch whose post-redirect canonical domain still matched.
+    # `official_domains` always contains the account's own domain, so testing
+    # membership there would clear the marker unconditionally.
+    if str(account.attributes.get("domain_validation") or "") == "VALIDATED":
+        warnings = tuple(
+            warning
+            for warning in warnings
+            if warning != IMPORT_PENDING_IDENTITY_WARNING
+        )
     return CompanyIdentityRecord(
         canonical_company_name=(
             str(raw.get("canonical_company_name"))
@@ -3067,7 +3105,13 @@ async def research_account(
             company_name=account.name,
             domain=account.domain,
         )
-        if not direct_sources or not direct_facts:
+        # Identity verification and evidence extraction are different questions.
+        # Fetching the supplied domain and confirming the post-redirect canonical
+        # domain still matches IS the verification; whether we could mine a usable
+        # passage from the page is a separate, weaker concern. Conflating them
+        # reported real companies as unverifiable simply because their homepage
+        # copy was terse.
+        if not direct_sources:
             raw_identity = account.attributes.get("company_identity")
             identity = (
                 {str(key): value for key, value in raw_identity.items()}

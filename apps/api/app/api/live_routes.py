@@ -62,6 +62,18 @@ from apps.api.app.jobs.queue import ResearchJob, enqueue_job
 from apps.api.app.providers.live import GatewayProviderError, LiveResearchProvider
 from apps.api.app.repositories.postgres import repository
 from apps.api.app.security.tokens import AuthError, verify_bearer_token
+from apps.api.app.services.private_alpha import (
+    AccessDenied,
+    LimitExceeded,
+    assert_daily_import_quota,
+    assert_export_size,
+    assert_import_size,
+    assert_invited,
+    assert_run_concurrency,
+    assert_workspace_capacity,
+    assert_workspace_quota,
+    experimental_discovery_allowed,
+)
 from apps.api.app.services.byoa import (
     neutralize_formula,
     product_mode_availability,
@@ -94,13 +106,23 @@ async def authenticated_user_id(
             verified = await verify_bearer_token(authorization)
         except AuthError as exc:
             raise HTTPException(status_code=401, detail=str(exc)) from exc
+        email = verified.claims.get("email")
+        try:
+            assert_invited(verified.subject, str(email) if email else None)
+        except AccessDenied as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
         return verified.subject
     if not settings.demo_auth_enabled:
         raise HTTPException(
             status_code=401,
             detail="Verified authentication is required when demo auth is disabled",
         )
-    return x_demo_user or "demo-user"
+    user_id = x_demo_user or "demo-user"
+    try:
+        assert_invited(user_id)
+    except AccessDenied as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return user_id
 
 
 async def get_live_principal(
@@ -203,6 +225,10 @@ async def create_workspace(
     # Workspace creation predates membership, so it authenticates the caller without
     # resolving one — but it must still authenticate.
     user_id = await authenticated_user_id(authorization, x_demo_user)
+    try:
+        await assert_workspace_quota(session, user_id)
+    except LimitExceeded as exc:
+        raise HTTPException(status_code=429, detail=exc.as_detail()) from exc
     return await repository.create_workspace(session, user_id, payload.name)
 
 
@@ -249,17 +275,30 @@ async def create_research(
     product_mode: ProductMode = ProductMode.BYOA_CORE,
 ) -> ResearchRun:
     availability = product_mode_availability()
-    if (
-        product_mode == ProductMode.AUTONOMOUS_DISCOVERY_EXPERIMENTAL
-        and not availability.search_provider_configured
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "CONFIGURATION_REQUIRED",
-                "message": availability.message,
-            },
-        )
+    if product_mode == ProductMode.AUTONOMOUS_DISCOVERY_EXPERIMENTAL:
+        if not experimental_discovery_allowed():
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "EXPERIMENTAL_DISCOVERY_DISABLED",
+                    "message": (
+                        "Automatic discovery is disabled during the private alpha. "
+                        "Account research remains available."
+                    ),
+                },
+            )
+        if not availability.search_provider_configured:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "CONFIGURATION_REQUIRED",
+                    "message": availability.message,
+                },
+            )
+    try:
+        await assert_run_concurrency(session, principal.workspace_id)
+    except LimitExceeded as exc:
+        raise HTTPException(status_code=429, detail=exc.as_detail()) from exc
     try:
         result = await repository.create_run(
             session,
@@ -469,6 +508,16 @@ async def select_icp(icp_id: str, principal: Current, session: Database) -> ICP:
     )
     if mode == ProductMode.BYOA_CORE:
         return selected
+    if not experimental_discovery_allowed():
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "EXPERIMENTAL_DISCOVERY_DISABLED",
+                "message": (
+                    "Automatic discovery is disabled during the private alpha."
+                ),
+            },
+        )
     availability = product_mode_availability()
     if not availability.search_provider_configured:
         raise HTTPException(
@@ -493,6 +542,14 @@ async def select_icp(icp_id: str, principal: Current, session: Database) -> ICP:
 
 @router.post("/accounts/refresh", status_code=202)
 async def refresh_accounts(principal: Current, session: Database) -> dict[str, str]:
+    if not experimental_discovery_allowed():
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "EXPERIMENTAL_DISCOVERY_DISABLED",
+                "message": "Automatic discovery is disabled during the private alpha.",
+            },
+        )
     availability = product_mode_availability()
     if not availability.search_provider_configured:
         raise HTTPException(
@@ -558,6 +615,15 @@ async def import_accounts(
                 "issues": [item.model_dump() for item in validation.issues],
             },
         )
+    # Checked before anything is written, so a refused import leaves no partial state.
+    try:
+        assert_import_size(len(validation.accepted))
+        await assert_daily_import_quota(session, principal.workspace_id)
+        await assert_workspace_capacity(
+            session, principal.workspace_id, len(validation.accepted)
+        )
+    except LimitExceeded as exc:
+        raise HTTPException(status_code=429, detail=exc.as_detail()) from exc
     icp = await session.scalar(
         select(ICPProfileRow)
         .where(
@@ -817,6 +883,10 @@ async def export_accounts(principal: Current, session: Database) -> Response:
         for item in await repository.list_accounts(session, principal.workspace_id)
         if item.review_status == AccountReviewStatus.APPROVED
     ]
+    try:
+        assert_export_size(len(accounts))
+    except LimitExceeded as exc:
+        raise HTTPException(status_code=429, detail=exc.as_detail()) from exc
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow(

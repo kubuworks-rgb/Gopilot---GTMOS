@@ -1438,7 +1438,16 @@ async def _fetch_supplied_official_sources(
     sources: list[SourceDocumentRow] = []
     facts: list[EvidenceFactRow] = []
     seen_source_ids: set[uuid.UUID] = set()
-    paths = ("", "about", "product", "products", "customers", "careers", "blog", "news")
+    paths = (
+        "",
+        "about",
+        "product",
+        "products",
+        "customers",
+        "careers",
+        "blog",
+        "news",
+    )[: settings.max_pages_per_account]
     for path in paths:
         if run.documents_used >= settings.max_research_documents:
             break

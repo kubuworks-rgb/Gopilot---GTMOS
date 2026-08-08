@@ -1,0 +1,146 @@
+name: CI
+
+# Runs entirely without search-provider credentials. Nothing here calls Exa,
+# Tavily, or any external research provider — BYOA is provider-independent by
+# design, and that property is part of what CI protects.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "22"
+  PYTHONPATH: ${{ github.workspace }}
+  # Explicitly absent so a provider can never be reached from CI.
+  EXA_API_KEY: ""
+  TAVILY_API_KEY: ""
+
+jobs:
+  backend:
+    name: Backend (pytest, ruff, mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r apps/api/requirements-dev.txt
+      - name: Ruff
+        run: python -m ruff check apps/api services/research_gateway
+      - name: Mypy
+        run: python -m mypy apps/api/app services/research_gateway/app
+      - name: Pytest
+        run: python -m pytest apps/api/tests services/research_gateway/tests -q
+
+  frontend:
+    name: Frontend (eslint, tsc, build, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint --workspace apps/web
+      - name: TypeScript
+        run: npm run typecheck --workspace apps/web
+      - name: Tests
+        run: npm run test --workspace apps/web
+      - name: Next.js build
+        run: npm run build --workspace apps/web
+
+  database:
+    name: Database (alembic + integration)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: gtm
+          POSTGRES_PASSWORD: gtm
+          POSTGRES_DB: gtm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gtm"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://gtm:gtm@127.0.0.1:5432/gtm
+      REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r apps/api/requirements-dev.txt
+      - name: Alembic upgrade to head
+        run: python -m alembic -c apps/api/alembic.ini upgrade head
+      - name: Alembic reports the expected head
+        run: python -m alembic -c apps/api/alembic.ini current
+      - name: Offline SQL generation
+        run: python -m alembic -c apps/api/alembic.ini upgrade head --sql > /dev/null
+      - name: Migrations are reversible
+        run: |
+          python -m alembic -c apps/api/alembic.ini downgrade -1
+          python -m alembic -c apps/api/alembic.ini upgrade head
+      # `alembic check` is added on feature/private-alpha-hardening, together with
+      # migration 0007. It reports pre-existing index drift until that lands, so
+      # gating this PR on it would fail for a reason this PR does not introduce.
+      - name: Live database integration tests
+        env:
+          RUN_LIVE_DB_TESTS: "1"
+          RESEARCH_MODE: live
+        run: python -m pytest apps/api/tests/test_live_database_integration.py -q
+
+  security:
+    name: Security (gateway, secrets, whitespace)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r apps/api/requirements-dev.txt
+      - name: Gateway security tests
+        run: python -m pytest services/research_gateway/tests/test_security.py -q
+      # Authentication tests are added on feature/private-alpha-hardening.
+      - name: Whitespace errors
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            git diff --check "$BASE_SHA" HEAD
+          elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+            git diff --check HEAD~1 HEAD
+          else
+            echo "Single commit; nothing to compare."
+          fi
+      - name: Secret scan
+        run: python scripts/secret_scan.py

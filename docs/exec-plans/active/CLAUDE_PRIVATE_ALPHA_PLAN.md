@@ -83,12 +83,72 @@ With that set the suite reports **0 errors**. This also explains the historical
 | 2 | P0-1 authentication | alpha | **DONE** (backend); login UI outstanding |
 | 3 | P1-4 migration `0007` | deployability | **DONE** |
 | 4 | P1-1 CI | deployability | **DONE** |
-| 5 | P1-2 / P1-6 gateway hardening | deployability | TODO |
-| 6 | P1-3 worker reliability | deployability | TODO |
-| 7 | P1-8 alpha limits + observability | deployability | TODO |
-| 8 | P1-5 deployment path | deployability | TODO |
-| 9 | P1-7 UX honesty | quality | TODO |
-| 10 | P2 cleanup / simplification | maintainability | TODO |
+| 5 | P1-2 / P1-6 gateway hardening | deployability | **DONE** |
+| 6 | P1-3 worker reliability | deployability | **DONE** |
+| 7 | P1-8 alpha limits + invite-only | deployability | **DONE** |
+| 8 | P1-5 deployment path | deployability | **DONE** (re-verify blocked) |
+| 9 | Frontend OIDC sign-in | alpha | **DONE** |
+| 10 | P1-7 UX honesty | quality | TODO |
+| 11 | P2 cleanup / simplification | maintainability | TODO |
+
+## What the first real deployment proved — and broke
+
+The whole stack was built and run for real (postgres, redis, migrate, gateway, api,
+worker, web — all healthy, migrations applied before any service took traffic), and
+the smoke test drove it through the web proxy against **real company websites**.
+
+It passed the invite gate, workspace, product, BYOA run, unsafe-domain rejection,
+import, duplicate detection, worker research, and evidence-backed briefs with no
+cross-company contamination.
+
+Then it found two defects the entire fixture suite had missed:
+
+1. **No imported account could ever leave `IDENTITY_REVIEW_REQUIRED`.** Import
+   writes a "not yet verified" marker and nothing cleared it once research
+   verified the domain. `decide_brief_state` returns `IDENTITY_REVIEW_REQUIRED`
+   whenever any warning is present, so the core BYOA workflow could not reach
+   `MONITOR`, `RESEARCH_CANDIDATE` or `FOUNDER_READY` **at all**.
+2. **A real company was reported as unverifiable.** `_sentences` discarded any
+   segment over 700 characters, so `sqlalchemy.org` — whose homepage is one long
+   run with almost no full stops — yielded zero passages, and the account was
+   labelled "the supplied official domain could not be verified". Untrue: the
+   domain had been fetched and matched. Identity verification was conflated with
+   evidence extraction.
+
+Both are fixed with regression tests
+(`apps/api/tests/test_byoa_identity_verification.py`). This is the clearest
+argument in the whole takeover for running the real thing: an offline evaluation
+over curated fixtures reported "BYOA CORE QUALITY PASS" while the deployed product
+could not move an account out of identity review.
+
+### Re-verified after the fixes
+
+Docker Desktop's engine died mid-run; `wsl --shutdown` and a relaunch recovered it
+without needing elevation. The stack was rebuilt from scratch on a clean volume and
+the smoke test re-run end to end:
+
+```
+[8]  sqlalchemy.org  state=RESEARCH_CANDIDATE  fit=0 intent=70 conf=94
+     python.org      state=RESEARCH_CANDIDATE  fit=0 intent=70 conf=94
+...
+SMOKE TEST PASSED
+```
+
+Both accounts now leave identity review, and `sqlalchemy.org` verifies with 2 real
+source documents instead of being called unverifiable.
+
+One assertion in the smoke test was wrong, not the product: it demanded an empty
+campaign subject for non-`FOUNDER_READY` accounts. A draft row does exist as a
+"Research checkpoint", but it is never approved, the API refuses to edit or approve
+it (409, step 10), and the UI shows "No outreach draft generated". The assertion now
+tests that gate rather than the subject string.
+
+Also verified against the running stack:
+
+- `scripts/delete_workspace_data.py` — dry run, cross-tenant refusal, then a real
+  delete leaving **zero orphans** across accounts, sources, evidence, briefs, audit
+  and memberships, while a second workspace's data was untouched.
+- The exact command in the runbook, run inside the `api` container.
 
 ---
 

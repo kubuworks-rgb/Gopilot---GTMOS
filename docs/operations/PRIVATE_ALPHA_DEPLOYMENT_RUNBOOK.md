@@ -119,13 +119,21 @@ docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha
 curl -fsS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/
 ```
 
-Then run the smoke test, which exercises import → research → brief → export
-against real infrastructure:
+Then run the smoke test. It exercises the whole BYOA journey — invite gate,
+workspace, product, run, import validation, import, duplicate detection, worker
+research against **real company websites**, evidence-backed briefs, the outreach
+gate, review, export and tenant isolation.
+
+`--user` must name an identity on the invite list, otherwise the very first
+workspace call is correctly refused with `403`:
 
 ```bash
 docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
-  exec api python scripts/private_alpha_smoke.py
+  exec api python scripts/private_alpha_smoke.py --user <an invited subject>
 ```
+
+It leaves its workspace behind for inspection and prints the exact command to
+remove it (section 11).
 
 ---
 

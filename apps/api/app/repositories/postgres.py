@@ -51,6 +51,7 @@ from apps.api.app.domain.models import (
     SourceDocument,
     Workspace,
 )
+from apps.api.app.services.entity_resolution import IMPORT_PENDING_IDENTITY_WARNING
 from apps.api.app.services.scoring import score_account
 from pydantic import HttpUrl
 
@@ -763,7 +764,7 @@ class PostgresRepository:
                         "relationship_evidence_ids": [],
                         "identity_confidence": 0.55,
                         "unresolved_identity_warnings": [
-                            "User-supplied domain has not yet been verified."
+                            IMPORT_PENDING_IDENTITY_WARNING
                         ],
                     },
                 },

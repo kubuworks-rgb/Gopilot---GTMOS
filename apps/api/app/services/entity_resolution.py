@@ -7,6 +7,11 @@ from enum import StrEnum
 from apps.api.app.services.company_identity import registrable_domain
 
 
+# Written at import time and cleared once research verifies the supplied domain.
+# Import and research must agree on the exact string, so it lives in one place.
+IMPORT_PENDING_IDENTITY_WARNING = "User-supplied domain has not yet been verified."
+
+
 class EntityRelation(StrEnum):
     SAME_ENTITY = "SAME_ENTITY"
     PRODUCT_OF = "PRODUCT_OF"

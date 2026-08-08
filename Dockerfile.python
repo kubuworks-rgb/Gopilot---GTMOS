@@ -1,0 +1,33 @@
+# Shared image for the three Python services: API, worker, research gateway.
+# They share one dependency set, so one image with different commands keeps the
+# build cache warm and guarantees the three run identical library versions.
+FROM python:3.13-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app
+
+WORKDIR /app
+
+# git is needed only to resolve the agent-reach archive dependency at build time.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY apps/api/requirements.txt /app/apps/api/requirements.txt
+RUN pip install --no-cache-dir -r /app/apps/api/requirements.txt
+
+COPY apps /app/apps
+COPY services /app/services
+COPY scripts /app/scripts
+
+# Never run application code as root.
+RUN useradd --create-home --uid 10001 gopilot \
+    && chown -R gopilot:gopilot /app
+USER gopilot
+
+EXPOSE 8000 8010
+
+# Overridden per service in compose.
+CMD ["python", "-m", "uvicorn", "apps.api.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

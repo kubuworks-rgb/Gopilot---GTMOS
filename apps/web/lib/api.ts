@@ -2,10 +2,33 @@ import type { Account, AccountImportRecord, AccountImportResult, AccountReviewSt
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 
+const ACCESS_TOKEN_KEY = "gopilot.access_token";
+
+/** Store the verified access token for subsequent API calls. */
+export function setAccessToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token) window.sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+  else window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+export function accessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+function authHeaders(): Record<string, string> {
+  const token = accessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+      ...(init?.headers ?? {}),
+    },
     cache: "no-store",
   });
   if (!response.ok) throw new Error(`API ${response.status}: ${await response.text()}`);

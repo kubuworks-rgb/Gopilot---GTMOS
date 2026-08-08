@@ -61,6 +61,7 @@ from apps.api.app.domain.models import (
 from apps.api.app.jobs.queue import ResearchJob, enqueue_job
 from apps.api.app.providers.live import GatewayProviderError, LiveResearchProvider
 from apps.api.app.repositories.postgres import repository
+from apps.api.app.security.tokens import AuthError, verify_bearer_token
 from apps.api.app.services.byoa import (
     neutralize_formula,
     product_mode_availability,
@@ -79,17 +80,36 @@ class LivePrincipal:
     role: str
 
 
-async def get_live_principal(
-    session: Database,
-    x_demo_user: Annotated[str | None, Header()] = None,
-    x_workspace_id: Annotated[str | None, Header()] = None,
-) -> LivePrincipal:
+async def authenticated_user_id(
+    authorization: str | None, x_demo_user: str | None
+) -> str:
+    """Resolve the caller's identity, failing closed.
+
+    In `oidc` mode the identity comes only from a verified token signature. The demo
+    header is never consulted, so it cannot be used to impersonate anyone.
+    """
+
+    if settings.auth_mode == "oidc":
+        try:
+            verified = await verify_bearer_token(authorization)
+        except AuthError as exc:
+            raise HTTPException(status_code=401, detail=str(exc)) from exc
+        return verified.subject
     if not settings.demo_auth_enabled:
         raise HTTPException(
             status_code=401,
             detail="Verified authentication is required when demo auth is disabled",
         )
-    user_id = x_demo_user or "demo-user"
+    return x_demo_user or "demo-user"
+
+
+async def get_live_principal(
+    session: Database,
+    authorization: Annotated[str | None, Header()] = None,
+    x_demo_user: Annotated[str | None, Header()] = None,
+    x_workspace_id: Annotated[str | None, Header()] = None,
+) -> LivePrincipal:
+    user_id = await authenticated_user_id(authorization, x_demo_user)
     try:
         membership = await repository.resolve_membership(
             session, user_id, x_workspace_id
@@ -177,16 +197,13 @@ async def product_modes(principal: Current) -> ProductModeAvailability:
 async def create_workspace(
     payload: WorkspaceCreate,
     session: Database,
+    authorization: Annotated[str | None, Header()] = None,
     x_demo_user: Annotated[str | None, Header()] = None,
 ) -> Workspace:
-    if not settings.demo_auth_enabled:
-        raise HTTPException(
-            status_code=401,
-            detail="Verified authentication is required when demo auth is disabled",
-        )
-    return await repository.create_workspace(
-        session, x_demo_user or "demo-user", payload.name
-    )
+    # Workspace creation predates membership, so it authenticates the caller without
+    # resolving one — but it must still authenticate.
+    user_id = await authenticated_user_id(authorization, x_demo_user)
+    return await repository.create_workspace(session, user_id, payload.name)
 
 
 @router.post("/products", response_model=ProductProfile, status_code=201)

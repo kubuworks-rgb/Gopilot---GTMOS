@@ -248,33 +248,41 @@ loops) and diffing against `Base.metadata`:
 
 | Classification | Count |
 |---|---|
-| `EXPECTED_EXISTING_INDEX` (agree exactly) | 54 |
-| `MISSING_IN_MIGRATION` | 22 |
+| `EXPECTED_EXISTING_INDEX` (agree exactly) | 55 |
+| `MISSING_IN_MIGRATION` | 21 |
 | `MISSING_IN_MODEL_METADATA` | 0 |
-| `NAMING_ONLY_DIFFERENCE` | 0 |
+| `NAMING_ONLY_DIFFERENCE` | 1 |
 | `ACTUAL_SCHEMA_DEFECT` | **0** |
 
-**The drift is purely additive and one-directional:** the models declare 22 indexes that
-no migration creates. There is no column-level or uniqueness disagreement anywhere, and
-no table mismatch. `alembic check` reports drift because autogenerate wants to *add*
-these, not because the deployed schema is wrong.
+**The drift is purely additive and one-directional:** the models declare 21 indexes that
+no migration creates, and **all 21 are pure performance indexes** (foreign keys and
+status columns). There is no column-level, uniqueness, or table disagreement anywhere.
+`alembic check` reports drift because autogenerate wants to *add* these, not because the
+deployed schema is wrong. Nothing about the data is at risk.
 
-Of the 22, **21 are pure performance indexes** (foreign keys and status columns). Exactly
-one carries a correctness meaning:
+The single `NAMING_ONLY_DIFFERENCE` is `uq_source_chunk_ordinal`: the model declares it
+as `Index(..., unique=True)`, while migration `0002` creates it as a `UniqueConstraint`
+inside `create_table`. PostgreSQL backs a unique constraint with a unique index of the
+same name, so **the invariant has been enforced all along** — the two declarations
+differ in kind, not in effect.
 
-- `uq_source_chunk_ordinal` — `UNIQUE (source_document_id, ordinal)` on `source_chunks`.
-  Declared on the model, never created. **A uniqueness invariant the database does not
-  enforce.**
+Two methodological notes worth recording, because both changed the answer:
 
-A methodological note worth recording: my first pass reported `uq_source_run_hash` as an
-`ACTUAL_SCHEMA_DEFECT` and `uq_source_workspace_hash` as `MISSING_IN_MODEL_METADATA`.
-Both were false positives caused by parsing `downgrade()` bodies alongside `upgrade()`.
-Migration `0005` correctly widens `uq_source_run_hash` to the 3-column model form.
+1. My first pass reported `uq_source_run_hash` as an `ACTUAL_SCHEMA_DEFECT` and
+   `uq_source_workspace_hash` as `MISSING_IN_MODEL_METADATA`. Both were false positives
+   from parsing `downgrade()` bodies alongside `upgrade()`. Migration `0005` correctly
+   widens `uq_source_run_hash` to the 3-column model form.
+2. My second pass reported `uq_source_chunk_ordinal` as an unenforced uniqueness
+   invariant. That was also wrong: source pattern-matching cannot see constraints
+   declared inline in `create_table`. Replacing the static parser with a test that
+   **executes** each `upgrade()` against a recording stub of `alembic.op` surfaced the
+   truth and now guards it permanently
+   (`apps/api/tests/test_migration_index_parity.py`).
+
 **No migration needs to be corrected — only extended.**
 
-The fix is a single additive migration `0007` creating the 22 missing indexes. It is
-non-destructive. The one unique index must be created defensively in case pre-existing
-rows violate it.
+The fix is a single additive migration `0007` creating the 21 missing indexes. It is
+non-destructive and touches no rows.
 
 Other schema observations: workspace scoping is consistent (every tenant table carries
 `workspace_id` with `ON DELETE CASCADE` to `workspaces`), and
@@ -759,7 +767,7 @@ Better than expected. The README is notably honest — line 248 explicitly state
 | P1-1 | No CI whatsoever | no `.github/` | Add credential-free workflow (all checks already pass locally) |
 | P1-2 | Gateway auth is a no-op when token unset | `research_gateway/app/main.py:47` | Require the token outside explicit local dev; fail closed |
 | P1-3 | Worker loses jobs on crash; failures invisible | `worker/app/main.py:27,41` | Reliable claim + failure recorded on the run/account row |
-| P1-4 | 22 model-declared indexes absent from the DB, incl. the unique `uq_source_chunk_ordinal` | §7 | Single additive migration `0007` |
+| P1-4 | 21 model-declared performance indexes absent from the DB | §7 | Single additive migration `0007` |
 | P1-5 | No deployable artifact | `docker-compose.yml` | Dockerfiles + full compose + runbook |
 | P1-6 | DNS-rebinding TOCTOU on user-supplied domains | `url_policy.py:40` | Pin the validated IP for the connection |
 | P1-7 | Dashboard asserts unearned completion | `command-center.tsx:150` | Render real run state |
@@ -843,7 +851,7 @@ Provider-neutral JWKS verification module (issuer, audience, algorithm allowlist
 by both routers. `DEMO_AUTH_ENABLED` permitted only outside production. Frontend sends a
 bearer token. Full §U test matrix plus explicit cross-workspace-denial tests.
 
-**Stage 3 — P1-4 Migration `0007`** — additive indexes; defensive unique creation.
+**Stage 3 — P1-4 Migration `0007`** — additive performance indexes only; no row changes.
 
 **Stage 4 — P1-1 CI** — backend (pytest/ruff/mypy), frontend (eslint/tsc/build/test),
 security (gateway tests, secret scan, `git diff --check`), database (Postgres + Redis +

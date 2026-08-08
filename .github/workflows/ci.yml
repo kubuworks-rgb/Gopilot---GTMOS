@@ -107,9 +107,8 @@ jobs:
         run: |
           python -m alembic -c apps/api/alembic.ini downgrade -1
           python -m alembic -c apps/api/alembic.ini upgrade head
-      # `alembic check` is added on feature/private-alpha-hardening, together with
-      # migration 0007. It reports pre-existing index drift until that lands, so
-      # gating this PR on it would fail for a reason this PR does not introduce.
+      - name: Schema matches model metadata
+        run: python -m alembic -c apps/api/alembic.ini check
       - name: Live database integration tests
         env:
           RUN_LIVE_DB_TESTS: "1"
@@ -130,7 +129,8 @@ jobs:
       - run: pip install -r apps/api/requirements-dev.txt
       - name: Gateway security tests
         run: python -m pytest services/research_gateway/tests/test_security.py -q
-      # Authentication tests are added on feature/private-alpha-hardening.
+      - name: Authentication tests
+        run: python -m pytest apps/api/tests/test_authentication.py -q
       - name: Whitespace errors
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

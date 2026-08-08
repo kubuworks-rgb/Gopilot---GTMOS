@@ -7,7 +7,9 @@ from pydantic import BaseModel, Field, HttpUrl
 
 
 HealthStatus = Literal["available", "degraded", "unavailable"]
-ResultStatus = Literal["completed", "partial", "failed"]
+ResultStatus = Literal[
+    "completed", "completed_with_provider_fallback", "partial", "failed"
+]
 
 
 class AdapterHealth(BaseModel):
@@ -56,6 +58,17 @@ class SearchResult(BaseModel):
     published_at: datetime | None = None
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     backend: str
+    provider: str | None = None
+    provider_relevance_score: float | None = Field(default=None, ge=0, le=1)
+
+
+class ProviderAttempt(BaseModel):
+    provider: str
+    authenticated: bool
+    outcome: Literal["completed", "insufficient_results", "failed", "not_configured"]
+    result_count: int = Field(default=0, ge=0)
+    error_code: str | None = None
+    latency_ms: int = Field(default=0, ge=0)
 
 
 class SearchDiagnostics(BaseModel):
@@ -66,6 +79,15 @@ class SearchDiagnostics(BaseModel):
     results_after_filter: int
     rejected_results: int
     rejection_reasons: dict[str, int] = Field(default_factory=dict)
+    provider_attempts: list[ProviderAttempt] = Field(default_factory=list)
+    fallback_used: bool = False
+    completion_status: Literal[
+        "completed",
+        "completed_with_provider_fallback",
+        "partial",
+        "failed",
+    ] = "completed"
+    estimated_cost_usd: float = Field(default=0, ge=0)
 
 
 class SearchResponse(BaseModel):

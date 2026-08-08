@@ -53,6 +53,18 @@ def test_complete_demo_acceptance_flow() -> None:
     assert accounts == sorted(accounts, key=lambda item: item["scores"]["priority"], reverse=True)
     account = accounts[0]
     assert all(name in account["scores"] for name in ("fit", "intent", "confidence", "priority"))
+    feedback = client.post(
+        "/api/v1/feedback",
+        headers=headers,
+        json={
+            "target_type": "account",
+            "target_id": account["id"],
+            "rating": "GOOD_ACCOUNT",
+            "reason": "Acceptance feedback persistence check",
+        },
+    )
+    assert feedback.status_code == 201
+    assert feedback.json()["rating"] == "GOOD_ACCOUNT"
 
     brief_response = client.get(f"/api/v1/accounts/{account['id']}/opportunity-brief", headers=headers)
     assert brief_response.status_code == 200

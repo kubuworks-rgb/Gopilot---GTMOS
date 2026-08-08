@@ -16,9 +16,7 @@ class Settings:
     research_gateway_url: str = os.getenv(
         "AGENT_REACH_GATEWAY_URL", "http://127.0.0.1:8010"
     ).rstrip("/")
-    gateway_internal_token: str | None = (
-        os.getenv("RESEARCH_GATEWAY_TOKEN") or None
-    )
+    gateway_internal_token: str | None = os.getenv("RESEARCH_GATEWAY_TOKEN") or None
     research_gateway_timeout_seconds: float = float(
         os.getenv("RESEARCH_GATEWAY_TIMEOUT_SECONDS", "120")
     )
@@ -28,11 +26,24 @@ class Settings:
     openai_api_key: str | None = os.getenv("OPENAI_API_KEY") or None
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
     github_token: str | None = os.getenv("GITHUB_TOKEN") or None
-    max_research_searches: int = int(os.getenv("MAX_RESEARCH_SEARCHES", "8"))
-    max_research_documents: int = int(os.getenv("MAX_RESEARCH_DOCUMENTS", "20"))
-    max_account_candidates: int = int(os.getenv("MAX_ACCOUNT_CANDIDATES", "20"))
-    max_accounts_researched: int = int(os.getenv("MAX_ACCOUNTS_RESEARCHED", "10"))
-    max_elapsed_seconds: int = int(os.getenv("MAX_RESEARCH_ELAPSED_SECONDS", "300"))
+    firmographic_provider: str = os.getenv(
+        "FIRMOGRAPHIC_PROVIDER", "public_evidence"
+    )
+    firmographic_api_key: str | None = os.getenv("FIRMOGRAPHIC_API_KEY") or None
+    candidate_prequalification_high_threshold: int = int(
+        os.getenv("CANDIDATE_PREQUALIFICATION_HIGH_THRESHOLD", "35")
+    )
+    candidate_prequalification_middle_threshold: int = int(
+        os.getenv("CANDIDATE_PREQUALIFICATION_MIDDLE_THRESHOLD", "30")
+    )
+    candidate_prequalification_low_threshold: int = int(
+        os.getenv("CANDIDATE_PREQUALIFICATION_LOW_THRESHOLD", "25")
+    )
+    max_research_searches: int = int(os.getenv("MAX_RESEARCH_SEARCHES", "60"))
+    max_research_documents: int = int(os.getenv("MAX_RESEARCH_DOCUMENTS", "100"))
+    max_account_candidates: int = int(os.getenv("MAX_ACCOUNT_CANDIDATES", "40"))
+    max_accounts_researched: int = int(os.getenv("MAX_ACCOUNTS_RESEARCHED", "15"))
+    max_elapsed_seconds: int = int(os.getenv("MAX_RESEARCH_ELAPSED_SECONDS", "900"))
     cors_origins: tuple[str, ...] = tuple(
         item.strip()
         for item in os.getenv(
@@ -65,9 +76,30 @@ class Settings:
             ("MAX_ACCOUNT_CANDIDATES", self.max_account_candidates),
             ("MAX_ACCOUNTS_RESEARCHED", self.max_accounts_researched),
             ("MAX_RESEARCH_ELAPSED_SECONDS", self.max_elapsed_seconds),
+            (
+                "CANDIDATE_PREQUALIFICATION_HIGH_THRESHOLD",
+                self.candidate_prequalification_high_threshold,
+            ),
+            (
+                "CANDIDATE_PREQUALIFICATION_MIDDLE_THRESHOLD",
+                self.candidate_prequalification_middle_threshold,
+            ),
+            (
+                "CANDIDATE_PREQUALIFICATION_LOW_THRESHOLD",
+                self.candidate_prequalification_low_threshold,
+            ),
         ):
             if value <= 0:
                 raise RuntimeError(f"{name} must be positive")
+        if not (
+            self.candidate_prequalification_low_threshold
+            <= self.candidate_prequalification_middle_threshold
+            <= self.candidate_prequalification_high_threshold
+        ):
+            raise RuntimeError(
+                "Candidate prequalification thresholds must satisfy low <= middle "
+                "<= high"
+            )
 
 
 settings = Settings()

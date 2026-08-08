@@ -1,0 +1,21 @@
+company_name,domain,scenario,identity_verified,identity_warning,qualification,icp_match,direct_competitor,has_signal,signal_supported,important_claim_supported,source_domain,claim_scope,expected_state
+Freshworks,freshworks.com,clear_match,true,false,QUALIFIED,true,false,true,true,true,freshworks.com,COMPANY_LEVEL,FOUNDER_READY
+Atlassian,https://www.atlassian.com,clear_match,true,false,QUALIFIED,true,false,true,true,true,atlassian.com,COMPANY_LEVEL,FOUNDER_READY
+GitLab,about.gitlab.com,clear_match,true,false,QUALIFIED,true,false,true,true,true,gitlab.com,COMPANY_LEVEL,FOUNDER_READY
+Zendesk,zendesk.com,direct_competitor,true,false,DISQUALIFIED,true,true,true,true,true,zendesk.com,COMPANY_LEVEL,DO_NOT_TARGET
+Tata Consultancy Services,tcs.com,clear_mismatch,true,false,DISQUALIFIED,false,false,false,false,true,tcs.com,COMPANY_LEVEL,DO_NOT_TARGET
+CloudSEK,cloudsek.com,no_current_signal,true,false,QUALIFIED,true,false,false,false,true,cloudsek.com,COMPANY_LEVEL,MONITOR
+OpenHR,openhr.tech,uncertain_employee_size,true,false,QUALIFIED_WITH_UNCERTAINTY,true,false,true,true,true,openhr.tech,PRODUCT_LEVEL,RESEARCH_CANDIDATE
+Fortifyze,fortifyze.com,no_current_signal,true,false,QUALIFIED,true,false,false,false,true,fortifyze.com,COMPANY_LEVEL,MONITOR
+ComplyZero,complyzero.com,uncertain_geography,true,false,QUALIFIED_WITH_UNCERTAINTY,true,false,false,false,true,complyzero.com,COMPANY_LEVEL,MONITOR
+Optivian Cloud,optivian.cloud,related_brand_evidence,true,false,QUALIFIED,true,false,true,true,true,optivian.ai,COMPANY_LEVEL,RESEARCH_CANDIDATE
+Acme Corporation,acme.com,ambiguous_same_name,false,true,QUALIFIED_WITH_UNCERTAINTY,true,false,false,false,false,acme.com,COMPANY_LEVEL,IDENTITY_REVIEW_REQUIRED
+BiggerWide,www.biggerwide.com,redirecting_domain,true,false,QUALIFIED,true,false,false,false,true,biggerwide.com,COMPANY_LEVEL,MONITOR
+BiggerWide duplicate,https://biggerwide.com/about,duplicate_domain,true,false,QUALIFIED,true,false,false,false,true,biggerwide.com,COMPANY_LEVEL,MONITOR
+Postman,postman.com,clear_match,true,false,QUALIFIED,true,false,true,true,true,postman.com,PRODUCT_LEVEL,FOUNDER_READY
+BrowserStack,browserstack.com,clear_match,true,false,QUALIFIED,true,false,true,true,true,browserstack.com,COMPANY_LEVEL,FOUNDER_READY
+Chargebee,chargebee.com,clear_match,true,false,QUALIFIED,true,false,true,true,true,chargebee.com,COMPANY_LEVEL,FOUNDER_READY
+Razorpay,razorpay.com,adjacent_vendor,true,false,QUALIFIED,true,false,false,false,true,razorpay.com,COMPANY_LEVEL,MONITOR
+Zoho,zoho.com,adjacent_vendor,true,false,QUALIFIED,true,false,false,false,true,zoho.com,COMPANY_LEVEL,MONITOR
+Freshdesk,freshdesk.com,related_product_brand,true,false,QUALIFIED,true,false,false,false,true,freshworks.com,PARENT_LEVEL,RESEARCH_CANDIDATE
+LinearB,linearb.io,clear_match,true,false,QUALIFIED,true,false,true,true,true,linearb.io,PRODUCT_LEVEL,FOUNDER_READY

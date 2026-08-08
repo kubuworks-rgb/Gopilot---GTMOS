@@ -36,6 +36,21 @@ def test_allows_public_http_url() -> None:
     assert validate_public_url("https://company.example/news", resolver=_resolver_for("93.184.216.34")) == "https://company.example/news"
 
 
+def test_allows_public_ipv4_address_synthesized_with_nat64_well_known_prefix() -> None:
+    assert validate_public_url(
+        "https://company.example/news",
+        resolver=_resolver_for("64:ff9b::5db8:d822"),
+    ) == "https://company.example/news"
+
+
+def test_blocks_private_ipv4_address_synthesized_with_nat64_prefix() -> None:
+    with pytest.raises(UnsafeUrlError, match="blocked address"):
+        validate_public_url(
+            "https://company.example/news",
+            resolver=_resolver_for("64:ff9b::a00:1"),
+        )
+
+
 def test_exact_platform_domain_rejects_lookalikes() -> None:
     assert validate_exact_domain("https://github.com/org/repo", {"github.com"})
     with pytest.raises(UnsafeUrlError):

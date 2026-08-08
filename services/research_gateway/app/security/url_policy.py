@@ -17,10 +17,14 @@ BLOCKED_HOSTS = {
     "metadata.google.internal",
     "metadata",
 }
+NAT64_WELL_KNOWN_PREFIX = ipaddress.ip_network("64:ff9b::/96")
 
 
 def _is_blocked_ip(address: str) -> bool:
     ip = ipaddress.ip_address(address)
+    if isinstance(ip, ipaddress.IPv6Address) and ip in NAT64_WELL_KNOWN_PREFIX:
+        translated = ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+        return _is_blocked_ip(str(translated))
     return any(
         (
             ip.is_private,

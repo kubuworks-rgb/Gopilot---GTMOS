@@ -113,7 +113,7 @@ async def search(request: SearchRequest, _: Internal) -> SearchResponse:
     try:
         results, diagnostics = await search_adapter.search(request)
         return SearchResponse(
-            status="completed",
+            status=diagnostics.completion_status,
             backend=search_adapter.backend,
             results=results,
             diagnostics=diagnostics,

@@ -168,6 +168,34 @@ BOILERPLATE_TERMS = (
     "accessibility menu",
     "open sidebar ad",
 )
+# Phrases that only ever appear in site chrome, never in a claim about a company.
+NAVIGATION_MARKERS = (
+    "skip to main content",
+    "skip to content",
+    "main navigation",
+    "toggle theme",
+    "toggle navigation",
+    "current theme",
+    "back to top",
+    "site map",
+    "sitemap",
+    "follow us",
+    "get involved",
+    "search submit",
+    "open menu",
+    "close menu",
+    "breadcrumb",
+    "share this",
+    "subscribe to our newsletter",
+)
+# Qualification notes that mention a mismatch term while explicitly declining to
+# assert one. Presenting these as mismatches misreports the system's own finding.
+NON_MISMATCH_MARKERS = (
+    "no automatic rejection",
+    "requires research",
+    "remains unknown",
+    "not treated as false",
+)
 SOURCE_CHUNK_SIZE = 1800
 SOURCE_CHUNK_STEP = 1100
 
@@ -224,13 +252,87 @@ def _sentences(text: str) -> list[str]:
     return passages
 
 
+def _is_boilerplate_passage(text: str) -> bool:
+    """Reject navigation and footer chrome before it can be shown as a fact.
+
+    A menu blob is not a claim about a company. Presenting one as SUPPORTED
+    evidence inverts the product's entire promise, so this errs toward rejecting:
+    one fewer fact beats a brief that cites "Toggle theme" as a verified fact.
+    Identity verification no longer depends on extracting a passage, so being
+    strict here costs nothing.
+    """
+
+    lowered = text.lower()
+    if any(term in lowered for term in BOILERPLATE_TERMS):
+        return True
+    if any(term in lowered for term in NAVIGATION_MARKERS):
+        return True
+
+    words = text.split()
+    if len(words) < 6:
+        return True
+
+    # Link runs are long and almost unpunctuated; real prose is not.
+    punctuation = sum(text.count(mark) for mark in ".,;:!?")
+    if len(words) >= 25 and punctuation <= 1:
+        return True
+
+    # Menus are overwhelmingly Title Case; sentences are not.
+    following = words[1:]
+    capitalised = sum(1 for word in following if word[:1].isupper())
+    if len(words) >= 12 and capitalised / max(1, len(following)) > 0.5:
+        return True
+
+    return False
+
+
+GEOGRAPHY_VOCABULARY: dict[str, tuple[str, ...]] = {
+    "india": (
+        "india", "indian", "bengaluru", "bangalore", "hyderabad", "pune",
+        "mumbai", "delhi", "chennai", "noida", "gurugram",
+    ),
+    "united states": (
+        "united states", "u.s.", "usa", "san francisco", "new york", "boston",
+        "austin", "seattle", "chicago", "denver",
+    ),
+    "united kingdom": ("united kingdom", "britain", "british", "london", "manchester"),
+    "europe": (
+        "europe", "european", "berlin", "paris", "amsterdam", "dublin",
+        "madrid", "stockholm", "munich",
+    ),
+    "apac": ("apac", "asia-pacific", "singapore", "tokyo", "seoul"),
+    "australia": ("australia", "australian", "sydney", "melbourne"),
+    "canada": ("canada", "canadian", "toronto", "vancouver", "montreal"),
+}
+
+
+def _target_geography_terms(target_market: str) -> tuple[str, ...]:
+    """Geography vocabulary implied by the founder's own target market.
+
+    Previously hardcoded to Indian cities, so a founder targeting anywhere else
+    could never score geography above zero no matter what the evidence said.
+    """
+
+    lowered = target_market.lower()
+    terms: list[str] = []
+    for region, vocabulary in GEOGRAPHY_VOCABULARY.items():
+        if region in lowered or any(term in lowered for term in vocabulary):
+            terms.extend(vocabulary)
+    return tuple(dict.fromkeys(terms))
+
+
+def _usable_passages(text: str) -> list[str]:
+    """Passages that read as claims rather than site furniture."""
+
+    return [item for item in _sentences(text) if not _is_boilerplate_passage(item)]
+
+
 def _evidence_passages(text: str, context: str) -> list[str]:
     context_tokens = _tokens(context)
     minimum_overlap = 1 if len(context_tokens) <= 3 else 2
     ranked: list[tuple[int, float, int, str]] = []
     for index, sentence in enumerate(_sentences(text)):
-        lowered = sentence.lower()
-        if any(term in lowered for term in BOILERPLATE_TERMS):
+        if _is_boilerplate_passage(sentence):
             continue
         sentence_tokens = _tokens(sentence)
         overlap = len(context_tokens & sentence_tokens)
@@ -400,16 +502,14 @@ async def _persist_source(
     candidates = (
         _evidence_passages(source.text, evidence_context)
         if evidence_context
-        else _sentences(source.text)[:2]
+        else _usable_passages(source.text)[:2]
     )
     # A first-party page that matched no context tokens is still the company
-    # describing itself. Falling back to its leading passages beats recording no
-    # evidence at all; the entity and claim-scope gates still decide what may
-    # attach to the account.
+    # describing itself, so fall back to its leading substantive passages. The
+    # fallback must apply the same quality gate: it previously did not, which is
+    # how navigation blobs reached briefs as SUPPORTED facts.
     if not candidates:
-        candidates = _sentences(source.text)[:2]
-    if not candidates and source.text.strip():
-        candidates = [source.text.strip()[:700]]
+        candidates = _usable_passages(source.text)[:2]
     facts: list[EvidenceFactRow] = []
     for passage in candidates:
         fact = EvidenceFactRow(
@@ -2514,19 +2614,24 @@ async def _score_and_brief(
         min(100.0, 62.0 + len(signal_matches) * 8) if signal_match else 0.0
     )
     all_text = " ".join(item.claim for item in facts).lower()
-    industry_match = (
-        100.0
-        if any(term in all_text for term in ("b2b saas", "enterprise software"))
-        else round(overlap * 100, 2)
-    )
-    geography_match = (
-        100.0
-        if any(
-            term in all_text
-            for term in ("india", "bengaluru", "bangalore", "hyderabad", "pune")
-        )
-        else 0.0
-    )
+    # None means "no evidence either way". Scoring absence as 0 would treat unknown
+    # as a verified mismatch, which is exactly what the product principles forbid --
+    # and it dragged Fit to 0 for every real company whose pages simply do not
+    # state their industry or location.
+    industry_match: float | None
+    if any(term in all_text for term in ("b2b saas", "enterprise software")):
+        industry_match = 100.0
+    elif overlap > 0:
+        industry_match = round(overlap * 100, 2)
+    else:
+        industry_match = None
+
+    geography_terms = _target_geography_terms(product.target_market)
+    geography_match: float | None
+    if geography_terms and any(term in all_text for term in geography_terms):
+        geography_match = 100.0
+    else:
+        geography_match = None
     size_status = account.attributes.get("company_size_status")
     size_in_range = account.attributes.get("company_size_in_range")
     size_match: float | None = (
@@ -2818,6 +2923,10 @@ async def _score_and_brief(
         or "unverified" in str(reason).lower()
         or "remain" in str(reason).lower()
     ]
+    # Substring matching alone misclassified neutral notes: "Competitor overlap
+    # requires research; no automatic rejection" contains "competitor" and was
+    # surfaced to the founder as "Mismatch:", reading as a competitor conflict the
+    # system had explicitly declined to assert.
     icp_mismatches = [
         reason
         for reason in _attribute_string_list(
@@ -2826,6 +2935,9 @@ async def _score_and_brief(
         if any(
             marker in str(reason).lower()
             for marker in ("outside", "mismatch", "competitor", "disqualif")
+        )
+        and not any(
+            marker in str(reason).lower() for marker in NON_MISMATCH_MARKERS
         )
     ]
     hypotheses = [

@@ -47,9 +47,9 @@ def signal_decay(observed_at: datetime, half_life_days: int = 45) -> float:
 
 def score_account(
     *,
-    industry_match: float,
+    industry_match: float | None,
     size_match: float | None,
-    geography_match: float,
+    geography_match: float | None,
     signal_strength: float,
     signal_recency: float | None,
     evidence_coverage: float,

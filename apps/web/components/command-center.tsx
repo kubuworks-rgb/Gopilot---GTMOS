@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { accessToken, api, API_BASE, serverAccessToken, subscribeToAccessToken } from "@/lib/api";
 import { isOidcConfigured } from "@/lib/auth";
-import type { AccountImportResult, Bootstrap, Brief, Evidence, EvidenceClaim } from "@/lib/types";
+import type { AccountImportResult, Bootstrap, Brief, Evidence, EvidenceClaim, ResearchRun } from "@/lib/types";
 import { EvidenceDrawer } from "./evidence-drawer";
 import { ScoreBadge, ScoreDetails } from "./score";
 import { AuthCallback, SignIn, signOut } from "./sign-in";
@@ -162,8 +162,60 @@ function Marketing({ data }: { data: Bootstrap }) {
   return <main className="marketing"><nav><Link className="brand" href="/"><span className="brand-mark">G</span><span>GOPILOT<strong>GTM OS</strong></span></Link><div><a href="#principles">How it works</a><Link className="primary-button" href="/dashboard">Open demo workspace</Link></div></nav><section className="hero"><span className="demo-badge">DETERMINISTIC PRODUCT DEMO</span><h1>Know exactly <em>who</em> to approach—and <em>why now.</em></h1><p>Turn your market into a ranked set of defensible account opportunities. Every claim opens to its source. Every score explains its math. Every action stays human-approved.</p><div className="hero-actions"><Link className="primary-button large" href="/dashboard">Explore the command center →</Link><Link className="secondary-button large" href="/accounts">View ranked accounts</Link></div><div className="proof-row"><span>✓ Evidence-linked claims</span><span>✓ Deterministic scores</span><span>✓ Human approval</span><span>✓ No autonomous outreach</span></div></section><section className="preview"><div className="preview-header"><span><i /> GoPilot Command Center</span><span className="demo-badge">DEMO DATA</span></div><div className="preview-grid"><div><small>Ranked opportunities</small><strong>{data.accounts.length}</strong><p>Fixture accounts ready for review</p></div>{data.accounts.slice(0,2).map(account => <article key={account.id}><span>{account.industry}</span><h3>{account.name}</h3><p>{account.top_signal}</p><b>{account.scores.priority}<small>Priority</small></b></article>)}</div></section><section id="principles" className="principles"><span className="eyebrow">A different unit of value</span><h2>Not another lead scraper.</h2><div><article><b>01</b><h3>Inspect the evidence</h3><p>Material claims connect to an observed passage and original source metadata.</p></article><article><b>02</b><h3>Understand the score</h3><p>Fit and intent stay separate, confidence gates priority, and the math remains deterministic.</p></article><article><b>03</b><h3>Keep humans in control</h3><p>Drafts can be edited, approved, or rejected. The MVP never auto-sends outreach.</p></article></div></section></main>;
 }
 
+const ACTIVE_RUN_STATUSES = ["queued", "planning", "researching", "extracting", "awaiting_icp", "discovering_accounts", "scoring"];
+
+/** Short enough for the metric tile, which is sized for numbers, not sentences. */
+function runLabel(run: ResearchRun | null, active: boolean): string {
+  if (!run) return "None";
+  if (active) return "Running";
+  return { completed: "Done", partial: "Partial", failed: "Failed" }[run.status] ?? run.status;
+}
+
+/**
+ * Reports what actually happened. Every figure here is derived from the run and
+ * the accounts; nothing is asserted. The previous version hardcoded "Research is
+ * complete", an active-run count of 1, "All above confidence threshold" and five
+ * ticked workflow steps regardless of state, which is precisely the kind of
+ * unearned claim the rest of the product refuses to make.
+ */
 function Dashboard({ data, averagePriority }: { data: Bootstrap; averagePriority: number }) {
-  return <><section className="intro-row"><div><h2>Good morning. Your market is moving.</h2><p>Research is complete and {data.accounts.length} account opportunities are ready for review.</p></div><Link className="primary-button" href="/research">View research run →</Link></section><section className="metric-grid"><div><span>Active research</span><strong>1</strong><small><i className="green-dot" /> Awaiting account review</small></div><div><span>Priority accounts</span><strong>{data.accounts.length}</strong><small>All above confidence threshold</small></div><div><span>Average priority</span><strong>{averagePriority}</strong><small>Confidence-adjusted score</small></div><div><span>Needs approval</span><strong>{data.approval_count}</strong><small>Campaign drafts, never auto-sent</small></div></section><section className="section-card"><div className="section-heading"><div><span className="eyebrow">Ranked by defensibility</span><h2>Top account opportunities</h2></div><Link href="/accounts">View all accounts →</Link></div><AccountTable data={data} compact /></section><section className="dashboard-bottom"><div className="section-card workflow-card"><div className="section-heading"><div><span className="eyebrow">Workflow</span><h2>Research run</h2></div><span className="status-pill supported">completed</span></div>{["Product profile confirmed", "Market evidence collected", "3 ICP candidates generated", "ICP selected", "Accounts scored and ranked"].map((item, i) => <div className="workflow-step" key={item}><span>✓</span><div><strong>{item}</strong><small>{i === 4 ? "Ready for human review" : "Validated"}</small></div></div>)}</div><div className="section-card signal-card"><div className="section-heading"><div><span className="eyebrow">Latest signals</span><h2>Why now</h2></div></div>{data.accounts.map(account => <Link href={`/accounts/${account.id}`} key={account.id}><span>↗</span><div><strong>{account.name}</strong><p>{account.top_signal}</p></div><small>{account.scores.intent.score} intent</small></Link>)}</div></section></>;
+  const run = data.research_run;
+  const runActive = Boolean(run && ACTIVE_RUN_STATUSES.includes(run.status));
+  const researched = data.accounts.filter(item => item.domain_validation !== "CANONICALIZED_UNVERIFIED");
+  const awaitingResearch = data.accounts.length - researched.length;
+  const withSignal = data.accounts.filter(item => item.scores.intent.score > 0);
+  const founderReady = data.accounts.filter(item => item.brief_state === "FOUNDER_READY");
+  const needsReview = data.accounts.filter(item => item.brief_state === "IDENTITY_REVIEW_REQUIRED");
+
+  const headline = !data.accounts.length
+    ? "No accounts imported yet."
+    : awaitingResearch > 0
+      ? `${awaitingResearch} of ${data.accounts.length} accounts still awaiting official-source research.`
+      : founderReady.length > 0
+        ? `${founderReady.length} of ${data.accounts.length} accounts are evidence-gated founder ready.`
+        : `${data.accounts.length} accounts researched; none has met the founder-ready evidence gate yet.`;
+
+  const steps: [string, boolean, string][] = [
+    ["Product profile confirmed", Boolean(data.product), data.product ? "User-confirmed input" : "Not yet provided"],
+    ["Accounts imported", data.accounts.length > 0, data.accounts.length ? `${data.accounts.length} imported` : "None yet"],
+    ["Official sources researched", researched.length > 0, researched.length ? `${researched.length} researched` : "Not started"],
+    ["Deterministic scores calculated", researched.length > 0, researched.length ? "Fit, intent and confidence" : "Awaiting research"],
+    ["Human review", data.accounts.some(item => item.review_status !== "PENDING"), "Approval is always required"],
+  ];
+
+  return <><section className="intro-row"><div><h2>Workspace status</h2><p>{headline}</p></div><Link className="primary-button" href={data.accounts.length ? "/accounts" : "/import"}>{data.accounts.length ? "Review priorities →" : "Import accounts →"}</Link></section>
+    <section className="metric-grid">
+      <div><span>Research run</span><strong>{runLabel(run, runActive)}</strong><small>{run ? `${run.documents_used} documents · ${run.searches_used} searches` : "Import accounts to begin"}</small></div>
+      <div><span>Accounts</span><strong>{data.accounts.length}</strong><small>{awaitingResearch > 0 ? `${awaitingResearch} awaiting research` : "All researched"}</small></div>
+      <div><span>Average priority</span><strong>{averagePriority}</strong><small>Confidence-adjusted, deterministic</small></div>
+      <div><span>Needs approval</span><strong>{data.approval_count}</strong><small>Drafts, never auto-sent</small></div>
+    </section>
+    {needsReview.length > 0 && <section className="section-card"><span className="eyebrow">Attention</span><h2>{needsReview.length} account{needsReview.length === 1 ? "" : "s"} need identity review</h2><p>Their supplied domains could not be verified against official sources.</p></section>}
+    <section className="section-card"><div className="section-heading"><div><span className="eyebrow">Ranked by defensibility</span><h2>Top account opportunities</h2></div><Link href="/accounts">View all accounts →</Link></div><AccountTable data={data} compact /></section>
+    <section className="dashboard-bottom">
+      <div className="section-card workflow-card"><div className="section-heading"><div><span className="eyebrow">Workflow</span><h2>Progress</h2></div><span className={`status-pill ${runActive ? "partially_supported" : run ? "supported" : ""}`}>{run ? (runActive ? "in progress" : run.status) : "not started"}</span></div>{steps.map(([label, done, detail]) => <div className="workflow-step" key={label}><span>{done ? "✓" : "○"}</span><div><strong>{label}</strong><small>{detail}</small></div></div>)}</div>
+      <div className="section-card signal-card"><div className="section-heading"><div><span className="eyebrow">Verified current signals</span><h2>Why now</h2></div></div>{withSignal.length ? withSignal.map(account => <Link href={`/accounts/${account.id}`} key={account.id}><span>↗</span><div><strong>{account.name}</strong><p>{account.top_signal}</p></div><small>{account.scores.intent.score} intent</small></Link>) : <p>No account has a verified current signal. NO_SIGNAL is a valid result — monitoring remains the correct action.</p>}</div>
+    </section></>;
 }
 
 function ImportAccountsView({ busy, result, onImport }: { busy: boolean; result: AccountImportResult | null; onImport: (kind: "single" | "pasted" | "csv", value: { company_name: string; domain: string } | string) => Promise<void> }) {

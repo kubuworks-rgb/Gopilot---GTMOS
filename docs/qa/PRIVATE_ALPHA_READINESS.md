@@ -47,6 +47,42 @@ Test suite: **275 passed, 9 skipped** (baseline at takeover was 172 with 2 error
 
 ---
 
+## What clicking through the UI found that the smoke test never did
+
+The smoke test passed. The product was still wrong in ways only reading a rendered
+brief could reveal — the API returned a correct-looking payload, and the founder-facing
+meaning of that payload was false.
+
+**Site chrome was presented as verified evidence.** The brief for `djangoproject.com`
+listed, under **VERIFIED PUBLIC EVIDENCE** and marked `SUPPORTED` at 82% confidence:
+
+> "Menu Main navigation Overview Download Documentation News Code Issues Community
+> Foundation Donate Search Submit Toggle theme (current theme: auto)…"
+
+That is the product's central promise exactly inverted. `BOILERPLATE_TERMS` was only
+applied inside `_evidence_passages`, and the fallback added earlier in this takeover
+bypassed it — improving extraction recall had silently destroyed its precision.
+
+**Fit was 0 for a correctly verified company.** Only `size_match` ever passed `None`,
+so absent industry and geography evidence was scored as a hard `0` — unknown treated
+as a verified mismatch, the one thing the product principles most explicitly forbid.
+My own audit called scoring "correct" because I checked the renormalising mechanism
+and never checked what was fed into it. Geography was also hardcoded to Indian
+cities, so any founder targeting elsewhere could never score above zero.
+
+**A non-mismatch was labelled a mismatch.** "Competitor overlap requires research; no
+automatic rejection" was surfaced as **"Mismatch:"** because the classifier matched
+the substring "competitor" — reading to a founder as a competitor conflict the system
+had explicitly declined to assert.
+
+**The dashboard asserted completion that had not happened** — a hardcoded active-run
+count of 1, "Research is complete", "All above confidence threshold", and five ticked
+workflow steps regardless of state.
+
+All four are fixed, with regression tests built from the verbatim text the deployed
+app rendered. The lesson mirrors the one below, one level up: a passing API contract
+is not a truthful brief.
+
 ## What the real run found that fixtures never did
 
 This is the most important finding of the whole takeover.
@@ -107,7 +143,7 @@ Stated so nobody meets them by surprise in production. All are in the runbook.
 | Invite changes need a service restart | avoids a migration for a table that may not survive contact with real usage |
 | Single host, single worker, no TLS in compose | put it behind a reverse proxy; the runbook says so |
 | Official-site failure matrix only partly exercised | redirects, oversized pages, 4xx and cross-domain redirects verified; robots, parked domains and expired TLS not |
-| Dashboard still shows hardcoded completion claims | cosmetic but dishonest; fix before showing the product to invitees |
+| Evidence confidence is a hardcoded 0.82 for every passage | the per-fact confidence number carries no information and should be derived or removed |
 | ~2,600 lines of historical acceptance scripts | inert; archiving is P2 |
 
 ---
@@ -116,13 +152,13 @@ Stated so nobody meets them by surprise in production. All are in the runbook.
 
 | Dimension | Takeover | Now | Reasoning |
 |---|---:|---:|---|
-| BYOA product quality | 68 | **82** | Signal honesty fixed; identity review no longer terminal; verified end to end against real sites. Held back by fit scoring returning 0 on real companies. |
+| BYOA product quality | 68 | **86** | Signal honesty fixed; identity review no longer terminal; site chrome no longer cited as evidence; unknown no longer scored as mismatch. Verified end to end against real sites and by reading rendered briefs. |
 | Engineering quality | 62 | **78** | 275 tests, CI green, worker reliability, migration parity guarded by an executing test. Monolith and duplication remain. |
 | Security | 55 | **86** | Gateway fails closed, addresses pinned against rebinding, invite gate, limits, secret scan tested against planted credentials. |
 | Authentication | 8 | **72** | Backend verification is complete and thoroughly tested. Browser flow written but unverified. |
 | Deployment | 15 | **80** | Full stack built, deployed and smoke-tested. No TLS, single host. |
 | Autonomous discovery | 35 | **35** | Untouched and still correctly experimental — off by default in the private alpha. |
-| **Overall** | **38** | **76** | One blocker, clearly scoped. |
+| **Overall** | **38** | **79** | One blocker, clearly scoped. |
 
 ---
 
@@ -130,9 +166,14 @@ Stated so nobody meets them by surprise in production. All are in the runbook.
 
 1. Provide OIDC issuer details and a public client ID (no secret).
 2. I complete a real sign-in against the deployed stack.
-3. Fix the dashboard's hardcoded claims — small, and it is the first thing an
-   invitee sees.
-4. Re-run the smoke test with `AUTH_MODE=oidc`.
-5. Re-classify. I expect **A** at that point.
+3. Re-run the smoke test with `AUTH_MODE=oidc`, then re-read a rendered brief —
+   the API passing is not sufficient evidence that the brief is truthful.
+4. Re-classify. I expect **A** at that point.
+
+Note for whoever continues this: every defect found after the audit was found by
+running the product, and each one was invisible to the layer below it. Unit tests
+missed what the deployed stack revealed; the deployed stack's passing smoke test
+missed what reading the rendered brief revealed. Budget for looking at the output,
+not just at green checks.
 
 Until then: do not merge to `main`, do not tag, do not deploy publicly.

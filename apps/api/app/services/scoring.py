@@ -51,7 +51,7 @@ def score_account(
     size_match: float | None,
     geography_match: float,
     signal_strength: float,
-    signal_recency: float,
+    signal_recency: float | None,
     evidence_coverage: float,
     source_quality: float,
     fit_evidence: list[str],
@@ -64,7 +64,10 @@ def score_account(
             ("Geography match", geography_match, 0.20, fit_evidence),
         ]
     )
-    intent = _breakdown(
+    # Recency is None when the supporting source carries no event date. Renormalizing
+    # onto signal strength keeps unknown recency from being scored as either a fresh
+    # event or a stale one; only a real event date can earn a recency contribution.
+    intent = _breakdown_missing_aware(
         [
             ("Signal strength", signal_strength, 0.60, signal_evidence),
             ("Signal recency", signal_recency, 0.40, signal_evidence),

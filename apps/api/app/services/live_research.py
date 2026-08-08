@@ -2317,6 +2317,32 @@ def _assess_account_evidence(
     return identity, attached, assessments, rejected
 
 
+EVENT_PAGE_MARKERS = (
+    "/careers",
+    "/jobs",
+    "/news",
+    "/blog",
+    "/press",
+    "/announcements",
+)
+
+
+def signal_event_date(source: SourceDocumentRow | None) -> datetime | None:
+    """Return the date the event actually happened, or None when it is unknown.
+
+    `EvidenceFactRow.observed_at` falls back to retrieval time, so it must never be
+    used as an event date: an undated page would otherwise look maximally fresh.
+    """
+
+    return source.published_at if source is not None else None
+
+
+def _is_event_semantics_page(source: SourceDocumentRow) -> bool:
+    """Pages that report happenings rather than describe the company in general."""
+
+    return any(marker in source.url.lower() for marker in EVENT_PAGE_MARKERS)
+
+
 def _signals_from_facts(
     facts: list[EvidenceFactRow],
     source_by_id: dict[uuid.UUID, SourceDocumentRow] | None = None,
@@ -2326,8 +2352,8 @@ def _signals_from_facts(
     attachment_by_fact_id: (
         dict[uuid.UUID, EvidenceAttachmentAssessment] | None
     ) = None,
-) -> list[tuple[str, EvidenceFactRow]]:
-    matches: list[tuple[str, EvidenceFactRow]] = []
+) -> list[tuple[str, EvidenceFactRow, datetime | None]]:
+    matches: list[tuple[str, EvidenceFactRow, datetime | None]] = []
     seen: set[tuple[str, uuid.UUID]] = set()
     for fact in facts:
         assessment = (
@@ -2373,25 +2399,18 @@ def _signals_from_facts(
                     )
                 ):
                     continue
-            if source is not None and signal_type != "CUSTOMER_GROWTH_INDICATOR":
-                dated_or_event_page = source.published_at is not None or any(
-                    marker in source.url.lower()
-                    for marker in (
-                        "/careers",
-                        "/jobs",
-                        "/news",
-                        "/blog",
-                        "/press",
-                        "/announcements",
-                    )
-                )
-                if not dated_or_event_page:
+            # Event semantics are required of every signal type without exception. A
+            # static page describing the company in general terms ("trusted by 100+
+            # customers") is not evidence that anything is happening now.
+            event_date = signal_event_date(source)
+            if source is not None and event_date is None:
+                if not _is_event_semantics_page(source):
                     continue
-            if (_now() - fact.observed_at).days > 730:
+            if event_date is not None and (_now() - event_date).days > 730:
                 continue
             key = (signal_type, fact.id)
             if key not in seen:
-                matches.append((signal_type, fact))
+                matches.append((signal_type, fact, event_date))
                 seen.add(key)
     return matches
 
@@ -2443,7 +2462,7 @@ async def _score_and_brief(
     signal_match = signal_matches[0] if signal_matches else None
     signal_evidence = [str(item[1].id) for item in signal_matches]
     fit_evidence = [str(facts[0].id)]
-    observed_at = signal_match[1].observed_at if signal_match else _now()
+    top_signal_event_date = signal_match[2] if signal_match else None
     signal_strength = (
         min(100.0, 62.0 + len(signal_matches) * 8) if signal_match else 0.0
     )
@@ -2485,7 +2504,13 @@ async def _score_and_brief(
         size_match=size_match,
         geography_match=geography_match,
         signal_strength=signal_strength,
-        signal_recency=signal_decay(observed_at) * 100 if score_signal else 0,
+        signal_recency=(
+            signal_decay(top_signal_event_date) * 100
+            if score_signal and top_signal_event_date is not None
+            else None
+            if score_signal
+            else 0
+        ),
         evidence_coverage=min(100, len(facts) * 30),
         source_quality=(
             sum(item.trust_score for item in source_rows)
@@ -2536,8 +2561,12 @@ async def _score_and_brief(
             )
     signal_models: list[Signal] = []
     why_now: list[EvidenceClaim] = []
-    for signal_type, fact in signal_matches:
-        adjusted = signal_strength / 100 * signal_decay(fact.observed_at)
+    for signal_type, fact, event_date in signal_matches:
+        # Undated events keep their full base strength rather than borrowing the
+        # freshness of the moment we happened to fetch the page.
+        adjusted = signal_strength / 100 * (
+            signal_decay(event_date) if event_date is not None else 1.0
+        )
         high_relevance_types = {
             "SUPPORT_HIRING",
             "CUSTOMER_SUCCESS_HIRING",
@@ -2595,7 +2624,7 @@ async def _score_and_brief(
                     if attachment
                     else account.domain
                 ),
-                event_date=fact.observed_at,
+                event_date=event_date,
                 source_id=str(fact.source_id),
                 supporting_passage=fact.passage,
                 claim_scope=(
@@ -2653,7 +2682,7 @@ async def _score_and_brief(
     elif brief_state == BriefState.MONITOR:
         recommended_action = "Monitor for a verified, account-specific trigger."
     if signal_match:
-        signal_type, fact = signal_match
+        signal_type, fact, _ = signal_match
         account.attributes = {
             **account.attributes,
             "top_signal": fact.claim,

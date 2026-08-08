@@ -2939,7 +2939,23 @@ async def _score_and_brief(
     )
 
 
-async def execute_job(kind: str, target_id: str) -> None:
+async def execute_job(
+    kind: str,
+    target_id: str,
+    *,
+    workspace_id: str | None = None,
+    actor_id: str | None = None,
+) -> None:
+    """Dispatch a queued job.
+
+    `workspace_id` is a defence-in-depth check: the enqueuing route already verified
+    membership, and this confirms the target still belongs to the workspace that
+    asked for it before any work is done.
+    """
+
+    if workspace_id is not None:
+        await _assert_job_target_workspace(kind, target_id, workspace_id)
+    del actor_id  # Reserved for attribution; audit rows are written by each stage.
     if kind == "research":
         await execute_research(target_id)
     elif kind == "discover_accounts":
@@ -2950,6 +2966,72 @@ async def execute_job(kind: str, target_id: str) -> None:
         await regenerate_brief(target_id)
     else:
         raise ValueError("Unsupported job kind")
+
+
+_JOB_TARGET_MODELS: dict[str, type[ResearchRunRow] | type[ICPProfileRow] | type[AccountRow]] = {
+    "research": ResearchRunRow,
+    "discover_accounts": ICPProfileRow,
+    "research_account": AccountRow,
+    "regenerate_brief": AccountRow,
+}
+
+
+async def _assert_job_target_workspace(
+    kind: str, target_id: str, workspace_id: str
+) -> None:
+    model = _JOB_TARGET_MODELS.get(kind)
+    if model is None:
+        raise ValueError("Unsupported job kind")
+    async with SessionFactory() as session:
+        row = await session.get(model, uuid.UUID(target_id))
+        if row is None:
+            raise KeyError(f"{kind} target not found")
+        if str(row.workspace_id) != workspace_id:
+            raise PermissionError("Job target belongs to another workspace")
+
+
+async def record_job_failure(kind: str, target_id: str, reason: str) -> None:
+    """Persist a terminal job failure so the product can show it.
+
+    Without this a exhausted job is visible only in worker logs, and the UI cannot
+    tell "still running" apart from "gave up".
+    """
+
+    error = {
+        "category": "JOB_FAILED",
+        "message": "Background research did not complete after repeated attempts",
+        "reason": reason,
+        "retryable": False,
+    }
+    async with SessionFactory() as session:
+        if kind in {"research", "discover_accounts"}:
+            run = await session.get(ResearchRunRow, uuid.UUID(target_id))
+            if kind == "discover_accounts":
+                icp = await session.get(ICPProfileRow, uuid.UUID(target_id))
+                run = (
+                    await session.get(ResearchRunRow, icp.research_run_id)
+                    if icp is not None
+                    else None
+                )
+            if run is not None:
+                run.status = "failed"
+                run.current_stage = "job_failed"
+                run.error = error
+                run.updated_at = _now()
+                await session.commit()
+            return
+
+        account = await session.get(AccountRow, uuid.UUID(target_id))
+        if account is not None:
+            account.attributes = {
+                **account.attributes,
+                "last_job_error": error,
+                "recommended_action": (
+                    "Background research failed; retry before changing status."
+                ),
+            }
+            account.last_researched_at = _now()
+            await session.commit()
 
 
 async def research_account(

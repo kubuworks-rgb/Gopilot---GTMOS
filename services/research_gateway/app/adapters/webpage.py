@@ -12,7 +12,11 @@ from services.research_gateway.app.errors import GatewayAdapterError
 from services.research_gateway.app.normalization import canonicalize_url, normalize_whitespace
 from services.research_gateway.app.schemas import AdapterHealth, FetchRequest, SourceDocumentInput
 from services.research_gateway.app.security.content import classify_untrusted_content
-from services.research_gateway.app.security.url_policy import UnsafeUrlError, validate_public_url
+from services.research_gateway.app.security.url_policy import (
+    ResolvedTarget,
+    UnsafeUrlError,
+    resolve_public_url,
+)
 
 
 ALLOWED_CONTENT_TYPES = {
@@ -81,6 +85,24 @@ def _parse_datetime(value: str | None) -> datetime | None:
         return None
 
 
+def _pinned_request(client: httpx.AsyncClient, target: ResolvedTarget) -> httpx.Request:
+    """Build a request bound to an address that already passed policy.
+
+    The URL's hostname is replaced by a validated literal address, while `Host` and
+    the TLS SNI/certificate hostname stay the original name. This closes the
+    DNS-rebinding window: without it, httpx would resolve the name a second time at
+    connect and could reach an address the policy never saw. TLS verification is
+    unaffected because `sni_hostname` drives certificate matching.
+    """
+
+    return client.build_request(
+        "GET",
+        target.pinned_url(target.addresses[0]),
+        headers={"Host": target.host_header},
+        extensions={"sni_hostname": target.hostname},
+    )
+
+
 class WebPageAdapter:
     name = "web"
 
@@ -113,12 +135,18 @@ class WebPageAdapter:
             ) as client:
                 for _ in range(settings.max_redirects + 1):
                     try:
-                        validate_public_url(url)
+                        target = resolve_public_url(url)
                     except UnsafeUrlError as exc:
                         raise GatewayAdapterError(
                             "URL_POLICY_BLOCKED", str(exc)
                         ) from exc
-                    async with client.stream("GET", url) as response:
+                    pinned = _pinned_request(client, target)
+                    async with client.stream(
+                        pinned.method,
+                        pinned.url,
+                        headers=pinned.headers,
+                        extensions=pinned.extensions,
+                    ) as response:
                         if response.status_code in {301, 302, 303, 307, 308}:
                             location = response.headers.get("location")
                             if not location:
@@ -156,15 +184,22 @@ class WebPageAdapter:
                                 "UNSUPPORTED_CONTENT_TYPE",
                                 f"Unsupported content type: {content_type or 'unknown'}",
                             )
+                        # Truncate at the limit rather than discarding the response.
+                        # Large marketing homepages are common, and the leading bytes
+                        # carry the title and hero copy that identity verification
+                        # needs. Never buffering more than max_bytes keeps the
+                        # resource bound intact.
                         body = bytearray()
+                        truncated = False
                         async for chunk in response.aiter_bytes():
+                            remaining = max_bytes - len(body)
+                            if len(chunk) >= remaining:
+                                body.extend(chunk[:remaining])
+                                truncated = True
+                                break
                             body.extend(chunk)
-                            if len(body) > max_bytes:
-                                raise GatewayAdapterError(
-                                    "FETCH_TOO_LARGE",
-                                    "Source exceeded the configured response limit",
-                                )
-                        final_url = str(response.url)
+                        # The logical URL, not the pinned IP literal we connected to.
+                        final_url = url
                         break
                 else:
                     raise GatewayAdapterError(
@@ -185,6 +220,7 @@ class WebPageAdapter:
             "http_status": response.status_code,
             "content_length": len(body),
             "redirect_count": redirect_count,
+            "truncated": truncated,
         }
         title = final_url
         author = None

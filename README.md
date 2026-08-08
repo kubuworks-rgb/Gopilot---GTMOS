@@ -120,9 +120,26 @@ AGENT_REACH_ENABLED=true
 AGENT_REACH_GATEWAY_URL=http://127.0.0.1:8010
 ```
 
-`DEMO_AUTH_ENABLED=true` is only for local live development. Production startup
-rejects demo auth and fixture research, and production needs a verified auth
-integration.
+`DEMO_AUTH_ENABLED=true` and `AUTH_MODE=demo` are only for local live development.
+Production startup rejects demo auth and fixture research, and requires
+`AUTH_MODE=oidc`.
+
+## Authentication
+
+`AUTH_MODE=oidc` verifies bearer tokens against any OIDC issuer's JWKS document —
+the product is not tied to one identity vendor, and the vendor choice lives in
+configuration rather than in domain logic. Set `JWT_ISSUER`, `JWT_AUDIENCE` and
+`JWKS_URL`; see `.env.example` for an example issuer.
+
+Verification is fail-closed. The signing algorithm is taken from the configured
+allowlist and never from the token, so unsigned (`alg: none`) and HMAC-signed
+tokens are rejected before any signature check. Only asymmetric algorithms may be
+configured, because a JWKS public key must never be usable as an HMAC secret.
+Issuer, audience, `exp`, `nbf` and `sub` are all required. Signing keys are cached
+with a TTL, refreshed once across a key rotation, and rate-limited so unknown key
+IDs cannot amplify requests against the issuer.
+
+Under `AUTH_MODE=oidc` the `X-Demo-User` header is ignored entirely.
 
 Run the services in separate terminals:
 
@@ -245,7 +262,8 @@ It does not claim that a public-web smoke occurred.
 
 ## Current limitations
 
-- Production JWT/JWKS authentication is not implemented; local live mode uses the
+- The browser sign-in flow is not built yet: the API verifies bearer tokens, but the
+  web app has no login screen and must be handed a token. Local live mode uses the
   explicitly enabled demo principal.
 - The current extraction and brief generator are deterministic and conservative;
   no live LLM or embedding provider is required.

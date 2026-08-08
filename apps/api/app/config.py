@@ -4,6 +4,12 @@ import os
 from dataclasses import dataclass
 
 
+# Asymmetric signature algorithms only; see Settings.jwt_algorithms.
+SUPPORTED_JWT_ALGORITHMS = frozenset(
+    {"RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512"}
+)
+
+
 @dataclass(frozen=True)
 class Settings:
     app_env: str = os.getenv("APP_ENV", "development")
@@ -13,6 +19,18 @@ class Settings:
     redis_url: str = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
     research_mode: str = os.getenv("RESEARCH_MODE", "fixture")
     demo_auth_enabled: bool = os.getenv("DEMO_AUTH_ENABLED", "true").lower() == "true"
+    auth_mode: str = os.getenv("AUTH_MODE", "demo").lower()
+    jwt_issuer: str | None = os.getenv("JWT_ISSUER") or None
+    jwt_audience: str | None = os.getenv("JWT_AUDIENCE") or None
+    jwks_url: str | None = os.getenv("JWKS_URL") or None
+    jwks_cache_ttl_seconds: int = int(os.getenv("JWKS_CACHE_TTL_SECONDS", "600"))
+    # Asymmetric only. Allowing an HMAC algorithm alongside JWKS public keys would
+    # let a caller sign a token with the published public key as the shared secret.
+    jwt_algorithms: tuple[str, ...] = tuple(
+        item.strip().upper()
+        for item in os.getenv("JWT_ALGORITHMS", "RS256").split(",")
+        if item.strip()
+    )
     research_gateway_url: str = os.getenv(
         "AGENT_REACH_GATEWAY_URL", "http://127.0.0.1:8010"
     ).rstrip("/")
@@ -55,12 +73,45 @@ class Settings:
     def validate(self) -> None:
         if self.research_mode not in {"fixture", "live"}:
             raise RuntimeError("RESEARCH_MODE must be fixture or live")
+        if self.auth_mode not in {"demo", "oidc"}:
+            raise RuntimeError("AUTH_MODE must be demo or oidc")
         if self.app_env == "production" and (
             self.demo_auth_enabled or self.research_mode == "fixture"
         ):
             raise RuntimeError(
                 "Production forbids demo authentication and fixture research"
             )
+        if self.app_env == "production" and self.auth_mode != "oidc":
+            raise RuntimeError("Production requires AUTH_MODE=oidc")
+        if self.auth_mode == "oidc":
+            missing = [
+                name
+                for name, value in (
+                    ("JWT_ISSUER", self.jwt_issuer),
+                    ("JWT_AUDIENCE", self.jwt_audience),
+                    ("JWKS_URL", self.jwks_url),
+                )
+                if not value
+            ]
+            if missing:
+                raise RuntimeError(
+                    f"AUTH_MODE=oidc requires {', '.join(missing)}"
+                )
+            if not self.jwt_algorithms:
+                raise RuntimeError("JWT_ALGORITHMS must not be empty")
+            unsupported = [
+                algorithm
+                for algorithm in self.jwt_algorithms
+                if algorithm not in SUPPORTED_JWT_ALGORITHMS
+            ]
+            if unsupported:
+                raise RuntimeError(
+                    "JWT_ALGORITHMS allows only asymmetric algorithms "
+                    f"({', '.join(sorted(SUPPORTED_JWT_ALGORITHMS))}); "
+                    f"rejected: {', '.join(unsupported)}"
+                )
+            if self.jwks_cache_ttl_seconds <= 0:
+                raise RuntimeError("JWKS_CACHE_TTL_SECONDS must be positive")
         if self.research_mode == "live":
             if not self.database_url.startswith(
                 ("postgresql+asyncpg://", "postgresql://")

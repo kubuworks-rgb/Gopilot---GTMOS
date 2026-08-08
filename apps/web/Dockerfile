@@ -12,8 +12,17 @@ WORKDIR /repo
 # runtime environment variable would be read too late and silently keep the
 # localhost default.
 ARG API_PROXY_TARGET=http://api:8000
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time too.
+ARG NEXT_PUBLIC_AUTH_MODE=demo
+ARG NEXT_PUBLIC_OIDC_ISSUER=
+ARG NEXT_PUBLIC_OIDC_CLIENT_ID=
+ARG NEXT_PUBLIC_OIDC_SCOPE="openid profile email"
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    API_PROXY_TARGET=${API_PROXY_TARGET}
+    API_PROXY_TARGET=${API_PROXY_TARGET} \
+    NEXT_PUBLIC_AUTH_MODE=${NEXT_PUBLIC_AUTH_MODE} \
+    NEXT_PUBLIC_OIDC_ISSUER=${NEXT_PUBLIC_OIDC_ISSUER} \
+    NEXT_PUBLIC_OIDC_CLIENT_ID=${NEXT_PUBLIC_OIDC_CLIENT_ID} \
+    NEXT_PUBLIC_OIDC_SCOPE=${NEXT_PUBLIC_OIDC_SCOPE}
 # npm workspaces hoist every dependency to the root, so there is no
 # apps/web/node_modules to copy.
 COPY --from=deps /repo/node_modules ./node_modules

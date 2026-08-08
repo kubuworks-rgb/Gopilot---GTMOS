@@ -4,16 +4,34 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 
 const ACCESS_TOKEN_KEY = "gopilot.access_token";
 
+// sessionStorage is external state, so components read it through
+// useSyncExternalStore rather than mirroring it into React state inside an
+// effect, which would cause cascading renders and break under SSR.
+const listeners = new Set<() => void>();
+
+export function subscribeToAccessToken(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 /** Store the verified access token for subsequent API calls. */
 export function setAccessToken(token: string | null): void {
   if (typeof window === "undefined") return;
   if (token) window.sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
   else window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  listeners.forEach((listener) => listener());
 }
 
 export function accessToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+/** Server snapshot: the server never holds a browser token. */
+export function serverAccessToken(): string | null {
+  return null;
 }
 
 function authHeaders(): Record<string, string> {

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { api, API_BASE } from "@/lib/api";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { accessToken, api, API_BASE, serverAccessToken, subscribeToAccessToken } from "@/lib/api";
+import { isOidcConfigured } from "@/lib/auth";
 import type { AccountImportResult, Bootstrap, Brief, Evidence, EvidenceClaim } from "@/lib/types";
 import { EvidenceDrawer } from "./evidence-drawer";
 import { ScoreBadge, ScoreDetails } from "./score";
+import { AuthCallback, SignIn, signOut } from "./sign-in";
 
 const nav = [
   ["dashboard", "Command center", "⌘"], ["import", "Import accounts", "⇧"],
@@ -36,8 +38,19 @@ export function CommandCenter({ segments }: { segments: string[] }) {
   const view = segments[0] ?? "home";
   const accountId = view === "accounts" ? segments[1] : undefined;
   const researchStatus = data?.research_run?.status;
+  const isCallback = view === "auth" && segments[1] === "callback";
 
-  useEffect(() => { api.bootstrap().then(setData).catch(err => setError(err instanceof Error ? err.message : "Unknown API error")); }, [refresh]);
+  // The token lives in sessionStorage, which is external state. Reading it through
+  // useSyncExternalStore keeps SSR correct and avoids mirroring it into React state.
+  const token = useSyncExternalStore(subscribeToAccessToken, accessToken, serverAccessToken);
+  // A configured OIDC deployment must not call the API before a token exists,
+  // or every request 401s and the user sees an error instead of a way to sign in.
+  const signedIn = !isOidcConfigured() || Boolean(token);
+
+  useEffect(() => {
+    if (isCallback || !signedIn) return;
+    api.bootstrap().then(setData).catch(err => setError(err instanceof Error ? err.message : "Unknown API error"));
+  }, [refresh, isCallback, signedIn]);
   useEffect(() => { if (accountId) api.brief(accountId).then(setBrief).catch(err => setError(err instanceof Error ? err.message : "Could not load account")); }, [accountId]);
   useEffect(() => {
     if (!researchStatus || !["queued", "planning", "researching", "extracting", "discovering_accounts", "scoring"].includes(researchStatus)) return;
@@ -46,6 +59,8 @@ export function CommandCenter({ segments }: { segments: string[] }) {
   }, [researchStatus]);
 
   const averagePriority = useMemo(() => data?.accounts.length ? Math.round(data.accounts.reduce((sum, item) => sum + item.scores.priority, 0) / data.accounts.length) : 0, [data]);
+  if (isCallback) return <AuthCallback onSignedIn={() => setRefresh(value => value + 1)} />;
+  if (!signedIn) return <SignIn />;
   if (error) return <ErrorState message={error} setup={() => { setActionBusy("workspace"); api.createWorkspace("GoPilot Live Workspace").then(() => { setError(""); setRefresh(value => value + 1); }).catch(err => setError(err instanceof Error ? err.message : "Workspace creation failed")).finally(() => setActionBusy("")); }} retry={() => { setError(""); setRefresh(value => value + 1); }} />;
   if (!data) return <Loading />;
   if (data.mode === "live" && !data.product) return <LiveOnboarding busy={actionBusy} onSubmit={async payload => { setActionBusy("product"); try { await api.createProduct(payload); setData(await api.bootstrap()); } finally { setActionBusy(""); } }} />;
@@ -114,7 +129,7 @@ export function CommandCenter({ segments }: { segments: string[] }) {
 
   const title = view === "accounts" && accountId ? brief?.account.name ?? "Account brief" : nav.find(item => item[0] === view)?.[1] ?? "Command center";
   return <div className="app-shell">
-    <aside className="sidebar"><Link className="brand" href="/"><span className="brand-mark">G</span><span>GOPILOT<strong>GTM OS</strong></span></Link><div className="workspace-switch"><span>Workspace</span><strong>{data.workspace.name}</strong><small>Founder workspace · Owner</small></div><nav aria-label="Primary">{nav.map(([slug, label, icon]) => <Link key={slug} href={`/${slug}`} className={`${view === slug ? "active" : ""} ${slug === "discovery" ? "experimental-nav" : ""}`}><span>{icon}</span>{label}{slug === "discovery" && <small>EXPERIMENTAL</small>}{slug === "approvals" && data.approval_count > 0 && <b>{data.approval_count}</b>}</Link>)}</nav><div className="sidebar-footer"><span className="status-dot" /> BYOA core available<small>{data.provider_message}</small></div></aside>
+    <aside className="sidebar"><Link className="brand" href="/"><span className="brand-mark">G</span><span>GOPILOT<strong>GTM OS</strong></span></Link><div className="workspace-switch"><span>Workspace</span><strong>{data.workspace.name}</strong><small>Founder workspace · Owner</small></div><nav aria-label="Primary">{nav.map(([slug, label, icon]) => <Link key={slug} href={`/${slug}`} className={`${view === slug ? "active" : ""} ${slug === "discovery" ? "experimental-nav" : ""}`}><span>{icon}</span>{label}{slug === "discovery" && <small>EXPERIMENTAL</small>}{slug === "approvals" && data.approval_count > 0 && <b>{data.approval_count}</b>}</Link>)}</nav><div className="sidebar-footer"><span className="status-dot" /> BYOA core available<small>{data.provider_message}</small>{isOidcConfigured() && <button className="secondary-button" onClick={() => signOut()}>Sign out</button>}</div></aside>
     <main className="workspace"><header className="topbar"><div><span className="eyebrow">{view === "accounts" && accountId ? "Account opportunity brief" : "Evidence-backed GTM workspace"}</span><h1>{title}</h1></div><div className="top-actions"><span className="demo-badge">{data.demo_data ? "DEMO DATA" : "LIVE PUBLIC DATA"}</span><span className="avatar">KW</span></div></header>
       <div className="content">
         {view === "dashboard" && <Dashboard data={data} averagePriority={averagePriority} />}

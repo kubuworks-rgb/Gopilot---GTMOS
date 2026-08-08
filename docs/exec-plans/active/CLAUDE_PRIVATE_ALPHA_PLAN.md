@@ -11,7 +11,7 @@ Work is separated by scope so PR #1 stays focused on the verified BYOA core.
 
 | Branch | Contains | State |
 |---|---|---|
-| `feature/byoa-core-product` (PR #1, draft) | Signal-honesty fix, takeover audit, credential-free CI | pushed — awaiting CI + review |
+| `feature/byoa-core-product` (PR #1, draft) | Signal-honesty fix, takeover audit, credential-free CI | pushed — **CI green, all 4 jobs** |
 | `feature/private-alpha-hardening` | OIDC authentication, migration `0007`, migration-parity tests, CI's `alembic check` and auth steps, and all later hardening | branched from PR #1 |
 | `backup/takeover-20260808` + tag `takeover-checkpoint-20260808` | The unsplit original three commits | retained; nothing lost |
 
@@ -19,9 +19,25 @@ Two CI steps are deliberately absent from PR #1 because they depend on work that
 not part of the BYOA core, and would fail there for reasons that PR does not
 introduce: `alembic check` (needs `0007`) and the authentication tests.
 
-**Sequencing:** hold PR #1 open and draft until its CI passes and it is reviewed.
-After it merges into `develop`, rebase this branch onto the updated `develop` and
-continue. Nothing merges automatically.
+### First CI run found a real problem
+
+Three tests in `test_acceptance_orchestration.py` shell out to `powershell.exe` to
+exercise the historical Phase 5 acceptance scripts. They test the QA harness, not
+the product, and cannot run on Linux. They are now skipped where that interpreter is
+absent — deleting them would discard preserved QA evidence.
+
+The first fix was wrong and CI caught it: it accepted `pwsh` as sufficient, but
+GitHub's Ubuntu runners ship PowerShell Core, so the guard passed and the tests still
+invoked a `powershell.exe` that did not exist. The gate is now on the interpreter
+these tests actually call.
+
+This is a live symptom of the acceptance-harness coupling in audit §Y/§22 — QA
+scripts entangled with the product suite. Archiving them stays P2.
+
+**Sequencing:** hold PR #1 open and draft until it is reviewed. After it merges into
+`develop`, rebase this branch onto the updated `develop` and continue. Nothing merges
+automatically.
+
 **Source audit:** [CLAUDE_PROJECT_TAKEOVER_AUDIT.md](../../qa/CLAUDE_PROJECT_TAKEOVER_AUDIT.md)
 **Target:** Limited private alpha of `BYOA_CORE`. Not a public launch. Not an
 autonomous-discovery release.

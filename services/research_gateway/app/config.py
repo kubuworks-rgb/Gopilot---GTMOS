@@ -4,8 +4,12 @@ import os
 from dataclasses import dataclass
 
 
+MINIMUM_GATEWAY_TOKEN_LENGTH = 32
+
+
 @dataclass(frozen=True)
 class GatewaySettings:
+    app_env: str = os.getenv("APP_ENV", "development")
     internal_token: str | None = os.getenv("RESEARCH_GATEWAY_TOKEN") or None
     agent_reach_enabled: bool = (
         os.getenv("AGENT_REACH_ENABLED", "false").lower() == "true"
@@ -49,6 +53,35 @@ class GatewaySettings:
         os.getenv("GDELT_MIN_INTERVAL_SECONDS", "6")
     )
     gdelt_max_attempts: int = int(os.getenv("GDELT_MAX_ATTEMPTS", "3"))
+
+    @property
+    def authentication_required(self) -> bool:
+        return bool(self.internal_token)
+
+    def validate(self) -> None:
+        """Refuse to start in a configuration that would expose an open fetcher.
+
+        The gateway retrieves arbitrary public URLs on request. Without a token it
+        is an unauthenticated fetch service for anyone who can reach the port, so
+        production must not run that way.
+        """
+
+        if self.app_env == "production" and not self.internal_token:
+            raise RuntimeError(
+                "Production requires RESEARCH_GATEWAY_TOKEN; the gateway will not "
+                "start as an unauthenticated fetch service"
+            )
+        if self.internal_token and len(self.internal_token) < MINIMUM_GATEWAY_TOKEN_LENGTH:
+            raise RuntimeError(
+                "RESEARCH_GATEWAY_TOKEN must be at least "
+                f"{MINIMUM_GATEWAY_TOKEN_LENGTH} characters"
+            )
+        if self.max_redirects < 0:
+            raise RuntimeError("GATEWAY_MAX_REDIRECTS must not be negative")
+        if self.default_max_bytes <= 0:
+            raise RuntimeError("GATEWAY_MAX_BYTES must be positive")
+        if self.fetch_timeout_seconds <= 0:
+            raise RuntimeError("GATEWAY_FETCH_TIMEOUT_SECONDS must be positive")
 
 
 settings = GatewaySettings()

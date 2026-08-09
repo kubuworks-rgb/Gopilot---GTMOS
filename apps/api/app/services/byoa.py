@@ -14,8 +14,11 @@ from apps.api.app.domain.models import (
     AccountImportIssue,
     AccountImportPayload,
     AccountImportRecord,
+    AccountImportRow,
     AccountImportSource,
+    AccountImportSummary,
     AccountImportValidation,
+    ImportRowVerdict,
     ProductModeAvailability,
 )
 from apps.api.app.services.company_identity import (
@@ -272,6 +275,53 @@ def _parse_pasted(value: str) -> list[Mapping[str, object]]:
     return records
 
 
+def _submitted_domain(row: Mapping[str, object]) -> str | None:
+    value = row.get("domain")
+    return str(value).strip() or None if value not in (None, "") else None
+
+
+def _submitted_name(row: Mapping[str, object]) -> str | None:
+    value = row.get("company_name")
+    return str(value).strip() or None if value not in (None, "") else None
+
+
+_NAME_NOISE = {
+    "inc", "llc", "ltd", "limited", "corp", "corporation", "company", "co",
+    "pvt", "private", "technologies", "technology", "software", "labs", "group",
+    "holdings", "solutions", "systems", "the", "and",
+}
+
+
+def _identity_review_reason(record: AccountImportRecord) -> str | None:
+    """Flag rows where the supplied name and domain may not be the same company.
+
+    Blueprint section 8: a row like "Acme AI" pointing at example-company.ai should
+    be surfaced for review rather than silently researched. The rule is deliberately
+    conservative and deterministic -- it flags only when the name and the domain
+    share no meaningful token at all, which is the case a human should look at.
+    It never rejects; the row is still imported, just marked.
+    """
+
+    brand = record.domain.split(".")[0].lower()
+    name_tokens = {
+        token
+        for token in re.findall(r"[a-z0-9]+", record.company_name.lower())
+        if token not in _NAME_NOISE and len(token) > 2
+    }
+    if not name_tokens:
+        return None
+    # A shared token, or either string containing the other, is good enough.
+    if any(token in brand or brand in token for token in name_tokens):
+        return None
+    joined = "".join(sorted(name_tokens))
+    if brand in joined or joined in brand:
+        return None
+    return (
+        f'"{record.company_name}" shares no name token with {record.domain}. '
+        "Confirm this is the right company before relying on its research."
+    )
+
+
 def validate_account_import(payload: AccountImportPayload) -> AccountImportValidation:
     source = payload.import_source
     parse_issues: list[AccountImportIssue] = []
@@ -289,11 +339,25 @@ def validate_account_import(payload: AccountImportPayload) -> AccountImportValid
     accepted: list[AccountImportRecord] = []
     issues = list(parse_issues)
     duplicate_domains: list[str] = []
+    rows: list[AccountImportRow] = []
     seen: set[str] = set()
     for row_number, row in enumerate(raw_rows, start=2 if payload.csv_text else 1):
+        submitted = _submitted_domain(row)
+        name = _submitted_name(row)
         record, row_issues = _record_from_mapping(row, row_number)
         issues.extend(row_issues)
         if record is None:
+            first = row_issues[0] if row_issues else None
+            rows.append(
+                AccountImportRow(
+                    row=row_number,
+                    company_name=name,
+                    submitted_domain=submitted,
+                    verdict=ImportRowVerdict.INVALID,
+                    code=first.code if first else "INVALID",
+                    reason=first.message if first else "Row could not be validated",
+                )
+            )
             continue
         if record.domain in seen:
             duplicate_domains.append(record.domain)
@@ -305,12 +369,61 @@ def validate_account_import(payload: AccountImportPayload) -> AccountImportValid
                     message="Duplicate canonical domain in this import",
                 )
             )
+            rows.append(
+                AccountImportRow(
+                    row=row_number,
+                    company_name=record.company_name,
+                    submitted_domain=submitted,
+                    canonical_domain=record.domain,
+                    verdict=ImportRowVerdict.DUPLICATE,
+                    code="DUPLICATE_DOMAIN",
+                    reason=f"{record.domain} already appears earlier in this import",
+                )
+            )
             continue
         seen.add(record.domain)
         accepted.append(record)
+        review_reason = _identity_review_reason(record)
+        rows.append(
+            AccountImportRow(
+                row=row_number,
+                company_name=record.company_name,
+                submitted_domain=submitted,
+                canonical_domain=record.domain,
+                verdict=(
+                    ImportRowVerdict.NEEDS_REVIEW
+                    if review_reason
+                    else ImportRowVerdict.VALID
+                ),
+                code="POSSIBLE_IDENTITY_MISMATCH" if review_reason else None,
+                reason=review_reason,
+            )
+        )
+        if review_reason:
+            issues.append(
+                AccountImportIssue(
+                    row=row_number,
+                    field="domain",
+                    code="POSSIBLE_IDENTITY_MISMATCH",
+                    message=review_reason,
+                )
+            )
+    summary = AccountImportSummary(
+        total=len(rows),
+        valid=sum(1 for item in rows if item.verdict is ImportRowVerdict.VALID),
+        duplicate=sum(
+            1 for item in rows if item.verdict is ImportRowVerdict.DUPLICATE
+        ),
+        invalid=sum(1 for item in rows if item.verdict is ImportRowVerdict.INVALID),
+        needs_review=sum(
+            1 for item in rows if item.verdict is ImportRowVerdict.NEEDS_REVIEW
+        ),
+    )
     return AccountImportValidation(
         import_source=source,
         accepted=accepted,
         issues=issues,
         duplicate_domains=sorted(set(duplicate_domains)),
+        rows=rows,
+        summary=summary,
     )

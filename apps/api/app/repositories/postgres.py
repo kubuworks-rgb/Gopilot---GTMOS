@@ -4,7 +4,7 @@ import uuid
 import re
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, desc, select
+from sqlalchemy import Select, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from apps.api.app.db.models import (
@@ -963,15 +963,26 @@ class PostgresRepository:
         return row
 
     async def approval_count(self, session: AsyncSession, workspace_id: str) -> int:
-        rows = (
-            await session.scalars(
-                select(CampaignDraftRow).where(
-                    CampaignDraftRow.workspace_id == _uuid(workspace_id),
-                    CampaignDraftRow.status == "draft",
-                )
+        """Drafts that can actually be approved.
+
+        A placeholder draft row is created for every imported account, and the API
+        refuses to approve one unless its account is evidence-gated FOUNDER_READY.
+        Counting every draft therefore advertised work that could not be done --
+        the badge said "3 need review" for accounts whose approve button returns
+        409. Blueprint section 18: only FOUNDER_READY exposes an outreach draft.
+        """
+
+        total = await session.scalar(
+            select(func.count())
+            .select_from(CampaignDraftRow)
+            .join(AccountRow, AccountRow.id == CampaignDraftRow.account_id)
+            .where(
+                CampaignDraftRow.workspace_id == _uuid(workspace_id),
+                CampaignDraftRow.status == "draft",
+                AccountRow.attributes["brief_state"].astext == "FOUNDER_READY",
             )
-        ).all()
-        return len(rows)
+        )
+        return int(total or 0)
 
     async def audit(self, session: AsyncSession, workspace_id: str) -> list[AuditEvent]:
         rows = (

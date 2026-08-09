@@ -84,8 +84,8 @@ export const api = {
     request<{ status: string }>(`/accounts/${accountId}/research`, { method: "POST" }),
   regenerateBrief: (accountId: string) =>
     request<{ status: string }>(`/accounts/${accountId}/regenerate-brief`, { method: "POST" }),
-  reviewAccount: (accountId: string, reviewStatus: AccountReviewStatus, briefState?: BriefState) =>
-    request<Account>(`/accounts/${accountId}/review`, { method: "PATCH", body: JSON.stringify({ review_status: reviewStatus, brief_state: briefState }) }),
+  reviewAccount: (accountId: string, reviewStatus: AccountReviewStatus, briefState?: BriefState, note?: string) =>
+    request<Account>(`/accounts/${accountId}/review`, { method: "PATCH", body: JSON.stringify({ review_status: reviewStatus, brief_state: briefState, note }) }),
   brief: (accountId: string) => request<Brief>(`/accounts/${accountId}/opportunity-brief`),
   selectICP: (icpId: string) =>
     request<ICP>(`/icps/${icpId}/select`, { method: "POST" }),

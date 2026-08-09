@@ -30,6 +30,7 @@ from apps.api.app.domain.models import (
     AccountImportSource,
     AccountOpportunityBrief,
     AccountScores,
+    AccountReviewEntry,
     AccountReviewStatus,
     AuditEvent,
     CampaignDraft,
@@ -65,6 +66,22 @@ def _uuid(value: str) -> uuid.UUID:
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _review_history(attributes: dict[str, object]) -> list[AccountReviewEntry]:
+    raw = attributes.get("review_history")
+    if not isinstance(raw, list):
+        return []
+    entries: list[AccountReviewEntry] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            entries.append(AccountReviewEntry.model_validate(item))
+        except ValueError:
+            # A malformed history entry must not make the account unreadable.
+            continue
+    return entries
 
 
 def _input_metadata_value(attributes: dict[str, object], key: str) -> str | None:
@@ -680,6 +697,7 @@ class PostgresRepository:
                 )
             ),
             owner=_input_metadata_value(row.attributes, "owner"),
+            review_history=_review_history(row.attributes),
         )
 
     async def import_accounts(

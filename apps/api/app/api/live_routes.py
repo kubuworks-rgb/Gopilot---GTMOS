@@ -33,6 +33,7 @@ from apps.api.app.domain.models import (
     AccountImportPayload,
     AccountImportResult,
     AccountImportValidation,
+    AccountReviewEntry,
     AccountReviewStatus,
     AccountReviewUpdate,
     AccountOpportunityBrief,
@@ -717,10 +718,23 @@ async def review_account(
             status_code=409,
             detail="FOUNDER_READY is evidence-gated and cannot be manually promoted",
         )
+    # Keep the decision history in order. A later reader needs to know not just the
+    # current status but who set it and why.
+    history = row.attributes.get("review_history")
+    entries = list(history) if isinstance(history, list) else []
+    entries.append(
+        AccountReviewEntry(
+            actor_id=principal.user_id,
+            review_status=payload.review_status,
+            brief_state=payload.brief_state or current_state,
+            note=(payload.note or "").strip() or None,
+        ).model_dump(mode="json")
+    )
     row.attributes = {
         **row.attributes,
         "review_status": payload.review_status.value,
         "brief_state": payload.brief_state or current_state,
+        "review_history": entries[-50:],
     }
     await repository.record(
         session,
@@ -732,6 +746,7 @@ async def review_account(
         {
             "review_status": payload.review_status.value,
             "brief_state": str(payload.brief_state or current_state),
+            "has_note": str(bool((payload.note or "").strip())),
         },
     )
     await session.commit()

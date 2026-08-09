@@ -57,6 +57,20 @@ class AccountReviewStatus(StrEnum):
     CHANGES_REQUESTED = "CHANGES_REQUESTED"
 
 
+class AccountReviewEntry(BaseModel):
+    """One recorded human decision, kept in order on the account.
+
+    Blueprint section 17: feedback is stored. A later reader needs to know not just
+    the current status but who set it and why.
+    """
+
+    actor_id: str
+    review_status: AccountReviewStatus
+    brief_state: str | None = None
+    note: str | None = None
+    recorded_at: datetime = Field(default_factory=utc_now)
+
+
 class ProfileClaim(BaseModel):
     field: str
     value: str | None
@@ -283,6 +297,7 @@ class Account(BaseModel):
     # Supplied at import and carried through to the export, so a founder can hand
     # the reviewed list to the right person on their team.
     owner: str | None = None
+    review_history: list[AccountReviewEntry] = Field(default_factory=list)
 
 
 class RetrievalOutcome(StrEnum):
@@ -557,6 +572,11 @@ class AccountReviewUpdate(BaseModel):
         "DO_NOT_TARGET",
         "IDENTITY_REVIEW_REQUIRED",
     ] | None = None
+    # Blueprint section 17: a status change without the reasoning behind it is not
+    # much use to whoever reads the account next.
+    note: str | None = Field(default=None, max_length=2000)
+
+
 
 
 class CampaignUpdate(BaseModel):
@@ -578,6 +598,9 @@ class FeedbackInput(BaseModel):
         "USEFUL",
         "NOT_USEFUL",
         "NEEDS_REVIEW",
+        # Blueprint section 17: flagging the wrong company is a distinct, important
+        # correction, not a generic "incorrect".
+        "WRONG_IDENTITY",
     ]
     reason: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=2000)
@@ -590,6 +613,7 @@ class FeedbackInput(BaseModel):
             "INCORRECT",
             "NOT_USEFUL",
             "NEEDS_REVIEW",
+            "WRONG_IDENTITY",
         }
         if self.rating in negative and not (self.reason or "").strip():
             raise ValueError("Negative feedback requires a reason")

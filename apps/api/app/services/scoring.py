@@ -56,6 +56,7 @@ def score_account(
     source_quality: float,
     fit_evidence: list[str],
     signal_evidence: list[str],
+    retrieval_coverage: float | None = None,
 ) -> AccountScores:
     fit = _breakdown_missing_aware(
         [
@@ -73,10 +74,21 @@ def score_account(
             ("Signal recency", signal_recency, 0.40, signal_evidence),
         ]
     )
-    confidence = _breakdown(
+    # Retrieval coverage is how much of what we tried to read we actually read. A
+    # brief built from one page out of eight must not carry the same confidence as
+    # one built from eight, and the founder must be able to see why in the
+    # component breakdown. None means the run predates outcome tracking, in which
+    # case the other two components renormalize rather than being penalised.
+    confidence = _breakdown_missing_aware(
         [
-            ("Evidence coverage", evidence_coverage, 0.55, fit_evidence + signal_evidence),
-            ("Source quality", source_quality, 0.45, fit_evidence + signal_evidence),
+            (
+                "Evidence coverage",
+                evidence_coverage,
+                0.40,
+                fit_evidence + signal_evidence,
+            ),
+            ("Source quality", source_quality, 0.35, fit_evidence + signal_evidence),
+            ("Retrieval coverage", retrieval_coverage, 0.25, []),
         ]
     )
     priority = round((fit.score * 0.55 + intent.score * 0.45) * confidence.score / 100)

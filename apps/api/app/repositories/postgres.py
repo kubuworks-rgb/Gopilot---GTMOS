@@ -67,6 +67,10 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def _optional_int(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 def _string_list(value: object) -> list[str]:
     return [str(item) for item in value] if isinstance(value, list) else []
 
@@ -471,6 +475,8 @@ class PostgresRepository:
             error=row.error,
             searches_used=row.searches_used,
             documents_used=row.documents_used,
+            max_searches=_optional_int(row.budgets.get("max_searches")),
+            max_documents=_optional_int(row.budgets.get("max_documents")),
             product_mode=ProductMode(
                 str(
                     row.budgets.get("product_mode")

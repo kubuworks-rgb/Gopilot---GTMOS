@@ -39,6 +39,9 @@ from apps.api.app.domain.models import (
     CampaignDraft,
     ClaimStatus,
     EvidenceClaim,
+    RetrievalAttempt,
+    RetrievalOutcome,
+    RetrievalSummary,
     Signal,
 )
 from apps.api.app.providers.live import GatewayProviderError, LiveResearchProvider
@@ -1550,6 +1553,23 @@ async def _research_account_sources(
     return sources, facts
 
 
+GATEWAY_CODE_TO_OUTCOME: dict[str, RetrievalOutcome] = {
+    "SOURCE_NOT_FOUND": RetrievalOutcome.NOT_FOUND,
+    "SOURCE_FORBIDDEN": RetrievalOutcome.FORBIDDEN,
+    "SOURCE_UNAVAILABLE": RetrievalOutcome.UNAVAILABLE,
+    "FETCH_TIMEOUT": RetrievalOutcome.TIMED_OUT,
+    "RATE_LIMITED": RetrievalOutcome.RATE_LIMITED,
+    "URL_POLICY_BLOCKED": RetrievalOutcome.BLOCKED_BY_POLICY,
+    "UNSUPPORTED_CONTENT_TYPE": RetrievalOutcome.UNSUPPORTED_CONTENT,
+}
+
+
+def _retrieval_outcome_for(code: str) -> RetrievalOutcome:
+    """Preserve the gateway's distinction instead of collapsing it to one error."""
+
+    return GATEWAY_CODE_TO_OUTCOME.get(code, RetrievalOutcome.UNAVAILABLE)
+
+
 async def _fetch_supplied_official_sources(
     session: AsyncSession,
     run: ResearchRunRow,
@@ -1557,9 +1577,10 @@ async def _fetch_supplied_official_sources(
     *,
     company_name: str,
     domain: str,
-) -> tuple[list[SourceDocumentRow], list[EvidenceFactRow]]:
+) -> tuple[list[SourceDocumentRow], list[EvidenceFactRow], RetrievalSummary]:
     sources: list[SourceDocumentRow] = []
     facts: list[EvidenceFactRow] = []
+    attempts: list[RetrievalAttempt] = []
     seen_source_ids: set[uuid.UUID] = set()
     paths = (
         "",
@@ -1610,6 +1631,16 @@ async def _fetch_supplied_official_sources(
                     ),
                     "retryable": False,
                 }
+                attempts.append(
+                    RetrievalAttempt(
+                        url=url,
+                        outcome=RetrievalOutcome.CROSS_DOMAIN_REDIRECT,
+                        detail=(
+                            f"Redirected to {canonical_source_domain}, "
+                            f"which is not {domain}"
+                        ),
+                    )
+                )
             else:
                 source, new_facts = await _persist_source(
                     session,
@@ -1628,12 +1659,45 @@ async def _fetch_supplied_official_sources(
                     "facts": len(new_facts),
                     "canonical_domain": canonical_source_domain,
                 }
+                truncated = bool(source_input.metadata.get("truncated"))
+                attempts.append(
+                    RetrievalAttempt(
+                        url=url,
+                        outcome=(
+                            RetrievalOutcome.TRUNCATED
+                            if truncated
+                            else RetrievalOutcome.RETRIEVED
+                        ),
+                        detail=(
+                            "Page exceeded the size limit and was read only in part"
+                            if truncated
+                            else None
+                        ),
+                    )
+                )
         except GatewayProviderError as exc:
             task.status = "failed"
             task.error = _error_payload(exc)
+            attempts.append(
+                RetrievalAttempt(
+                    url=url,
+                    outcome=_retrieval_outcome_for(exc.category),
+                    detail=exc.safe_message,
+                )
+            )
         task.completed_at = _now()
         await session.flush()
-    return sources, facts
+    # A truncated page still yielded evidence, so it counts as retrieved.
+    retrieved = sum(
+        1
+        for item in attempts
+        if item.outcome
+        in {RetrievalOutcome.RETRIEVED, RetrievalOutcome.TRUNCATED}
+    )
+    summary = RetrievalSummary(
+        attempted=len(attempts), retrieved=retrieved, attempts=attempts
+    )
+    return sources, facts, summary
 
 
 async def discover_accounts(
@@ -2596,6 +2660,12 @@ async def _score_and_brief(
         item for item in all_source_rows if item.id in attached_source_ids
     ]
     source_by_id = {item.id: item for item in source_rows}
+    raw_retrieval = account.attributes.get("retrieval")
+    retrieval_summary = (
+        RetrievalSummary.model_validate(raw_retrieval)
+        if isinstance(raw_retrieval, dict)
+        else RetrievalSummary()
+    )
     target_tokens = _tokens(product.target_market)
     evidence_tokens = _tokens(" ".join(item.claim for item in facts))
     overlap = len(target_tokens & evidence_tokens) / max(1, len(target_tokens))
@@ -2671,6 +2741,9 @@ async def _score_and_brief(
         ),
         fit_evidence=fit_evidence,
         signal_evidence=signal_evidence,
+        retrieval_coverage=(
+            retrieval_summary.coverage if retrieval_summary.attempted else None
+        ),
     )
     snapshot = AccountScoreSnapshotRow(
         workspace_id=run.workspace_id,
@@ -3048,6 +3121,7 @@ async def _score_and_brief(
         hypotheses=hypotheses,
         reason_not_to_target=reason_not_to_target,
         next_research_step=next_research_step,
+        retrieval=retrieval_summary,
         campaign=CampaignDraft(
             id=str(draft_id),
             account_id=str(account.id),
@@ -3210,13 +3284,21 @@ async def research_account(
         product = await session.get(ProductProfileRow, run.product_id)
         if product is None:
             return
-        direct_sources, direct_facts = await _fetch_supplied_official_sources(
-            session,
-            run,
-            provider,
-            company_name=account.name,
-            domain=account.domain,
+        direct_sources, direct_facts, retrieval = (
+            await _fetch_supplied_official_sources(
+                session,
+                run,
+                provider,
+                company_name=account.name,
+                domain=account.domain,
+            )
         )
+        # Persist on the account so the brief can report what we actually read,
+        # rather than presenting a one-page-out-of-eight run as a complete one.
+        account.attributes = {
+            **account.attributes,
+            "retrieval": retrieval.model_dump(mode="json"),
+        }
         # Identity verification and evidence extraction are different questions.
         # Fetching the supplied domain and confirming the post-redirect canonical
         # domain still matches IS the verification; whether we could mine a usable

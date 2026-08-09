@@ -163,6 +163,10 @@ class ResearchRun(BaseModel):
     error: dict[str, object] | None = None
     searches_used: int = 0
     documents_used: int = 0
+    # The run's own budgets, so progress bars report the real ceiling rather than
+    # a number hardcoded in the UI.
+    max_searches: int | None = None
+    max_documents: int | None = None
     findings: list[Finding] = Field(default_factory=list)
     product_mode: ProductMode = ProductMode.BYOA_CORE
 
@@ -278,6 +282,82 @@ class Account(BaseModel):
     review_status: AccountReviewStatus = AccountReviewStatus.PENDING
 
 
+class RetrievalOutcome(StrEnum):
+    """Why an official page did or did not become evidence.
+
+    Distinct states, never collapsed into a generic error: a founder reading a brief
+    needs to tell "the page said nothing useful" apart from "we were rate limited"
+    apart from "that page does not exist".
+    """
+
+    RETRIEVED = "RETRIEVED"
+    TRUNCATED = "TRUNCATED"
+    # Absent, not failed: most company sites have no /careers or /customers page.
+    NOT_FOUND = "NOT_FOUND"
+    FORBIDDEN = "FORBIDDEN"
+    UNAVAILABLE = "UNAVAILABLE"
+    TIMED_OUT = "TIMED_OUT"
+    RATE_LIMITED = "RATE_LIMITED"
+    BLOCKED_BY_POLICY = "BLOCKED_BY_POLICY"
+    UNSUPPORTED_CONTENT = "UNSUPPORTED_CONTENT"
+    CROSS_DOMAIN_REDIRECT = "CROSS_DOMAIN_REDIRECT"
+
+
+class RetrievalAttempt(BaseModel):
+    url: str
+    outcome: RetrievalOutcome
+    detail: str | None = None
+
+
+class RetrievalSummary(BaseModel):
+    """How much of what we tried to read we actually read."""
+
+    attempted: int = 0
+    retrieved: int = 0
+    attempts: list[RetrievalAttempt] = Field(default_factory=list)
+
+    @property
+    def absent(self) -> int:
+        """Pages that do not exist on the site. Probing them is not a failure."""
+        return sum(
+            1
+            for item in self.attempts
+            if item.outcome is RetrievalOutcome.NOT_FOUND
+        )
+
+    @property
+    def coverage(self) -> float:
+        """0-100 over pages that actually exist.
+
+        Absent pages are excluded from the denominator. A site whose only page is
+        its homepage has been read completely, and scoring it 12% would penalise
+        every small company for not having a /careers page.
+        """
+        existing = self.attempted - self.absent
+        if existing <= 0:
+            return 0.0
+        return round(self.retrieved / existing * 100, 2)
+
+    @property
+    def failed(self) -> list[RetrievalAttempt]:
+        """Pages that yielded nothing.
+
+        A truncated page is not here: it was read in part and did produce evidence,
+        so counting it as a failure would contradict `retrieved`. It is still
+        reported to the reader as a caveat, just not as a failure.
+        """
+        return [
+            item
+            for item in self.attempts
+            if item.outcome
+            not in {
+                RetrievalOutcome.RETRIEVED,
+                RetrievalOutcome.TRUNCATED,
+                RetrievalOutcome.NOT_FOUND,
+            }
+        ]
+
+
 class EvidenceClaim(BaseModel):
     statement: str
     status: ClaimStatus
@@ -329,6 +409,9 @@ class AccountOpportunityBrief(BaseModel):
     hypotheses: list[EvidenceClaim] = Field(default_factory=list)
     reason_not_to_target: str | None = None
     next_research_step: str | None = None
+    # What we tried to read and what we actually got. Without this a brief built
+    # from one page out of eight looked identical to one built from eight.
+    retrieval: RetrievalSummary = Field(default_factory=RetrievalSummary)
     generated_at: datetime = Field(default_factory=utc_now)
 
 

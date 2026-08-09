@@ -293,7 +293,14 @@ async def main() -> int:
         body = response.text
         rows = [line for line in body.splitlines() if line.strip()]
         check(len(rows) == 2, f"only approved accounts exported ({len(rows) - 1} row)")
-        check("company_name,canonical_domain" in rows[0], "export header is correct")
+        # Compared against the shared definition rather than a literal, so renaming
+        # a column cannot leave this assertion quietly checking the wrong thing.
+        from apps.api.app.services.exports import EXPORT_COLUMNS
+
+        check(
+            rows[0].split(",") == EXPORT_COLUMNS,
+            f"export header matches the {len(EXPORT_COLUMNS)} defined columns",
+        )
         for secret in ("Authorization", "Bearer ", "EXA_API_KEY", "password"):
             check(secret not in body, f"export leaks no {secret!r}")
 

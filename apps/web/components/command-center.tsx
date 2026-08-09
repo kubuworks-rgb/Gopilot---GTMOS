@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { accessToken, api, API_BASE, serverAccessToken, subscribeToAccessToken } from "@/lib/api";
+import { accessToken, api, API_BASE, serverAccessToken, subscribeToAccessToken, type ImportPayload } from "@/lib/api";
 import { isOidcConfigured } from "@/lib/auth";
-import type { AccountImportResult, Bootstrap, Brief, Evidence, EvidenceClaim, ResearchRun, RetrievalOutcome } from "@/lib/types";
+import type { AccountImportResult, AccountImportValidation, Bootstrap, Brief, Evidence, EvidenceClaim, ImportRowVerdict, ResearchRun, RetrievalOutcome } from "@/lib/types";
 import { EvidenceDrawer } from "./evidence-drawer";
 import { ScoreBadge, ScoreDetails } from "./score";
 import { AuthCallback, SignIn, signOut } from "./sign-in";
@@ -35,6 +35,8 @@ export function CommandCenter({ segments }: { segments: string[] }) {
   const [icpBusy, setIcpBusy] = useState("");
   const [actionBusy, setActionBusy] = useState("");
   const [importResult, setImportResult] = useState<AccountImportResult | null>(null);
+  const [importValidation, setImportValidation] = useState<AccountImportValidation | null>(null);
+  const [pendingImport, setPendingImport] = useState<ImportPayload | null>(null);
   const view = segments[0] ?? "home";
   const accountId = view === "accounts" ? segments[1] : undefined;
   const researchStatus = data?.research_run?.status;
@@ -95,20 +97,37 @@ export function CommandCenter({ segments }: { segments: string[] }) {
     }
   }
 
-  async function importAccounts(kind: "single" | "pasted" | "csv", value: { company_name: string; domain: string } | string) {
+  function importPayload(kind: "single" | "pasted" | "csv", value: { company_name: string; domain: string } | string) {
+    if (kind === "single") return { accounts: [value as { company_name: string; domain: string }], import_source: "SINGLE" as const };
+    if (kind === "pasted") return { pasted_domains: value as string, import_source: "PASTED_DOMAINS" as const };
+    return { csv_text: value as string, import_source: "CSV_UPLOAD" as const };
+  }
+
+  // Blueprint section 8: validate and show the per-row outcome before anything is
+  // written, so the user inspects duplicates and problems before research starts.
+  async function validateImport(kind: "single" | "pasted" | "csv", value: { company_name: string; domain: string } | string) {
+    setActionBusy("import");
+    setImportResult(null);
+    try {
+      const payload = importPayload(kind, value);
+      setPendingImport(payload);
+      setImportValidation(await api.validateImport(payload));
+    } finally {
+      setActionBusy("");
+    }
+  }
+
+  async function confirmImport() {
     const current = data;
-    if (!current?.product) return;
+    if (!current?.product || !pendingImport) return;
     setActionBusy("import");
     try {
       if (!current.research_run || current.research_run.product_mode !== "BYOA_CORE") {
         await api.startResearch(current.product.id, "BYOA_CORE");
       }
-      const result = kind === "single"
-        ? await api.importSingle(value as { company_name: string; domain: string })
-        : kind === "pasted"
-          ? await api.importPasted(value as string)
-          : await api.importCsv(value as string);
-      setImportResult(result);
+      setImportResult(await api.importAccounts(pendingImport));
+      setImportValidation(null);
+      setPendingImport(null);
       setData(await api.bootstrap());
     } finally {
       setActionBusy("");
@@ -133,7 +152,7 @@ export function CommandCenter({ segments }: { segments: string[] }) {
     <main className="workspace"><header className="topbar"><div><span className="eyebrow">{view === "accounts" && accountId ? "Account opportunity brief" : "Evidence-backed GTM workspace"}</span><h1>{title}</h1></div><div className="top-actions"><span className="demo-badge">{data.demo_data ? "DEMO DATA" : "LIVE PUBLIC DATA"}</span><span className="avatar">KW</span></div></header>
       <div className="content">
         {view === "dashboard" && <Dashboard data={data} averagePriority={averagePriority} />}
-        {view === "import" && <ImportAccountsView busy={actionBusy === "import"} result={importResult} onImport={importAccounts} />}
+        {view === "import" && <ImportAccountsView busy={actionBusy === "import"} result={importResult} validation={importValidation} onValidate={validateImport} onConfirm={() => void confirmImport()} onCancel={() => { setImportValidation(null); setPendingImport(null); }} />}
         {view === "product" && <ProductView data={data} busy={actionBusy === "research"} onResearch={startResearch} />}
         {view === "research" && <ResearchView data={data} />}
         {view === "icps" && <ICPView data={data} busyId={icpBusy} onSelect={selectICP} />}
@@ -218,22 +237,59 @@ function Dashboard({ data, averagePriority }: { data: Bootstrap; averagePriority
     </section></>;
 }
 
-function ImportAccountsView({ busy, result, onImport }: { busy: boolean; result: AccountImportResult | null; onImport: (kind: "single" | "pasted" | "csv", value: { company_name: string; domain: string } | string) => Promise<void> }) {
+function ImportAccountsView({ busy, result, validation, onValidate, onConfirm, onCancel }: { busy: boolean; result: AccountImportResult | null; validation: AccountImportValidation | null; onValidate: (kind: "single" | "pasted" | "csv", value: { company_name: string; domain: string } | string) => Promise<void>; onConfirm: () => void; onCancel: () => void }) {
   const [method, setMethod] = useState<"single" | "pasted" | "csv">("single");
   const [company, setCompany] = useState("");
   const [domain, setDomain] = useState("");
   const [bulk, setBulk] = useState("");
+  const onImport = onValidate;
   return <section className="import-workflow">
     <div className="workflow-strip">{["Import Accounts", "Validate Accounts", "Research Accounts", "Review Priorities", "Inspect Briefs", "Approve or Change Status", "Export"].map((item, index) => <span className={index === 0 ? "active" : ""} key={item}>{index + 1}. {item}</span>)}</div>
     <div className="section-card import-card">
       <div><span className="eyebrow">BYOA core · default mode</span><h2>Import accounts you already care about</h2><p>Account research uses supplied official domains and remains available without Exa or Tavily.</p></div>
       <div className="import-tabs">{(["single", "pasted", "csv"] as const).map(item => <button className={method === item ? "active" : ""} key={item} onClick={() => setMethod(item)}>{item === "single" ? "Single account" : item === "pasted" ? "Pasted domains" : "CSV upload"}</button>)}</div>
-      {method === "single" && <form className="import-form" onSubmit={event => { event.preventDefault(); void onImport("single", { company_name: company, domain }); }}><label>Company name<input required minLength={2} value={company} onChange={event => setCompany(event.target.value)} placeholder="Acme Software" /></label><label>Official domain<input required value={domain} onChange={event => setDomain(event.target.value)} placeholder="acme.com" /></label><button className="primary-button" disabled={busy} type="submit">{busy ? "Validating…" : "Validate and import"}</button></form>}
-      {method === "pasted" && <form className="import-form" onSubmit={event => { event.preventDefault(); void onImport("pasted", bulk); }}><label>One domain per line<textarea required rows={10} value={bulk} onChange={event => setBulk(event.target.value)} placeholder={"Acme, acme.com\nexample.org"} /></label><button className="primary-button" disabled={busy} type="submit">{busy ? "Validating…" : "Validate and import"}</button></form>}
-      {method === "csv" && <form className="import-form" onSubmit={event => { event.preventDefault(); void onImport("csv", bulk); }}><label>CSV file<input required type="file" accept=".csv,text/csv" onChange={event => { const file = event.target.files?.[0]; if (file) void file.text().then(setBulk); }} /></label><small>Required headers: company_name, domain. Optional: industry, country, employee_band, notes, crm_id, owner, tags.</small><button className="primary-button" disabled={busy || !bulk} type="submit">{busy ? "Validating…" : "Validate and import"}</button></form>}
+      {method === "single" && <form className="import-form" onSubmit={event => { event.preventDefault(); void onImport("single", { company_name: company, domain }); }}><label>Company name<input required minLength={2} value={company} onChange={event => setCompany(event.target.value)} placeholder="Acme Software" /></label><label>Official domain<input required value={domain} onChange={event => setDomain(event.target.value)} placeholder="acme.com" /></label><button className="primary-button" disabled={busy} type="submit">{busy ? "Checking…" : "Check accounts"}</button></form>}
+      {method === "pasted" && <form className="import-form" onSubmit={event => { event.preventDefault(); void onImport("pasted", bulk); }}><label>One domain per line<textarea required rows={10} value={bulk} onChange={event => setBulk(event.target.value)} placeholder={"Acme, acme.com\nexample.org"} /></label><button className="primary-button" disabled={busy} type="submit">{busy ? "Checking…" : "Check accounts"}</button></form>}
+      {method === "csv" && <form className="import-form" onSubmit={event => { event.preventDefault(); void onImport("csv", bulk); }}><label>CSV file<input required type="file" accept=".csv,text/csv" onChange={event => { const file = event.target.files?.[0]; if (file) void file.text().then(setBulk); }} /></label><small>Required headers: company_name, domain. Optional: industry, country, employee_band, notes, crm_id, owner, tags.</small><button className="primary-button" disabled={busy || !bulk} type="submit">{busy ? "Checking…" : "Check accounts"}</button></form>}
+      {validation && <ImportValidationReport validation={validation} busy={busy} onConfirm={onConfirm} onCancel={onCancel} />}
       {result && <div className="import-result"><strong>{result.imported.length} accounts imported</strong><span>{result.duplicate_domains.length} duplicates skipped</span>{result.issues.map((issue, index) => <small key={`${issue.code}-${index}`}>Row {issue.row}: {issue.message}</small>)}{result.imported.length > 0 && <Link className="primary-button" href="/accounts">Research imported accounts →</Link>}</div>}
     </div>
   </section>;
+}
+
+const VERDICT_LABELS: Record<ImportRowVerdict, string> = {
+  VALID: "Valid",
+  DUPLICATE: "Duplicate",
+  INVALID: "Invalid",
+  NEEDS_REVIEW: "Needs review",
+};
+
+/**
+ * Blueprint section 8: show what happened to every submitted row before research
+ * starts. Every row appears, including accepted ones, so nothing can be silently
+ * dropped between upload and research.
+ */
+function ImportValidationReport({ validation, busy, onConfirm, onCancel }: { validation: AccountImportValidation; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
+  const { summary, rows } = validation;
+  const problems = rows.filter(item => item.verdict !== "VALID");
+  const canonicalised = rows.filter(item => item.canonical_domain && item.submitted_domain && item.submitted_domain.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/$/, "") !== item.canonical_domain);
+  return <div className="import-result">
+    <strong>{summary.total} row{summary.total === 1 ? "" : "s"} checked</strong>
+    <span>{summary.valid} valid · {summary.duplicate} duplicate · {summary.invalid} invalid · {summary.needs_review} need review</span>
+    {canonicalised.length > 0 && <small>{canonicalised.length} domain{canonicalised.length === 1 ? " was" : "s were"} canonicalised: {canonicalised.slice(0, 5).map(item => `${item.submitted_domain} → ${item.canonical_domain}`).join(", ")}{canonicalised.length > 5 ? ", …" : ""}</small>}
+    {problems.length > 0 && <div className="table-wrap"><table><thead><tr><th>Row</th><th>Company</th><th>Domain</th><th>Result</th><th>Reason</th></tr></thead><tbody>
+      {problems.map(item => <tr key={item.row}>
+        <td>{item.row}</td>
+        <td>{item.company_name ?? "—"}</td>
+        <td>{item.canonical_domain ?? item.submitted_domain ?? "—"}</td>
+        <td><span className={`qualification-pill ${item.verdict.toLowerCase()}`}>{VERDICT_LABELS[item.verdict]}</span></td>
+        <td>{item.reason ?? "—"}</td>
+      </tr>)}
+    </tbody></table></div>}
+    {summary.valid + summary.needs_review === 0
+      ? <><p>Nothing here can be imported. Fix the rows above and try again.</p><button className="secondary-button" onClick={onCancel}>Start over</button></>
+      : <footer><button className="primary-button" disabled={busy} onClick={onConfirm}>{busy ? "Importing…" : `Import ${summary.valid + summary.needs_review} account${summary.valid + summary.needs_review === 1 ? "" : "s"}`}</button><button className="secondary-button" disabled={busy} onClick={onCancel}>Cancel</button></footer>}
+  </div>;
 }
 
 function ExperimentalDiscoveryView({ data, busy, onStart }: { data: Bootstrap; busy: boolean; onStart: () => Promise<void> }) {

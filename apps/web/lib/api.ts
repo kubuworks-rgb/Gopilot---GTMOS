@@ -1,6 +1,14 @@
-import type { Account, AccountImportRecord, AccountImportResult, AccountReviewStatus, Bootstrap, Brief, BriefState, Campaign, Feedback, FeedbackRating, ICP, Product, ProductMode, ResearchRun, Workspace } from "./types";
+import type { Account, AccountImportRecord, AccountImportResult, AccountImportSource, AccountImportValidation, AccountReviewStatus, Bootstrap, Brief, BriefState, Campaign, Feedback, FeedbackRating, ICP, Product, ProductMode, ResearchRun, Workspace } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+
+/** One shape for validate and import, so the confirmed payload is the checked one. */
+export interface ImportPayload {
+  accounts?: AccountImportRecord[];
+  pasted_domains?: string;
+  csv_text?: string;
+  import_source: AccountImportSource;
+}
 
 const ACCESS_TOKEN_KEY = "gopilot.access_token";
 
@@ -67,6 +75,10 @@ export const api = {
     request<AccountImportResult>("/accounts/import", { method: "POST", body: JSON.stringify({ pasted_domains: pastedDomains, import_source: "PASTED_DOMAINS" }) }),
   importCsv: (csvText: string) =>
     request<AccountImportResult>("/accounts/import", { method: "POST", body: JSON.stringify({ csv_text: csvText, import_source: "CSV_UPLOAD" }) }),
+  validateImport: (body: ImportPayload) =>
+    request<AccountImportValidation>("/account-imports/validate", { method: "POST", body: JSON.stringify(body) }),
+  importAccounts: (body: ImportPayload) =>
+    request<AccountImportResult>("/accounts/import", { method: "POST", body: JSON.stringify(body) }),
   refreshAccounts: () => request<{ status: string }>("/accounts/refresh", { method: "POST" }),
   researchAccount: (accountId: string) =>
     request<{ status: string }>(`/accounts/${accountId}/research`, { method: "POST" }),

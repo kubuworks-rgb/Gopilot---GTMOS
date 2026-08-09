@@ -471,11 +471,52 @@ class AccountImportIssue(BaseModel):
     message: str
 
 
+class ImportRowVerdict(StrEnum):
+    VALID = "VALID"
+    DUPLICATE = "DUPLICATE"
+    INVALID = "INVALID"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+
+
+class AccountImportRow(BaseModel):
+    """One input row and what happened to it.
+
+    Every submitted row appears here, including the ones that were accepted, so a
+    row can never be silently dropped between upload and research.
+    """
+
+    row: int
+    company_name: str | None = None
+    submitted_domain: str | None = None
+    canonical_domain: str | None = None
+    verdict: ImportRowVerdict
+    code: str | None = None
+    reason: str | None = None
+
+    @property
+    def canonicalised(self) -> bool:
+        return bool(
+            self.submitted_domain
+            and self.canonical_domain
+            and self.submitted_domain != self.canonical_domain
+        )
+
+
+class AccountImportSummary(BaseModel):
+    total: int = 0
+    valid: int = 0
+    duplicate: int = 0
+    invalid: int = 0
+    needs_review: int = 0
+
+
 class AccountImportValidation(BaseModel):
     import_source: AccountImportSource
     accepted: list[AccountImportRecord]
     issues: list[AccountImportIssue] = Field(default_factory=list)
     duplicate_domains: list[str] = Field(default_factory=list)
+    rows: list[AccountImportRow] = Field(default_factory=list)
+    summary: AccountImportSummary = Field(default_factory=AccountImportSummary)
 
 
 class ImportedAccountResult(BaseModel):

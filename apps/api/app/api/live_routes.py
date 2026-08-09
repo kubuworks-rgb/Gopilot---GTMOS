@@ -75,10 +75,10 @@ from apps.api.app.services.private_alpha import (
     experimental_discovery_allowed,
 )
 from apps.api.app.services.byoa import (
-    neutralize_formula,
     product_mode_availability,
     validate_account_import,
 )
+from apps.api.app.services.exports import EXPORT_COLUMNS, csv_safe, export_row
 
 
 router = APIRouter(prefix="/api/v1")
@@ -872,8 +872,7 @@ async def update_campaign(
     )
 
 
-def _csv_safe(value: object) -> str:
-    return neutralize_formula(value)
+_csv_safe = csv_safe
 
 
 @router.get("/exports/accounts.csv")
@@ -889,55 +888,12 @@ async def export_accounts(principal: Current, session: Database) -> Response:
         raise HTTPException(status_code=429, detail=exc.as_detail()) from exc
     output = io.StringIO(newline="")
     writer = csv.writer(output)
-    writer.writerow(
-        [
-            "company_name",
-            "canonical_domain",
-            "identity_status",
-            "qualification_status",
-            "fit_score",
-            "intent_score",
-            "confidence_score",
-            "priority_score",
-            "brief_state",
-            "recommended_action",
-            "primary_evidence_url",
-            "unknowns",
-            "review_status",
-            "import_source",
-        ]
-    )
+    writer.writerow(EXPORT_COLUMNS)
     for account in accounts:
         brief = await repository.brief(
             session, principal.workspace_id, account.id
         )
-        primary_evidence_url = (
-            str(brief.sources[0].canonical_url)
-            if brief is not None and brief.sources
-            else ""
-        )
-        writer.writerow(
-            [
-                _csv_safe(account.name),
-                _csv_safe(account.domain),
-                _csv_safe(account.domain_validation),
-                _csv_safe(account.qualification_status.value),
-                account.scores.fit.score,
-                account.scores.intent.score,
-                account.scores.confidence.score,
-                account.scores.priority,
-                _csv_safe(account.brief_state),
-                _csv_safe(account.recommended_action),
-                _csv_safe(primary_evidence_url),
-                _csv_safe(
-                    " | ".join(brief.unknowns) if brief is not None else ""
-                ),
-                _csv_safe(account.review_status.value),
-                _csv_safe(
-                    account.import_source.value if account.import_source else ""
-                ),
-            ]
-        )
+        writer.writerow(export_row(account, brief))
         await repository.record(
             session,
             uuid.UUID(principal.workspace_id),

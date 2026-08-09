@@ -2504,6 +2504,10 @@ def _assess_account_evidence(
                     "evidence_id": str(fact.id),
                     "source_id": str(fact.source_id),
                     "source_domain": assessment.source_domain,
+                    "source_url": source.canonical_url,
+                    # The passage is what lets a reader judge the exclusion for
+                    # themselves; without it the panel is an unfalsifiable claim.
+                    "passage": fact.passage[:400],
                     "subject": assessment.subject_entity,
                     "relation": assessment.relation.value,
                     "scope": assessment.claim_scope.value,

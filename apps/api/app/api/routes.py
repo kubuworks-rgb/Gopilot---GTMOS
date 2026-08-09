@@ -37,10 +37,10 @@ from apps.api.app.domain.models import (
 from apps.api.app.config import settings
 from apps.api.app.repositories.fixture import repository
 from apps.api.app.services.byoa import (
-    neutralize_formula,
     product_mode_availability,
     validate_account_import,
 )
+from apps.api.app.services.exports import EXPORT_COLUMNS, csv_safe, export_row
 
 
 router = APIRouter(prefix="/api/v1")
@@ -373,8 +373,7 @@ def review_account(
     return account
 
 
-def _csv_safe(value: object) -> str:
-    return neutralize_formula(value)
+_csv_safe = csv_safe
 
 
 @router.get("/exports/accounts.csv")
@@ -387,48 +386,12 @@ def export_accounts(principal: Current) -> Response:
     ]
     output = io.StringIO(newline="")
     writer = csv.writer(output)
-    writer.writerow(
-        [
-            "company_name",
-            "canonical_domain",
-            "identity_status",
-            "qualification_status",
-            "fit_score",
-            "intent_score",
-            "confidence_score",
-            "priority_score",
-            "brief_state",
-            "recommended_action",
-            "primary_evidence_url",
-            "unknowns",
-            "review_status",
-            "import_source",
-        ]
-    )
+    # Shared with the live router so the two export surfaces cannot drift apart
+    # again -- they already had, before this was consolidated.
+    writer.writerow(EXPORT_COLUMNS)
     for brief in approved:
         account = brief.account
-        writer.writerow(
-            [
-                _csv_safe(account.name),
-                _csv_safe(account.domain),
-                _csv_safe(account.domain_validation),
-                _csv_safe(account.qualification_status.value),
-                account.scores.fit.score,
-                account.scores.intent.score,
-                account.scores.confidence.score,
-                account.scores.priority,
-                _csv_safe(account.brief_state),
-                _csv_safe(account.recommended_action),
-                _csv_safe(
-                    str(brief.sources[0].canonical_url) if brief.sources else ""
-                ),
-                _csv_safe(" | ".join(brief.unknowns)),
-                _csv_safe(account.review_status.value),
-                _csv_safe(
-                    account.import_source.value if account.import_source else ""
-                ),
-            ]
-        )
+        writer.writerow(export_row(account, brief))
         repository.record(
             principal.workspace_id,
             principal.user_id,

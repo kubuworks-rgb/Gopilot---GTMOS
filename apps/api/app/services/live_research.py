@@ -382,6 +382,24 @@ def compose_executive_summary(
     return f"{opener} {evidence} {timing}"
 
 
+def evidence_confidence(*, source_trust: float, context_matched: bool) -> float:
+    """Per-fact confidence, derived from real inputs rather than asserted.
+
+    Every fact used to be written with a hardcoded 0.82 and rendered as "82%
+    confidence", which implied a per-fact judgement that did not exist. Two real
+    signals are available at extraction time:
+
+    * the source's own computed quality (role, directness, recency, entity match),
+      which already varies between a first-party page and a directory listing; and
+    * whether the passage actually matched the research question, or was taken as a
+      fallback because nothing matched -- the fallback is weaker evidence for the
+      specific claim being investigated, even from a good source.
+    """
+
+    relevance = 1.0 if context_matched else 0.85
+    return round(min(0.99, max(0.05, source_trust * relevance)), 2)
+
+
 def _usable_passages(text: str) -> list[str]:
     """Passages that read as claims rather than site furniture."""
 
@@ -569,8 +587,12 @@ async def _persist_source(
     # describing itself, so fall back to its leading substantive passages. The
     # fallback must apply the same quality gate: it previously did not, which is
     # how navigation blobs reached briefs as SUPPORTED facts.
+    context_matched = bool(candidates)
     if not candidates:
         candidates = _usable_passages(source.text)[:2]
+    confidence = evidence_confidence(
+        source_trust=quality, context_matched=context_matched
+    )
     facts: list[EvidenceFactRow] = []
     for passage in candidates:
         fact = EvidenceFactRow(
@@ -581,7 +603,7 @@ async def _persist_source(
             object=passage,
             claim=passage,
             passage=passage,
-            confidence="0.82",
+            confidence=f"{confidence:.2f}",
             status=ClaimStatus.SUPPORTED.value,
             observed_at=source.published_at or source.retrieved_at,
             valid_from=source.published_at,

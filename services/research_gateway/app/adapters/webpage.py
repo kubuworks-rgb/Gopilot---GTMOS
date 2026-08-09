@@ -168,6 +168,20 @@ class WebPageAdapter:
                                 "Source temporarily unavailable",
                                 retryable=True,
                             )
+                        # A missing page and a refused page mean different things.
+                        # Most company sites simply have no /careers or /customers
+                        # page; reporting that as a research failure would be both
+                        # alarming and wrong. Being forbidden is a real obstacle.
+                        if response.status_code in {404, 410}:
+                            raise GatewayAdapterError(
+                                "SOURCE_NOT_FOUND",
+                                f"No such page (HTTP {response.status_code})",
+                            )
+                        if response.status_code in {401, 403}:
+                            raise GatewayAdapterError(
+                                "SOURCE_FORBIDDEN",
+                                f"Access refused (HTTP {response.status_code})",
+                            )
                         if response.status_code >= 400:
                             raise GatewayAdapterError(
                                 "SOURCE_UNAVAILABLE",

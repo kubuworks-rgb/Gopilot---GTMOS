@@ -67,6 +67,15 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+def _input_metadata_value(attributes: dict[str, object], key: str) -> str | None:
+    """Read a user-supplied import field, tolerating absence at every level."""
+    metadata = attributes.get("input_metadata")
+    if not isinstance(metadata, dict):
+        return None
+    value = metadata.get(key)
+    return str(value).strip() or None if value not in (None, "") else None
+
+
 def _optional_int(value: object) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
@@ -670,6 +679,7 @@ class PostgresRepository:
                     or AccountReviewStatus.PENDING.value
                 )
             ),
+            owner=_input_metadata_value(row.attributes, "owner"),
         )
 
     async def import_accounts(

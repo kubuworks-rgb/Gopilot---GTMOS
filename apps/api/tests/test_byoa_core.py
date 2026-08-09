@@ -16,6 +16,7 @@ from apps.api.app.services.byoa import (
     product_mode_availability,
     validate_account_import,
 )
+from apps.api.app.services.exports import EXPORT_COLUMNS
 from apps.api.app.services.entity_resolution import (
     AttachmentDecision,
     ClaimScope,
@@ -285,24 +286,13 @@ def test_safe_export_contract_and_formula_neutralisation() -> None:
     assert reviewed.status_code == 200
     exported = client.get("/api/v1/exports/accounts.csv", headers=HEADERS)
     rows = list(csv.DictReader(io.StringIO(exported.text)))
-    row = next(item for item in rows if item["canonical_domain"] == "safe-export-co.com")
-    assert set(row) == {
-        "company_name",
-        "canonical_domain",
-        "identity_status",
-        "qualification_status",
-        "fit_score",
-        "intent_score",
-        "confidence_score",
-        "priority_score",
-        "brief_state",
-        "recommended_action",
-        "primary_evidence_url",
-        "unknowns",
-        "review_status",
-        "import_source",
-    }
+    # Blueprint section 19 names: `domain` and `state`, plus the owner field that
+    # was missing entirely. Asserted against the shared definition so the two
+    # export surfaces cannot drift apart again.
+    row = next(item for item in rows if item["domain"] == "safe-export-co.com")
+    assert set(row) == set(EXPORT_COLUMNS)
     assert row["review_status"] == "APPROVED"
+    assert row["state"] == "RESEARCH_CANDIDATE"
 
 
 def test_non_founder_ready_campaign_cannot_be_edited_or_approved() -> None:

@@ -280,6 +280,9 @@ class Account(BaseModel):
     import_source: AccountImportSource | None = None
     provenance: Literal["IMPORTED", "DISCOVERED"] = "DISCOVERED"
     review_status: AccountReviewStatus = AccountReviewStatus.PENDING
+    # Supplied at import and carried through to the export, so a founder can hand
+    # the reviewed list to the right person on their team.
+    owner: str | None = None
 
 
 class RetrievalOutcome(StrEnum):

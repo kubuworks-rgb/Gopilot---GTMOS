@@ -471,12 +471,7 @@ class QAEvaluationRow(TenantRecord):
     notes: Mapped[str | None] = mapped_column(Text)
 
 
-class JobLeaseRow(TenantRecord):
-    __tablename__ = "job_leases"
-    research_task_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("research_tasks.id", ondelete="CASCADE"), index=True
-    )
-    worker_id: Mapped[str] = mapped_column(String(128))
-    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
+# JobLeaseRow was removed in migration 0008. A lease table was modelled for worker
+# reliability but never read or written: the worker claims jobs with Redis BLMOVE
+# into a per-worker in-flight list instead, which is where that concern actually
+# lives.

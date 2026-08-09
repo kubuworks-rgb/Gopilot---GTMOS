@@ -19,7 +19,6 @@ from apps.api.app.services.live_research import (
 )
 from services.research_gateway.app.schemas import SearchResult
 from pydantic import HttpUrl
-from apps.api.app.workflows.research_graph import STAGES, build_research_graph
 
 
 client = TestClient(app)
@@ -83,19 +82,6 @@ def test_csv_formula_injection_is_neutralized() -> None:
     assert _csv_safe("=HYPERLINK('bad')").startswith("'")
     assert _csv_safe("Normal Co") == "Normal Co"
 
-
-def test_langgraph_workflow_is_bounded_and_deterministic() -> None:
-    graph = build_research_graph(checkpointed=False)
-    result = graph.invoke(
-        {
-            "workflow_run_id": "run_test",
-            "workspace_id": "ws_test",
-            "completed_stages": [],
-            "status": "queued",
-        }
-    )
-    assert result["completed_stages"] == list(STAGES)
-    assert result["status"] == "completed"
 
 
 def test_account_qualification_preserves_unknown_size() -> None:

@@ -70,6 +70,14 @@ class _RecordingOp:
 
     def drop_table(self, table_name: str, **_: Any) -> None:
         self.columns.pop(table_name, None)
+        # Postgres drops a table's indexes with it, so the replay must too or a
+        # dropped table leaves phantom indexes that look like drift.
+        for name in [
+            index
+            for index, (table, _cols, _unique) in self.indexes.items()
+            if table == table_name
+        ]:
+            self.indexes.pop(name, None)
 
     def add_column(self, table_name: str, column: Any, **_: Any) -> None:
         self.columns.setdefault(table_name, set()).add(column.name)

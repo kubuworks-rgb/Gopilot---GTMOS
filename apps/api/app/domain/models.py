@@ -401,6 +401,9 @@ class AccountOpportunityBrief(BaseModel):
     recommended_problem: str
     recommended_offer: str
     recommended_action: str
+    # Blueprint section 16.1. Composed deterministically from the verified data
+    # below, so it can introduce no claim the rest of the brief does not support.
+    executive_summary: str = ""
     risks: list[str]
     evidence: list[EvidenceFact]
     sources: list[SourceDocument]

@@ -324,6 +324,64 @@ def _target_geography_terms(target_market: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(terms))
 
 
+BRIEF_STATE_OPENERS: dict[str, str] = {
+    "FOUNDER_READY": "{name} is ready for founder review.",
+    "RESEARCH_CANDIDATE": "{name} is a research candidate.",
+    "MONITOR": "{name} is worth monitoring rather than approaching now.",
+    "IDENTITY_REVIEW_REQUIRED": "{name} needs identity review before anything else.",
+    "DO_NOT_TARGET": "{name} should not be targeted.",
+}
+
+
+def compose_executive_summary(
+    *,
+    company_name: str,
+    brief_state: str,
+    verified_fact_count: int,
+    unknown_count: int,
+    has_signal: bool,
+    priority: int,
+) -> str:
+    """Two or three sentences, assembled from data the brief already proves.
+
+    Blueprint section 16.1. Deliberately deterministic: an LLM is permitted for
+    brief composition, but a summary that can only restate counted, verified inputs
+    cannot invent a claim the rest of the brief does not support.
+    """
+
+    opener = BRIEF_STATE_OPENERS.get(
+        brief_state, "{name} has been researched."
+    ).format(name=company_name)
+
+    if verified_fact_count and unknown_count:
+        evidence = (
+            f"Research verified {verified_fact_count} "
+            f"fact{'' if verified_fact_count == 1 else 's'} from official sources "
+            f"and left {unknown_count} "
+            f"criteri{'on' if unknown_count == 1 else 'a'} unresolved."
+        )
+    elif verified_fact_count:
+        evidence = (
+            f"Research verified {verified_fact_count} "
+            f"fact{'' if verified_fact_count == 1 else 's'} from official sources "
+            "with no unresolved criteria."
+        )
+    elif unknown_count:
+        evidence = (
+            f"No fact could be verified yet, and {unknown_count} "
+            f"criteri{'on' if unknown_count == 1 else 'a'} remain{'s' if unknown_count == 1 else ''} unresolved."
+        )
+    else:
+        evidence = "No official evidence has been collected yet."
+
+    timing = (
+        f"A current supported signal gives a reason to act now, and priority is {priority}."
+        if has_signal
+        else f"No current supported signal was found, so priority stands at {priority}."
+    )
+    return f"{opener} {evidence} {timing}"
+
+
 def _usable_passages(text: str) -> list[str]:
     """Passages that read as claims rather than site furniture."""
 
@@ -3125,6 +3183,14 @@ async def _score_and_brief(
         hypotheses=hypotheses,
         reason_not_to_target=reason_not_to_target,
         next_research_step=next_research_step,
+        executive_summary=compose_executive_summary(
+            company_name=account.name,
+            brief_state=brief_state.value,
+            verified_fact_count=len(facts[:5]),
+            unknown_count=len(unknowns),
+            has_signal=bool(signal_models),
+            priority=scores.priority,
+        ),
         retrieval=retrieval_summary,
         campaign=CampaignDraft(
             id=str(draft_id),

@@ -74,6 +74,7 @@ from apps.api.app.services.private_alpha import (
     assert_workspace_capacity,
     assert_workspace_quota,
     experimental_discovery_allowed,
+    retention_policy,
 )
 from apps.api.app.services.byoa import (
     product_mode_availability,
@@ -207,6 +208,8 @@ async def bootstrap(principal: Current, session: Database) -> dict[str, object]:
             session, principal.workspace_id
         ),
         "capabilities": capabilities,
+        # Shown on Settings. A retention policy the user cannot read is not a policy.
+        "retention": retention_policy(),
     }
 
 

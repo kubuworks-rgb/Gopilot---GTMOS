@@ -92,6 +92,14 @@ class Settings:
     )
     max_workspaces_per_user: int = int(os.getenv("MAX_WORKSPACES_PER_USER", "3"))
     max_export_rows: int = int(os.getenv("MAX_EXPORT_ROWS", "1000"))
+    # Retention. Research data becomes *eligible* for deletion after this window;
+    # nothing is deleted automatically. Enforcement is an operator-run, dry-run-first
+    # command, because silently discarding a customer's evidence would be worse than
+    # keeping it too long. See docs/security/PRIVATE_ALPHA_DATA_HANDLING.md.
+    research_retention_days: int = int(os.getenv("RESEARCH_RETENTION_DAYS", "180"))
+    retention_auto_delete: bool = (
+        os.getenv("RETENTION_AUTO_DELETE", "false").lower() == "true"
+    )
     max_pages_per_account: int = int(os.getenv("MAX_PAGES_PER_ACCOUNT", "8"))
     cors_origins: tuple[str, ...] = tuple(
         item.strip()
@@ -159,9 +167,17 @@ class Settings:
             ("MAX_WORKSPACES_PER_USER", self.max_workspaces_per_user),
             ("MAX_EXPORT_ROWS", self.max_export_rows),
             ("MAX_PAGES_PER_ACCOUNT", self.max_pages_per_account),
+            ("RESEARCH_RETENTION_DAYS", self.research_retention_days),
         ):
             if value <= 0:
                 raise RuntimeError(f"{name} must be positive")
+        if self.retention_auto_delete:
+            raise RuntimeError(
+                "RETENTION_AUTO_DELETE is not implemented. Retention is enforced by "
+                "running scripts/apply_retention.py, which previews before it "
+                "deletes. Automatic deletion needs an explicit product decision on "
+                "the window first."
+            )
         if self.research_mode == "live":
             if not self.database_url.startswith(
                 ("postgresql+asyncpg://", "postgresql://")

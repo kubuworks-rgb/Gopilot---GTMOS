@@ -62,6 +62,26 @@ class LimitExceeded(Exception):
         }
 
 
+def retention_policy(config: Settings | None = None) -> dict[str, object]:
+    """The retention statement shown on Settings.
+
+    Defined once and served by both routers, so what a user reads cannot drift from
+    what an operator configured.
+    """
+
+    config = config or settings
+    return {
+        "research_retention_days": config.research_retention_days,
+        "automatic_deletion": config.retention_auto_delete,
+        "summary": (
+            "Retrieved pages and the evidence derived from them are kept for "
+            f"{config.research_retention_days} days, after which they become "
+            "eligible for deletion. Your accounts, briefs and review notes are kept "
+            "until you delete them. Nothing is deleted automatically."
+        ),
+    }
+
+
 def assert_invited(
     subject: str, email: str | None = None, config: Settings | None = None
 ) -> None:

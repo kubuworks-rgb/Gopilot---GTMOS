@@ -209,6 +209,62 @@ def main() -> int:
             replay.status_code == 400, "an already-used code is refused"
         )
 
+        print("\n[10] Tenant isolation")
+        # A valid token is not a licence to read someone else's workspace: the
+        # membership check has to run after the signature check, not instead of it.
+        foreign = client.get(
+            f"{args.api}/bootstrap",
+            headers={
+                "Authorization": f"Bearer {new_token}",
+                "X-Workspace-Id": "00000000-0000-0000-0000-0000000000ff",
+            },
+        )
+        failures += not check(
+            foreign.status_code == 403,
+            f"a valid token cannot reach another workspace ({foreign.status_code})",
+        )
+
+        print("\n[11] Logout")
+        signed_out = client.get(
+            f"{args.issuer}/logout",
+            params={"post_logout_redirect_uri": "http://localhost:3000/"},
+            follow_redirects=False,
+        )
+        failures += not check(
+            signed_out.status_code in (302, 303),
+            "logout redirects back to the application",
+        )
+        # The refresh token must not survive sign-out, or "log out" would only mean
+        # "log out until the next background refresh".
+        after_logout = client.post(
+            f"{args.issuer}/token",
+            data={
+                "grant_type": "refresh_token",
+                "refresh_token": str(refreshed.json()["refresh_token"]),
+                "client_id": "gopilot-local",
+            },
+        )
+        failures += not check(
+            after_logout.status_code == 400,
+            f"the refresh token is dead after logout ({after_logout.status_code})",
+        )
+
+        print("\n[12] Signing back in")
+        again = sign_in(
+            client, args.issuer, args.redirect, args.subject, "founder@example.com"
+        )
+        resumed = client.get(
+            f"{args.api}/bootstrap",
+            headers={"Authorization": f"Bearer {again['access_token']}"},
+        )
+        failures += not check(
+            resumed.status_code == 200, "a fresh sign-in authorises again"
+        )
+        failures += not check(
+            resumed.json().get("workspace") is not None,
+            "the workspace is still there after signing back in",
+        )
+
     print(f"\n{'OIDC FLOW VERIFIED' if failures == 0 else f'{failures} CHECK(S) FAILED'}")
     return 1 if failures else 0
 

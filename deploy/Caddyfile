@@ -1,0 +1,36 @@
+# TLS termination for a private-alpha deployment.
+#
+# Caddy rather than nginx because certificate provisioning and renewal are
+# automatic: there is no certbot cron to forget, and a forgotten renewal is the
+# most common way a small deployment ends up serving a browser warning.
+#
+# Set DOMAIN and ACME_EMAIL in .env.private-alpha, then bring the stack up with
+# the tls overlay (see docs/operations/DEPLOYMENT.md).
+
+{
+	email {$ACME_EMAIL}
+	# Fail visibly rather than falling back to plaintext if ACME cannot complete.
+	auto_https disable_redirects
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The web app is the only service that should ever be publicly reachable.
+	# api, worker and gateway stay on the internal compose network. The gateway in
+	# particular fetches arbitrary public URLs on request and must never be exposed.
+	reverse_proxy web:3000
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -297,6 +297,7 @@ class Account(BaseModel):
     # Supplied at import and carried through to the export, so a founder can hand
     # the reviewed list to the right person on their team.
     owner: str | None = None
+    tags: list[str] = Field(default_factory=list)
     review_history: list[AccountReviewEntry] = Field(default_factory=list)
 
 

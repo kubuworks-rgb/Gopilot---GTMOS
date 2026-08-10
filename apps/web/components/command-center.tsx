@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { accessToken, api, API_BASE, serverAccessToken, subscribeToAccessToken, type ImportPayload } from "@/lib/api";
 import { isOidcConfigured } from "@/lib/auth";
-import type { AccountImportResult, AccountImportValidation, AccountReviewStatus, Bootstrap, Brief, BriefState, Evidence, EvidenceClaim, FeedbackRating, ImportRowVerdict, ResearchRun, RetrievalOutcome } from "@/lib/types";
+import type { Account, AccountImportResult, AccountImportValidation, AccountReviewStatus, Bootstrap, Brief, BriefState, Evidence, EvidenceClaim, FeedbackRating, ImportRowVerdict, ResearchRun, RetrievalOutcome } from "@/lib/types";
+import { EMPTY_FILTERS, facetValues, filterAccounts, isFiltered, tagValues, type AccountFilters, type SortKey } from "@/lib/account-filters";
 import { EvidenceDrawer } from "./evidence-drawer";
 import { ScoreBadge, ScoreDetails } from "./score";
 import { AuthCallback, SignIn, signOut } from "./sign-in";
@@ -230,7 +231,7 @@ function Dashboard({ data, averagePriority }: { data: Bootstrap; averagePriority
       <div><span>Needs approval</span><strong>{data.approval_count}</strong><small>Drafts, never auto-sent</small></div>
     </section>
     {needsReview.length > 0 && <section className="section-card"><span className="eyebrow">Attention</span><h2>{needsReview.length} account{needsReview.length === 1 ? "" : "s"} need identity review</h2><p>Their supplied domains could not be verified against official sources.</p></section>}
-    <section className="section-card"><div className="section-heading"><div><span className="eyebrow">Ranked by defensibility</span><h2>Top account opportunities</h2></div><Link href="/accounts">View all accounts →</Link></div><AccountTable data={data} compact /></section>
+    <section className="section-card"><div className="section-heading"><div><span className="eyebrow">Ranked by defensibility</span><h2>Top account opportunities</h2></div><Link href="/accounts">View all accounts →</Link></div><AccountTable accounts={data.accounts} compact /></section>
     <section className="dashboard-bottom">
       <div className="section-card workflow-card"><div className="section-heading"><div><span className="eyebrow">Workflow</span><h2>Progress</h2></div><span className={`status-pill ${runActive ? "partially_supported" : run ? "supported" : ""}`}>{run ? (runActive ? "in progress" : run.status) : "not started"}</span></div>{steps.map(([label, done, detail]) => <div className="workflow-step" key={label}><span>{done ? "✓" : "○"}</span><div><strong>{label}</strong><small>{detail}</small></div></div>)}</div>
       <div className="section-card signal-card"><div className="section-heading"><div><span className="eyebrow">Verified current signals</span><h2>Why now</h2></div></div>{withSignal.length ? withSignal.map(account => <Link href={`/accounts/${account.id}`} key={account.id}><span>↗</span><div><strong>{account.name}</strong><p>{account.top_signal}</p></div><small>{account.scores.intent.score} intent</small></Link>) : <p>No account has a verified current signal. NO_SIGNAL is a valid result — monitoring remains the correct action.</p>}</div>
@@ -303,10 +304,55 @@ function ResearchView({ data }: { data: Bootstrap }) { const run = data.research
 
 function ICPView({ data, busyId, onSelect }: { data: Bootstrap; busyId: string; onSelect: (icpId: string) => Promise<void> }) { return <><section className="intro-row"><div><span className="eyebrow">{data.icps.length === 1 ? "Active profile" : `${data.icps.length} candidates`}</span><h2>{data.product_mode === "BYOA_CORE" ? "Target profile for your imported accounts" : "Choose the market worth learning from"}</h2><p>{data.product_mode === "BYOA_CORE" ? "You supplied the accounts, so this profile records what qualifies them rather than selecting a market." : "Each candidate traces its rationale to research evidence."}</p></div></section><section className="icp-grid">{data.icps.map((icp, index) => <article className={`icp-card ${icp.selected ? "selected" : ""}`} key={icp.id}><header><span>ICP 0{index + 1}</span><span>{icp.recommended && <b>★ Recommended</b>}{icp.selected && <b>✓ Selected</b>}</span></header><h2>{icp.name}</h2><p>{icp.description}</p><label>Firmographics</label><div className="tag-list">{icp.firmographics.map(item => <span key={item}>{item}</span>)}</div><label>Qualification logic</label><ul>{icp.qualification_logic.map(item => <li key={item}>{item}</li>)}</ul><label>Buying triggers</label><ul>{icp.triggers.map(item => <li key={item}>{item}</li>)}</ul><footer><span>{icp.evidence_ids.length === 0 ? "User-confirmed, not evidence-derived" : `${icp.evidence_ids.length} evidence record${icp.evidence_ids.length === 1 ? "" : "s"}`}</span><button disabled={icp.selected || Boolean(busyId)} onClick={() => void onSelect(icp.id)}>{icp.selected ? "Active ICP" : busyId === icp.id ? "Selecting…" : "Select ICP"}</button></footer></article>)}</section></>; }
 
-function AccountTable({ data, compact = false }: { data: Bootstrap; compact?: boolean }) {
+function AccountTable({ accounts, compact = false }: { accounts: Account[]; compact?: boolean }) {
+  const data = { accounts };
   return <div className="table-wrap"><table><thead><tr><th>Company</th><th>Provenance</th><th>Status</th><th>Fit</th><th>Intent</th><th>Confidence</th><th>Priority</th><th>Top signal</th><th /></tr></thead><tbody>{data.accounts.slice(0, compact ? 3 : undefined).map(account => <tr key={account.id}><td><div className="company-cell"><span>{account.name.slice(0, 2).toUpperCase()}</span><div><strong>{account.name}</strong><small>{account.domain} · {account.location}</small></div></div></td><td><span className={`provenance-badge ${account.provenance.toLowerCase()}`}>{account.provenance}</span><small className="cell-note">{account.import_source?.replaceAll("_", " ") ?? "AUTONOMOUS DISCOVERY"}</small></td><td><span className={`qualification-pill ${account.brief_state.toLowerCase()}`}>{account.brief_state.replaceAll("_", " ")}</span><small className="cell-note">{account.review_status.replaceAll("_", " ")}</small></td><td><b>{account.scores.fit.score}</b></td><td><b>{account.scores.intent.score}</b></td><td><b>{account.scores.confidence.score}</b></td><td><span className="priority-pill">{account.priority_band} · {account.scores.priority}</span></td><td><p className="signal-text">{account.top_signal_type && <strong>{account.top_signal_type.replaceAll("_", " ")} · </strong>}{account.top_signal}</p></td><td><Link className="row-link" href={`/accounts/${account.id}`}>Inspect →</Link></td></tr>)}</tbody></table></div>;
 }
-function AccountsView({ data }: { data: Bootstrap }) { return <><section className="filter-bar"><input aria-label="Search accounts" placeholder="⌕  Search accounts…" /><button>Industry ▾</button><button>Review status ▾</button><button>Brief state ▾</button><span>{data.accounts.length} accounts</span><Link className="primary-button" href="/import">Import accounts</Link></section><section className="section-card account-table-card"><AccountTable data={data} /></section></>; }
+const SORT_LABELS: Record<SortKey, string> = {
+  priority: "Priority",
+  fit: "Fit",
+  intent: "Intent",
+  confidence: "Confidence",
+  unknowns: "Fewest unknowns",
+};
+
+/**
+ * Blueprint §14. These controls previously rendered and did nothing. Facet options
+ * are derived from the accounts actually present, so the list never offers a filter
+ * that would return zero rows.
+ */
+function AccountsView({ data }: { data: Bootstrap }) {
+  const [filters, setFilters] = useState<AccountFilters>(EMPTY_FILTERS);
+  const visible = useMemo(() => filterAccounts(data.accounts, filters), [data.accounts, filters]);
+  const set = (patch: Partial<AccountFilters>) => setFilters(current => ({ ...current, ...patch }));
+
+  const states = facetValues(data.accounts, "brief_state");
+  const industries = facetValues(data.accounts, "industry");
+  const countries = facetValues(data.accounts, "location");
+  const owners = facetValues(data.accounts, "owner");
+  const tags = tagValues(data.accounts);
+
+  return <>
+    <section className="filter-bar">
+      <input aria-label="Search accounts" placeholder="⌕  Search accounts…" value={filters.search} onChange={event => set({ search: event.target.value })} />
+      <select aria-label="State" value={filters.state} onChange={event => set({ state: event.target.value })}><option value="">All states</option>{states.map(item => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select>
+      {industries.length > 0 && <select aria-label="Industry" value={filters.industry} onChange={event => set({ industry: event.target.value })}><option value="">All industries</option>{industries.map(item => <option key={item} value={item}>{item}</option>)}</select>}
+      {countries.length > 0 && <select aria-label="Country" value={filters.country} onChange={event => set({ country: event.target.value })}><option value="">All countries</option>{countries.map(item => <option key={item} value={item}>{item}</option>)}</select>}
+      {owners.length > 0 && <select aria-label="Owner" value={filters.owner} onChange={event => set({ owner: event.target.value })}><option value="">All owners</option>{owners.map(item => <option key={item} value={item}>{item}</option>)}</select>}
+      {tags.length > 0 && <select aria-label="Tag" value={filters.tag} onChange={event => set({ tag: event.target.value })}><option value="">All tags</option>{tags.map(item => <option key={item} value={item}>{item}</option>)}</select>}
+      <select aria-label="Signal" value={filters.signal} onChange={event => set({ signal: event.target.value as AccountFilters["signal"] })}><option value="">Any signal</option><option value="with">Has a signal</option><option value="without">No signal</option></select>
+      <select aria-label="Sort by" value={filters.sort} onChange={event => set({ sort: event.target.value as SortKey })}>{(Object.keys(SORT_LABELS) as SortKey[]).map(key => <option key={key} value={key}>Sort: {SORT_LABELS[key]}</option>)}</select>
+      <span>{isFiltered(filters) ? `${visible.length} of ${data.accounts.length} accounts` : `${data.accounts.length} accounts`}</span>
+      {isFiltered(filters) && <button onClick={() => setFilters({ ...EMPTY_FILTERS, sort: filters.sort })}>Clear filters</button>}
+      <Link className="primary-button" href="/import">Import accounts</Link>
+    </section>
+    <section className="section-card account-table-card">
+      {visible.length === 0
+        ? <p>{data.accounts.length === 0 ? "No accounts imported yet." : "No account matches these filters."}</p>
+        : <AccountTable accounts={visible} />}
+    </section>
+  </>;
+}
 
 const RETRIEVAL_LABELS: Record<RetrievalOutcome, string> = {
   RETRIEVED: "Read",
@@ -488,5 +534,5 @@ function ApprovalsView({ data }: { data: Bootstrap }) {
       : ready.map(account => <Link className="approval-row" href={`/accounts/${account.id}`} key={account.id}><div className="company-cell"><span>{account.name.slice(0,2).toUpperCase()}</span><div><strong>{account.name}</strong><small>Campaign draft · {account.scores.priority} priority</small></div></div><p>{account.top_signal}</p><button>Review evidence and draft →</button></Link>)}
   </section>;
 }
-function SettingsView({ data }: { data: Bootstrap }) { const capabilities = data.capabilities ?? []; return <section className="settings-grid"><div className="section-card"><span className="eyebrow">Workspace</span><h2>{data.workspace.name}</h2><dl className="definition-list"><div><dt>Role</dt><dd>Owner</dd></div><div><dt>Data mode</dt><dd><span className="demo-badge">{data.demo_data ? "DEMO DATA" : "LIVE PUBLIC DATA"}</span></dd></div><div><dt>Research mode</dt><dd>{data.mode}</dd></div></dl></div><div className="section-card"><span className="eyebrow">Research capabilities</span><h2>{data.mode === "live" ? "Gateway health" : "Fixture provider active"}</h2><p>The system never substitutes fixtures for failed live research.</p><div className="capability-list">{(capabilities.length ? capabilities : ["Public web", "RSS", "Public GitHub", "YouTube metadata/transcripts"].map(channel => ({ channel, status: "available" as const, detail: "Gateway contract ready" }))).map(item => <div key={item.channel}><span className="status-dot" /><strong>{item.channel}</strong><small>{item.status} · {item.detail}</small></div>)}</div></div><div className="section-card"><span className="eyebrow">Safety invariants</span><h2>Policy enforced</h2><ul className="check-list"><li>Tenant membership checked server-side</li><li>No LLM numerical scoring</li><li>No cookie-backed social scraping</li><li>No autonomous outreach</li><li>CSV formula injection protected</li></ul></div></section>; }
+function SettingsView({ data }: { data: Bootstrap }) { const capabilities = data.capabilities ?? []; return <section className="settings-grid"><div className="section-card"><span className="eyebrow">Workspace</span><h2>{data.workspace.name}</h2><dl className="definition-list"><div><dt>Role</dt><dd>Owner</dd></div><div><dt>Data mode</dt><dd><span className="demo-badge">{data.demo_data ? "DEMO DATA" : "LIVE PUBLIC DATA"}</span></dd></div><div><dt>Research mode</dt><dd>{data.mode}</dd></div></dl></div><div className="section-card"><span className="eyebrow">Research capabilities</span><h2>{data.mode === "live" ? "Gateway health" : "Fixture provider active"}</h2><p>The system never substitutes fixtures for failed live research.</p><div className="capability-list">{(capabilities.length ? capabilities : ["Public web", "RSS", "Public GitHub", "YouTube metadata/transcripts"].map(channel => ({ channel, status: "available" as const, detail: "Gateway contract ready" }))).map(item => <div key={item.channel}><span className="status-dot" /><strong>{item.channel}</strong><small>{item.status} · {item.detail}</small></div>)}</div></div><div className="section-card"><span className="eyebrow">Data retention</span><h2>{data.retention ? `${data.retention.research_retention_days} days` : "Not configured"}</h2><p>{data.retention?.summary ?? "Retention policy is unavailable."}</p><ul className="check-list"><li>Accounts, briefs and review notes: kept until you delete them</li><li>Retrieved pages and derived evidence: {data.retention?.research_retention_days ?? "—"} days, then eligible for deletion</li><li>Automatic deletion: {data.retention?.automatic_deletion ? "enabled" : "off — an operator must review and confirm"}</li></ul></div><div className="section-card"><span className="eyebrow">Safety invariants</span><h2>Policy enforced</h2><ul className="check-list"><li>Tenant membership checked server-side</li><li>No LLM numerical scoring</li><li>No cookie-backed social scraping</li><li>No autonomous outreach</li><li>CSV formula injection protected</li></ul></div></section>; }
 function Onboarding({ data }: { data: Bootstrap }) { const product = data.product; if (!product) return null; return <section className="onboarding-card"><span className="demo-badge">{data.demo_data ? "LOCAL DEMO AUTH" : "LIVE WORKSPACE"}</span><h1>Your end-to-end workspace is ready.</h1><p>{data.demo_data ? "The deterministic acceptance dataset is clearly labelled and never substitutes for live research." : "The profile is confirmed and ready for bounded public-source research."}</p><div className="onboarding-summary"><div><span>Company</span><strong>{product.company_name}</strong></div><div><span>Product</span><strong>{product.product}</strong></div><div><span>Target</span><strong>{product.target_market}</strong></div></div><Link className="primary-button large" href="/dashboard">Enter workspace →</Link></section>; }

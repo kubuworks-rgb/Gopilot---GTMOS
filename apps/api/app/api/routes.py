@@ -41,6 +41,7 @@ from apps.api.app.services.byoa import (
     validate_account_import,
 )
 from apps.api.app.services.exports import EXPORT_COLUMNS, csv_safe, export_row
+from apps.api.app.services.private_alpha import retention_policy
 
 
 router = APIRouter(prefix="/api/v1")
@@ -67,6 +68,8 @@ def bootstrap(principal: Current) -> dict[str, object]:
     return {
         "mode": "fixture",
         "demo_data": True,
+        # Same statement in both modes; a policy the user cannot read is not one.
+        "retention": retention_policy(),
         "product_mode": (
             runs[-1].product_mode if runs else ProductMode.BYOA_CORE
         ),

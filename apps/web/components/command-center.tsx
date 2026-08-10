@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { accessToken, api, API_BASE, serverAccessToken, subscribeToAccessToken, type ImportPayload } from "@/lib/api";
-import { isOidcConfigured } from "@/lib/auth";
+import { accessToken, api, API_BASE, serverAccessToken, subscribeToAccessToken, UnauthenticatedError, type ImportPayload } from "@/lib/api";
+import { isOidcConfigured, rememberReturnPath } from "@/lib/auth";
 import type { Account, AccountImportResult, AccountImportValidation, AccountReviewStatus, Bootstrap, Brief, BriefState, Evidence, EvidenceClaim, FeedbackRating, ImportRowVerdict, ResearchRun, RetrievalOutcome } from "@/lib/types";
 import { EMPTY_FILTERS, facetValues, filterAccounts, isFiltered, tagValues, type AccountFilters, type SortKey } from "@/lib/account-filters";
 import { EvidenceDrawer } from "./evidence-drawer";
@@ -50,9 +50,25 @@ export function CommandCenter({ segments }: { segments: string[] }) {
   // or every request 401s and the user sees an error instead of a way to sign in.
   const signedIn = !isOidcConfigured() || Boolean(token);
 
+  // Remember the destination so sign-in returns the user here, not to the dashboard.
+  useEffect(() => {
+    if (!signedIn && isOidcConfigured() && !isCallback) {
+      rememberReturnPath(window.location.pathname);
+    }
+  }, [signedIn, isCallback]);
+
   useEffect(() => {
     if (isCallback || !signedIn) return;
-    api.bootstrap().then(setData).catch(err => setError(err instanceof Error ? err.message : "Unknown API error"));
+    api.bootstrap().then(setData).catch(err => {
+      // An expired session mid-session must show the sign-in screen, not an error
+      // the user cannot act on.
+      if (err instanceof UnauthenticatedError) {
+        rememberReturnPath(window.location.pathname);
+        setData(null);
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Unknown API error");
+    });
   }, [refresh, isCallback, signedIn]);
   useEffect(() => { if (accountId) api.brief(accountId).then(setBrief).catch(err => setError(err instanceof Error ? err.message : "Could not load account")); }, [accountId]);
   useEffect(() => {
@@ -149,7 +165,7 @@ export function CommandCenter({ segments }: { segments: string[] }) {
 
   const title = view === "accounts" && accountId ? brief?.account.name ?? "Account brief" : nav.find(item => item[0] === view)?.[1] ?? "Command center";
   return <div className="app-shell">
-    <aside className="sidebar"><Link className="brand" href="/"><span className="brand-mark">G</span><span>GOPILOT<strong>GTM OS</strong></span></Link><div className="workspace-switch"><span>Workspace</span><strong>{data.workspace.name}</strong><small>Founder workspace · Owner</small></div><nav aria-label="Primary">{nav.map(([slug, label, icon]) => <Link key={slug} href={`/${slug}`} className={`${view === slug ? "active" : ""} ${slug === "discovery" ? "experimental-nav" : ""}`}><span>{icon}</span>{label}{slug === "discovery" && <small>EXPERIMENTAL</small>}{slug === "approvals" && data.approval_count > 0 && <b>{data.approval_count}</b>}</Link>)}</nav><div className="sidebar-footer"><span className="status-dot" /> BYOA core available<small>{data.provider_message}</small>{isOidcConfigured() && <button className="secondary-button" onClick={() => signOut()}>Sign out</button>}</div></aside>
+    <aside className="sidebar"><Link className="brand" href="/"><span className="brand-mark">G</span><span>GOPILOT<strong>GTM OS</strong></span></Link><div className="workspace-switch"><span>Workspace</span><strong>{data.workspace.name}</strong><small>Founder workspace · Owner</small></div><nav aria-label="Primary">{nav.map(([slug, label, icon]) => <Link key={slug} href={`/${slug}`} className={`${view === slug ? "active" : ""} ${slug === "discovery" ? "experimental-nav" : ""}`}><span>{icon}</span>{label}{slug === "discovery" && <small>EXPERIMENTAL</small>}{slug === "approvals" && data.approval_count > 0 && <b>{data.approval_count}</b>}</Link>)}</nav><div className="sidebar-footer"><span className="status-dot" /> BYOA core available<small>{data.provider_message}</small>{isOidcConfigured() && <button className="secondary-button" onClick={() => void signOut()}>Sign out</button>}</div></aside>
     <main className="workspace"><header className="topbar"><div><span className="eyebrow">{view === "accounts" && accountId ? "Account opportunity brief" : "Evidence-backed GTM workspace"}</span><h1>{title}</h1></div><div className="top-actions"><span className="demo-badge">{data.demo_data ? "DEMO DATA" : "LIVE PUBLIC DATA"}</span><span className="avatar">KW</span></div></header>
       <div className="content">
         {view === "dashboard" && <Dashboard data={data} averagePriority={averagePriority} />}

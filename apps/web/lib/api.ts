@@ -1,3 +1,4 @@
+import { clearSession, refreshAccessToken, tokenIsStale } from "./auth";
 import type { Account, AccountImportRecord, AccountImportResult, AccountImportSource, AccountImportValidation, AccountReviewStatus, Bootstrap, Brief, BriefState, Campaign, Feedback, FeedbackRating, ICP, Product, ProductMode, ResearchRun, Workspace } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
@@ -47,8 +48,16 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+/** Raised when the session is gone and the caller should be sent to sign in. */
+export class UnauthenticatedError extends Error {
+  constructor(message = "Your session has ended. Please sign in again.") {
+    super(message);
+    this.name = "UnauthenticatedError";
+  }
+}
+
+async function send(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -57,6 +66,34 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
     cache: "no-store",
   });
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Refresh proactively when the token is about to expire, so a long session does
+  // not fail mid-action and bounce the user out of work they were doing.
+  if (tokenIsStale()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) setAccessToken(refreshed);
+  }
+
+  let response = await send(path, init);
+
+  // A 401 after a valid-looking token usually means it expired early or the issuer
+  // rotated keys. Try once, then give up rather than looping.
+  if (response.status === 401 && accessToken()) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      setAccessToken(refreshed);
+      response = await send(path, init);
+    }
+  }
+
+  if (response.status === 401) {
+    setAccessToken(null);
+    clearSession();
+    throw new UnauthenticatedError();
+  }
+
   if (!response.ok) throw new Error(`API ${response.status}: ${await response.text()}`);
   return response.json() as Promise<T>;
 }

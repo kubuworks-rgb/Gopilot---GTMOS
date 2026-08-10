@@ -66,6 +66,15 @@ class FixtureRepository:
         return workspace
 
     def assert_member(self, user_id: str, workspace_id: str) -> None:
+        # The demo workspace admits any authenticated caller. This repository serves
+        # the offline demo, where there is one workspace and no real tenancy to
+        # protect -- and gating it on a hardcoded "demo-user" made the fixture
+        # unusable with OIDC, since a real subject is never that string.
+        # Live tenancy is enforced by the Postgres repository, which checks real
+        # membership rows; see test_router_contract_parity.py for the boundary.
+        if workspace_id == self.demo_workspace_id:
+            self.memberships.setdefault(user_id, set()).add(workspace_id)
+            return
         if workspace_id not in self.memberships.get(user_id, set()):
             raise PermissionError("Workspace membership required")
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.api.app.api import live_routes, routes
+from apps.api.app.api import dependencies, live_routes, routes
 
 
 # Endpoints that legitimately exist only in live mode: each needs a worker, a real
@@ -88,6 +88,48 @@ def test_the_shared_surface_is_not_empty() -> None:
 
 def test_both_routers_use_the_same_prefix() -> None:
     assert routes.router.prefix == live_routes.router.prefix
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("resolver", ["fixture", "live"])
+async def test_both_routers_enforce_the_invite_gate(
+    monkeypatch: pytest.MonkeyPatch, resolver: str
+) -> None:
+    """The drift that actually bit twice: a gate added to one router only.
+
+    `assert_invited` lived in `live_routes` alone, so in fixture mode any identity
+    with a valid signature was admitted to an invite-only deployment. Authentication
+    is not authorisation, and both routers have to ask both questions.
+    """
+    from fastapi import HTTPException
+
+    from apps.api.app.config import Settings
+    from apps.api.app.services import private_alpha
+
+    alpha = Settings(
+        private_alpha_enabled=True,
+        auth_mode="demo",
+        demo_auth_enabled=True,
+        private_alpha_allowed_subjects=("invited",),
+        private_alpha_allowed_emails=(),
+    )
+    # Settings is frozen, so replace the object each module resolved at import.
+    for module in (dependencies, live_routes, private_alpha):
+        monkeypatch.setattr(module, "settings", alpha)
+
+    async def resolve(user: str) -> None:
+        if resolver == "live":
+            await live_routes.authenticated_user_id(None, user)
+        else:
+            await dependencies.get_principal(None, user, None)
+
+    with pytest.raises(HTTPException) as refused:
+        await resolve("stranger")
+    assert refused.value.status_code == 403, (
+        f"{resolver} router admitted an uninvited identity"
+    )
+
+    await resolve("invited")  # the gate must not refuse everyone
 
 
 def test_export_is_defined_once_for_both() -> None:

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { setAccessToken } from "@/lib/api";
-import { AUTH_MODE, beginSignIn, completeSignIn, isOidcConfigured } from "@/lib/auth";
+import { AUTH_MODE, beginSignIn, clearSession, completeSignIn, isOidcConfigured, signOutUrl, takeReturnPath } from "@/lib/auth";
 
 /** Shown when OIDC is configured and the browser holds no access token. */
 export function SignIn() {
@@ -59,8 +59,9 @@ export function AuthCallback({ onSignedIn }: { onSignedIn: () => void }) {
       .then((token) => {
         if (cancelled) return;
         setAccessToken(token);
-        // Drop the code and state from the address bar before continuing.
-        window.history.replaceState({}, "", "/dashboard");
+        // Drop the code and state from the address bar, and return the user to
+        // whatever they were trying to reach rather than always to the dashboard.
+        window.history.replaceState({}, "", takeReturnPath());
         onSignedIn();
       })
       .catch((err) => {
@@ -95,8 +96,24 @@ export function AuthCallback({ onSignedIn }: { onSignedIn: () => void }) {
   );
 }
 
-export function signOut(): void {
+/**
+ * Clear the local session, then end the issuer's session too when it supports it.
+ *
+ * Clearing locally first matters: if the issuer is unreachable the user must still
+ * end up signed out here, rather than stranded with a live token because a redirect
+ * failed.
+ */
+export async function signOut(): Promise<void> {
   setAccessToken(null);
+  clearSession();
+  const endSession = await signOutUrl();
+  if (endSession) {
+    const params = new URLSearchParams({
+      post_logout_redirect_uri: window.location.origin,
+    });
+    window.location.assign(`${endSession}?${params.toString()}`);
+    return;
+  }
   window.location.assign("/");
 }
 

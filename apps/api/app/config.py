@@ -151,6 +151,39 @@ class Settings:
                 )
             if self.jwks_cache_ttl_seconds <= 0:
                 raise RuntimeError("JWKS_CACHE_TTL_SECONDS must be positive")
+        # TLS. Nothing in the stack can prove a proxy terminated TLS correctly, but
+        # a production deployment that never mentions https is one that was never
+        # configured for it, and it would otherwise serve plaintext in silence.
+        # JWKS is the sharpest case: fetched over http, anyone on the path can
+        # substitute the signing keys and mint tokens the API will accept.
+        if self.app_env == "production":
+            insecure = [
+                name
+                for name, value in (
+                    ("JWT_ISSUER", self.jwt_issuer),
+                    ("JWKS_URL", self.jwks_url),
+                    ("AGENT_REACH_GATEWAY_URL", self.research_gateway_url),
+                )
+                if value and value.startswith("http://")
+            ]
+            if insecure:
+                raise RuntimeError(
+                    f"Production forbids plaintext http:// for {', '.join(insecure)}. "
+                    "Token signing keys fetched over http can be substituted in "
+                    "transit by anyone on the path, which forges any identity."
+                )
+            plaintext_origins = [
+                origin
+                for origin in self.cors_origins
+                if origin.startswith("http://")
+                and not origin.startswith(("http://127.0.0.1", "http://localhost"))
+            ]
+            if plaintext_origins:
+                raise RuntimeError(
+                    "Production forbids plaintext CORS_ALLOWED_ORIGINS: "
+                    f"{', '.join(plaintext_origins)}. Serve the web app over https "
+                    "through the reverse proxy (see docs/operations/DEPLOYMENT.md)."
+                )
         if self.private_alpha_enabled and not (
             self.private_alpha_allowed_subjects or self.private_alpha_allowed_emails
         ):

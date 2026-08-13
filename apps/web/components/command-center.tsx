@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { accessToken, api, API_BASE, serverAccessToken, subscribeToAccessToken, UnauthenticatedError, type ImportPayload } from "@/lib/api";
 import { isOidcConfigured, rememberReturnPath } from "@/lib/auth";
 import type { Account, AccountImportResult, AccountImportValidation, AccountReviewStatus, Bootstrap, Brief, BriefState, Evidence, EvidenceClaim, FeedbackRating, ImportRowVerdict, ResearchRun, RetrievalOutcome } from "@/lib/types";
-import { EMPTY_FILTERS, facetValues, filterAccounts, isFiltered, tagValues, type AccountFilters, type SortKey } from "@/lib/account-filters";
+import { EMPTY_FILTERS, SCORE_THRESHOLDS, facetValues, filterAccounts, isFiltered, tagValues, type AccountFilters, type SortKey } from "@/lib/account-filters";
 import { EvidenceDrawer } from "./evidence-drawer";
 import { ScoreBadge, ScoreDetails } from "./score";
 import { AuthCallback, SignIn, signOut } from "./sign-in";
@@ -332,6 +332,13 @@ const SORT_LABELS: Record<SortKey, string> = {
   unknowns: "Fewest unknowns",
 };
 
+const SCORE_FILTERS = [
+  { key: "minPriority", label: "Priority" },
+  { key: "minFit", label: "Fit" },
+  { key: "minIntent", label: "Intent" },
+  { key: "minConfidence", label: "Confidence" },
+] as const satisfies readonly { key: keyof AccountFilters; label: string }[];
+
 /**
  * Blueprint §14. These controls previously rendered and did nothing. Facet options
  * are derived from the accounts actually present, so the list never offers a filter
@@ -357,6 +364,11 @@ function AccountsView({ data }: { data: Bootstrap }) {
       {owners.length > 0 && <select aria-label="Owner" value={filters.owner} onChange={event => set({ owner: event.target.value })}><option value="">All owners</option>{owners.map(item => <option key={item} value={item}>{item}</option>)}</select>}
       {tags.length > 0 && <select aria-label="Tag" value={filters.tag} onChange={event => set({ tag: event.target.value })}><option value="">All tags</option>{tags.map(item => <option key={item} value={item}>{item}</option>)}</select>}
       <select aria-label="Signal" value={filters.signal} onChange={event => set({ signal: event.target.value as AccountFilters["signal"] })}><option value="">Any signal</option><option value="with">Has a signal</option><option value="without">No signal</option></select>
+      {SCORE_FILTERS.map(({ key, label }) => <select key={key} aria-label={label} value={filters[key]} onChange={event => set({ [key]: Number(event.target.value) } as Partial<AccountFilters>)}>
+        <option value={0}>Any {label.toLowerCase()}</option>
+        {SCORE_THRESHOLDS.map(threshold => <option key={threshold} value={threshold}>{label} {threshold}+</option>)}
+      </select>)}
+      <select aria-label="Unknowns" value={filters.unknowns} onChange={event => set({ unknowns: event.target.value as AccountFilters["unknowns"] })}><option value="">Any unknowns</option><option value="without">Nothing unresolved</option><option value="with">Has open questions</option></select>
       <select aria-label="Sort by" value={filters.sort} onChange={event => set({ sort: event.target.value as SortKey })}>{(Object.keys(SORT_LABELS) as SortKey[]).map(key => <option key={key} value={key}>Sort: {SORT_LABELS[key]}</option>)}</select>
       <span>{isFiltered(filters) ? `${visible.length} of ${data.accounts.length} accounts` : `${data.accounts.length} accounts`}</span>
       {isFiltered(filters) && <button onClick={() => setFilters({ ...EMPTY_FILTERS, sort: filters.sort })}>Clear filters</button>}

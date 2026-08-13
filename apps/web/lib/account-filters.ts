@@ -18,6 +18,12 @@ export interface AccountFilters {
   owner: string;
   tag: string;
   signal: "" | "with" | "without";
+  /** Score floors, 0 meaning "no floor". Scores are 0-100. */
+  minPriority: number;
+  minFit: number;
+  minIntent: number;
+  minConfidence: number;
+  unknowns: "" | "with" | "without";
   sort: SortKey;
 }
 
@@ -29,8 +35,20 @@ export const EMPTY_FILTERS: AccountFilters = {
   owner: "",
   tag: "",
   signal: "",
+  minPriority: 0,
+  minFit: 0,
+  minIntent: 0,
+  minConfidence: 0,
+  unknowns: "",
   sort: "priority",
 };
+
+/**
+ * Offered as floors rather than bands. "Fit is 60-79" is a question about the
+ * scoring model; "show me everything at 60 or better" is the question a founder
+ * deciding who to contact is actually asking.
+ */
+export const SCORE_THRESHOLDS = [80, 60, 40] as const;
 
 /**
  * Unresolved criteria for an account. The brief carries an explicit unknowns list,
@@ -108,6 +126,16 @@ export function filterAccounts(
     if (filters.tag && !(account.tags ?? []).includes(filters.tag)) return false;
     if (filters.signal === "with" && !hasSignal(account)) return false;
     if (filters.signal === "without" && hasSignal(account)) return false;
+    if (account.scores.priority < filters.minPriority) return false;
+    if (account.scores.fit.score < filters.minFit) return false;
+    if (account.scores.intent.score < filters.minIntent) return false;
+    if (account.scores.confidence.score < filters.minConfidence) return false;
+    // An account with open questions is not a worse account, it is a less
+    // finished one, so this separates "ready to act on" from "needs a look"
+    // rather than ranking them against each other.
+    const unresolved = unknownCount(account) > 0;
+    if (filters.unknowns === "with" && !unresolved) return false;
+    if (filters.unknowns === "without" && unresolved) return false;
     return true;
   });
 
@@ -127,6 +155,11 @@ export function isFiltered(filters: AccountFilters): boolean {
     Boolean(filters.country) ||
     Boolean(filters.owner) ||
     Boolean(filters.tag) ||
-    Boolean(filters.signal)
+    Boolean(filters.signal) ||
+    Boolean(filters.unknowns) ||
+    filters.minPriority > 0 ||
+    filters.minFit > 0 ||
+    filters.minIntent > 0 ||
+    filters.minConfidence > 0
   );
 }

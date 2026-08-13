@@ -99,13 +99,24 @@ running in a degraded mode.
 | Private alpha with both invite lists empty | Refuses to start |
 | `RETENTION_AUTO_DELETE=true` | Refuses to start — not implemented |
 | A gateway token under 32 characters | Refuses to start |
+| Production with `http://` in `JWT_ISSUER`, `JWKS_URL` or `AGENT_REACH_GATEWAY_URL` | Refuses to start |
+| Production with a non-loopback `http://` origin in `CORS_ALLOWED_ORIGINS` | Refuses to start |
 
-**The one thing that does not fail loudly:** running without the TLS overlay. The
-stack starts and serves plain HTTP, because that is the correct behaviour on
-`localhost`. Nothing in the application can tell the difference between a laptop and
-a public IP, so this is the operator's responsibility.
+The last two are the TLS checks. `JWKS_URL` is the one that matters most: fetched
+over plaintext, the token signing keys can be substituted in transit, and the API
+will then accept tokens minted by whoever substituted them. That is an
+authentication bypass that leaves no trace and looks like normal operation, so a
+production configuration naming an `http://` JWKS endpoint is refused outright.
 
-Verify before announcing a URL:
+Loopback origins stay allowed, because the proxy reaches the app over `127.0.0.1`
+and that hop never leaves the host.
+
+**What still does not fail loudly:** whether the proxy in front of you is actually
+terminating TLS correctly. The checks above prove the configuration was written
+for https; they cannot prove a certificate is valid, current, or served. An
+operator who sets `APP_ENV=production` and the right URLs but never starts the
+overlay still gets a service answering in plaintext on the published port.
+Nothing inside the application can see that, so verify it from outside:
 
 ```bash
 curl -sS -o /dev/null -w '%{http_code}\n' http://<DOMAIN>/    # expect 308 → https
@@ -113,7 +124,7 @@ curl -sSI https://<DOMAIN>/ | head -3                          # expect 200 + HS
 ```
 
 If the first returns `200` rather than a redirect, the overlay is not running and
-the service is answering in plaintext.
+the service is answering in plaintext. Do not announce the URL.
 
 ---
 

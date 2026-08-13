@@ -1,229 +1,248 @@
 # GoPilot — Billing Scope
 
-**Status:** scoping only. **No implementation.** Numbers below are proposals for you
-to decide, not commitments.
-**Date:** 2026-08-09
-
-New scope — not in the product blueprint. Positioning context comes from
-[COMPETITOR_POSITIONING.md](COMPETITOR_POSITIONING.md); enforcement call sites were
-read from the codebase, not designed in the abstract.
+**Date:** 2026-08-13
+**Status:** Scoping only. No billing code exists and none is to be written yet.
+**Evidence:** measurements from the live §40 run (see
+[LIVE_E2E_FINDINGS.md](../qa/LIVE_E2E_FINDINGS.md)), not estimates.
 
 ---
 
 ## 1. Where the cost actually sits
 
-Before proposing a meter, where does a workspace cost money?
+Measured on the live run — real Postgres, real worker, real fetches against real
+company sites, no paid research provider.
 
-| Activity | Real cost | Scales with |
+| Per researched account | Measured |
+|---|---|
+| Outbound HTTP fetches attempted | **8** |
+| Pages actually read | 3–5 (404s and refusals are normal) |
+| Source documents stored | ~2.8 |
+| Source chunks stored | ~13 |
+| Evidence facts extracted | ~4.5 |
+| Cleaned text retained | ~13 kB |
+| Wall-clock | ~15–20 s, dominated by polite fetch pacing |
+
+Whole scenario workspace: 18 accounts imported, 6 researched → 17 documents, 79
+chunks, 27 facts, 76 kB text.
+
+**The dominant cost is outbound fetching, not inference.** Scoring is
+deterministic and uses no LLM at all, so the marginal cost of an account is
+bandwidth, gateway time, rate-limit exposure against third-party sites, and the
+storage that retention keeps for 180 days.
+
+This matters commercially: cost scales with **how many companies were researched**
+and almost nothing else. Importing 500 accounts and researching none costs
+essentially nothing. Researching 50 costs 400 fetches.
+
+---
+
+## 2. The metered unit
+
+**Accounts researched per month.** Confirmed by the measurements above: it is
+directly proportional to the dominant cost and it is the unit a founder already
+thinks in.
+
+Counting rules, and why each follows from the cost data:
+
+| Action | Counts? | Why |
 |---|---|---|
-| **Researching an account** | 1–8 HTTP fetches, parsing, chunking, storage, worker time | **accounts researched** |
-| Re-researching | same again | re-research requests |
-| Storing evidence | Postgres rows, text | accounts × pages retained |
-| Viewing briefs/dashboards | a database read | negligible |
-| Seats | nothing marginal | nothing |
+| First research of an account | **Yes** | 8 fetches |
+| Re-research of the same account | **Yes** | repeats all 8 fetches |
+| `regenerate_brief` | **No** | recomposes stored evidence; zero fetches |
+| Reading an account or brief | **No** | zero fetches |
+| Exporting | **No** | zero fetches |
+| Importing without researching | **No** | validation only |
 
-**The cost is research operations, not UI usage.** A workspace with 5 users reading
-100 researched accounts costs almost exactly what 1 user reading them costs.
+**Never meter signals, facts, or evidence items.** The measured spread is 0–9
+facts per account, driven by what the site happened to say. Charging per fact
+would pay the system to inflate its own output — the one incentive an
+evidence-backed product must not create. It would also punish a founder for
+researching a company with a thin website, which is information, not a failure.
 
-That points to **accounts researched per month** as the meter, with **seats as a
-packaging lever rather than a cost recovery mechanism**.
+---
 
-One caveat worth pricing around: re-research is a real repeat cost, and today
-`/accounts/{id}/research` can be called repeatedly with no per-account throttle. Any
-meter counting "accounts researched" must decide whether a re-research counts again.
-**Proposal: yes, it counts** — it consumes the same resources, and not counting it
-creates an obvious loophole.
+## 3. Plan tiers
 
-## 2. Plan model
+Positioning assumption from earlier research: undercut Clay's ~$150/mo entry
+point. Three tiers, priced on the meter above.
 
-Three tiers. The paid entry point deliberately undercuts Clay's ~$149–185/mo, which
-the positioning work identified as the reference price.
-
-| | **Solo** (free) | **Founder** | **Team** |
+| | **Solo** | **Founder** | **Team** |
 |---|---|---|---|
-| Price | $0 | **$79/mo** proposed | **$249/mo** proposed |
-| Accounts researched / month | 25 | 300 | 1,500 |
-| Accounts stored | 100 | 1,000 | 5,000 |
+| Price | **$0** | **$79/mo** | **$199/mo** |
+| Accounts researched / month | 25 | 300 | 1,000 |
 | Seats | 1 | 3 | 10 |
-| Concurrent research runs | 1 | 3 | 5 |
-| Imports / day | 3 | 20 | 50 |
-| Export | ✓ | ✓ | ✓ |
-| Experimental discovery | ✗ | ✗ | opt-in |
-| Retention | 30 days | 180 days | 365 days |
+| Workspaces | 1 | 3 | 10 |
+| Retention | 30 days | 180 days | 180 days |
+| Export | CSV | CSV | CSV + API |
 
-**Why free tier exists.** Entity-safety and unknown-aware reasoning are invisible
-until you use them on companies you know. 25 accounts is enough for a founder to
-check GoPilot against companies whose truth they can verify — which is the actual
-sales mechanism for this product.
+Reasoning:
 
-**Why $79.** Below Clay's entry point, above the "is this serious?" line. The
-positioning is not "cheaper Clay" — it's a different tool — but the price has to be
-legible against the thing buyers compare it to.
+- **Solo at $0/25 accounts** is the trial. 25 is enough to research a real
+  prospect list and judge whether the evidence is worth paying for; the honest
+  product only proves itself on real companies.
+- **Founder at $79** sits roughly half of Clay's entry point. At 300 accounts
+  that is ~2,400 fetches/month — comfortably servable on one host.
+- **Team at $199** is still below Clay's entry while adding seats, which is where
+  multi-person GTM teams actually feel the constraint.
 
-**Why seats are generous.** Seats cost nothing marginal. Charging per seat would
-push teams to share logins, which destroys the review-attribution that `review_history`
-exists to provide.
+Seats are a limit, not a per-seat price. Per-seat pricing on a three-person
+founding team is a tax on collaboration, and the cost data says seats are nearly
+free — a seat that never triggers research costs nothing.
 
-**Retention as a tier lever** is deliberate: it maps to a real storage cost and is
-already implemented as a configurable window per §33 work.
+---
 
-### Open question for you
+## 4. Enforcement call sites
 
-Is 300 researched accounts/month right for $79? It implies ~$0.26/account. I have no
-usage data — this is a guess anchored to competitor pricing, not to observed
-behaviour. **Recommend launching Founder-tier metered but not enforced for the first
-cohort**, to gather the distribution before committing to a number.
+These exist today and already return structured refusals. Billing enforcement
+belongs at the same points, not in new middleware.
 
-## 3. Enforcement points — actual call sites
+**The meter increments here — and nowhere else:**
 
-These already exist and follow one pattern: raise `LimitExceeded`, return `429` with
-a machine-readable code. Plan limits should extend this, **not introduce a second
-mechanism**.
+- [`live_routes.py:682`](../../apps/api/app/api/live_routes.py:682)
+  `research_account` — the only path that queues per-account fetching.
+- [`live_routes.py:275`](../../apps/api/app/api/live_routes.py:275)
+  `create_research` — the product/ICP run. Fetches the founder's *own* site, so
+  it should be excluded from the customer's meter.
 
-| Where | File:line | Today | Plan-aware change |
-|---|---|---|---|
-| Import size | `live_routes.py:624` `assert_import_size` | Global cap | Per-plan cap |
-| Accounts stored | `live_routes.py:626` `assert_workspace_capacity` | Global cap | Per-plan cap |
-| Imports/day | `live_routes.py:625` `assert_daily_import_quota` | Global cap | Per-plan cap |
-| Concurrent runs | `live_routes.py:303` `assert_run_concurrency` | Global cap | Per-plan cap |
-| Workspaces/user | `live_routes.py:233` `assert_workspace_quota` | Global cap | Per-plan cap |
-| Export rows | `live_routes.py:904` `assert_export_size` | Global cap | Per-plan cap |
-| **Research quota** | **`live_routes.py:689`** `research_account` | **none** | **New — the meter** |
-| **Research quota** | **`live_routes.py:770`** `regenerate_brief` | **none** | Free (no fetch) |
-| **Research quota** | **`live_routes.py:339`** run creation | **none** | New |
+**Explicitly not metered:**
 
-**The important gap:** every existing limit is a *shape* limit (how many accounts,
-how often). None is a *consumption* limit. The meter needs one new check at
-`research_account` — the single place a fetch is actually queued.
+- [`live_routes.py:763`](../../apps/api/app/api/live_routes.py:763) `regenerate_brief`
+- [`live_routes.py:897`](../../apps/api/app/api/live_routes.py:897) `export_accounts`
+- [`live_routes.py:608`](../../apps/api/app/api/live_routes.py:608) `import_accounts`
 
-`regenerate_brief` should **not** consume quota: it recomputes from stored evidence
-without fetching. Charging for it would push users away from re-reading their own
-data, which is the opposite of the desired behaviour.
+**The limit-check pattern to reuse**, in
+[`private_alpha.py`](../../apps/api/app/services/private_alpha.py):
+`assert_import_size` (109), `assert_workspace_capacity` (123),
+`assert_daily_import_quota` (151), `assert_run_concurrency` (180),
+`assert_workspace_quota` (208), `assert_export_size` (232).
 
-### Counting correctly
+Each raises `LimitExceeded`, which carries `code`, `message`, `limit` and
+`attempted`, and surfaces as **429** with a machine-readable body. A billing limit
+should raise the same shape with `code: "PLAN_LIMIT_REACHED"` rather than
+inventing a second refusal vocabulary.
 
-Count at **enqueue**, not completion — otherwise a user can queue 10,000 jobs before
-the first finishes. But a job that dead-letters should refund, since the customer got
-nothing. Both hooks exist: `enqueue_job`, and `record_job_failure` for terminal
-failures.
+Note the ordering already established at
+[`live_routes.py:620`](../../apps/api/app/api/live_routes.py:620): limits are
+checked *before* anything is written, so a refused request leaves no partial
+state. A metered check must keep that property — increment only after the job is
+successfully queued, or a failed enqueue bills for work never done.
 
-## 4. Over-limit and lapsed-subscription behaviour
+### Where subscription state lives
 
-**Proposal: read-only, never destructive.**
+Workspace-level, not user-level: the workspace already owns accounts, membership
+and audit, and a founder with three workspaces should not be billed three times
+by accident. A new `workspace_billing` row keyed by `workspace_id`, holding plan,
+Stripe customer and subscription ids, current period bounds, and status.
 
-| State | Behaviour |
+Usage is *derived, not stored as a counter*: count `account_research_requested`
+audit events in the current period. The audit table is already the source of
+truth, and a derived count cannot drift from reality the way a hand-maintained
+counter does.
+
+---
+
+## 5. Over-limit and lapsed subscription
+
+**Proposal: soft cap with a hard stop on new research only.**
+
+Over the monthly limit:
+
+- New research is refused with 429 `PLAN_LIMIT_REACHED`, naming the limit, the
+  count, and the reset date.
+- **Everything already researched stays fully readable, reviewable and
+  exportable.**
+
+Lapsed subscription (payment failed, 14-day grace):
+
+- During grace: full function, persistent banner.
+- After grace: workspace becomes read-only. Research refused; reading, review and
+  **export stay available**.
+
+Tradeoffs, stated plainly:
+
+- *Against:* read-only workspaces cost us storage indefinitely for £0. Retention
+  bounds it at 180 days, but it is a real cost.
+- *For:* the alternative — withholding evidence a founder already paid to gather —
+  makes the product hostile at exactly the moment they are deciding whether to
+  come back. It also risks looking like ransom over their own data.
+- *Rejected:* deleting data on lapse. Retention is a published promise
+  (`retention_policy`, served on the Settings screen); overriding it for
+  non-payment would make that promise conditional and untrustworthy.
+
+**Export must never be gated.** A founder who cannot get their data out will not
+trust the product with it in the first place.
+
+---
+
+## 6. Stripe integration outline
+
+Design only.
+
+**Checkout.** Stripe Checkout in subscription mode, not a custom card form — no
+card data should reach GoPilot at any point. `client_reference_id` carries the
+workspace id so the webhook can bind the subscription without trusting the
+browser.
+
+**Webhooks.** A single endpoint, signature-verified with the webhook secret
+(never the API key), that is the *only* writer of subscription state — the
+browser's return from Checkout is a UI hint and must never grant entitlement.
+
+| Event | Effect |
 |---|---|
-| Within limits | Normal |
-| Quota exhausted | Research blocked (`429`, plan code). Everything else works. |
-| Payment failed | 14-day grace, full function, escalating banner |
-| Grace expired | **Read-only**: view, review, export. No new research or imports. |
-| Cancelled | Read-only for the retention window, then eligible for deletion |
+| `checkout.session.completed` | bind customer + subscription to workspace |
+| `customer.subscription.updated` | plan or period change |
+| `customer.subscription.deleted` | start grace, then read-only |
+| `invoice.payment_failed` | start grace, flag the workspace |
+| `invoice.payment_succeeded` | clear grace |
 
-**Why read-only rather than a hard block.** The product's asset is the founder's
-accumulated evidence and review decisions. Locking them out of data they already paid
-to produce is the behaviour that generates chargebacks and bad-faith reviews. **Export
-must keep working in every non-fraud state** — a customer who cannot get their data
-out will say so publicly, and for a product selling trustworthiness that is a
-disproportionate cost.
+Handlers must be idempotent on Stripe's event id — webhooks are delivered at least
+once, and a replayed `subscription.deleted` must not re-lock a recovered account.
 
-**Tradeoffs, stated plainly:**
+**Portal.** Stripe Customer Portal for plan changes, payment method and invoices.
+Building those screens is weeks of work Stripe already did.
 
-- Read-only is *weaker* commercial pressure than a hard block. Some will sit in
-  read-only indefinitely. Acceptable: they cost nothing (no research = no fetches).
-- A 14-day grace means up to two weeks of unpaid research at full rate. Bounded by
-  the plan's own quota, so the exposure is capped and small.
-- Quota-exhausted-but-paid is the one hard block, and it should upsell rather than
-  merely refuse.
+**Secrets.** Stripe keys follow the existing rule: environment only, never in
+`.env.example`, never in Git, never logged. `RESEARCH_GATEWAY_TOKEN` already sets
+the precedent, including the 32-character minimum enforced at startup.
 
-## 5. Integration
+---
 
-**Stripe.** Nothing in this stack argues otherwise: Checkout removes card handling
-entirely (this codebase must never touch card data), webhooks fit the existing
-worker/queue shape, and the Customer Portal removes the need to build plan-change and
-payment-method UI at all.
+## 7. Deliberately not yet
 
-### Minimal integration
+- Usage-based/metered billing to Stripe (report usage; charge a flat tier)
+- Invoicing, POs, procurement, tax handling beyond Stripe Tax defaults
+- Proration on mid-cycle plan changes
+- Enterprise contracts, custom terms, SSO-gated plans
+- Annual pricing and discounts
+- Dunning sequences beyond the single grace window
+- Per-seat pricing
+- Free-trial credit-card capture
+- Any refund automation
 
-**Storage — workspace-level, not user-level.** Limits are already enforced per
-workspace (`assert_workspace_capacity`, `assert_daily_import_quota`), and a user can
-belong to several. Billing must line up with the thing being limited.
+---
 
-```
-workspace_subscriptions
-  workspace_id        FK, unique
-  stripe_customer_id
-  stripe_subscription_id
-  plan                solo | founder | team
-  status              active | past_due | canceled | incomplete
-  current_period_end
-  grace_until         nullable
-  accounts_researched_this_period   int
-  period_started_at
-```
+## 8. Sequence, when it is time
 
-A new table rather than columns on `workspaces`: billing state changes on a different
-cadence than workspace identity, and keeping it separate means a billing outage
-cannot corrupt tenancy.
+1. Usage metering with **enforcement disabled** — count and display only. Confirms
+   the meter matches reality before anyone is blocked by it.
+2. Read the numbers from real alpha usage. The tier boundaries above are informed
+   by cost, not by demand; only usage tells you whether 300 is generous or mean.
+3. Plan records and the Settings surface showing usage against limit.
+4. Stripe Checkout + webhooks, still without enforcement.
+5. Turn enforcement on, soft cap first.
 
-**Three flows only:**
+---
 
-1. **Checkout** — `POST /billing/checkout` → Stripe Checkout session → redirect.
-2. **Webhook** — `POST /billing/webhook`, signature-verified, handling
-   `checkout.session.completed`, `customer.subscription.updated`,
-   `customer.subscription.deleted`, `invoice.payment_failed`. Idempotent by event ID;
-   Stripe retries.
-3. **Portal** — `POST /billing/portal` → Stripe Customer Portal. Plan changes,
-   payment methods and cancellation are Stripe's UI, not ours.
+## 9. One risk worth naming
 
-**Webhook is the only source of truth for subscription state.** Never infer
-entitlement from a checkout redirect — the user can navigate away, and the redirect
-is not authenticated as a payment.
+The meter is honest but it is not free of incentive. Charging per account
+researched rewards *volume of research*, and the product's actual value is
+**deciding which companies not to bother with**. A founder who imports 300
+accounts, sees that 280 are poor fits, and contacts 20 has received enormous value
+and generated a large bill; one who researches 30 well-chosen companies pays
+little.
 
-### Security notes
-
-- Webhook signature verification is mandatory; an unverified endpoint is a free
-  subscription for anyone who reads the docs.
-- `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are secrets: the CI scanner already
-  matches `SECRET_KEY` and would catch a committed one.
-- The webhook must be reachable publicly while `api` stays internal — the Caddy
-  config needs one explicit path exception, and that is the **only** route that should
-  be exposed without authentication.
-
-## 6. Deliberately out of scope
-
-For a first paid tier — flagged as skipped, not forgotten:
-
-| Not building | Why |
-|---|---|
-| Usage-based billing beyond a cap | Metered billing needs usage-reporting reconciliation and a dispute story. A cap is legible and one integer. |
-| Invoicing / purchase orders | Enterprise procurement. No enterprise customers. |
-| Proration | Stripe handles it on plan change; do not reimplement. |
-| Multi-currency | USD only until there is demand with a location attached. |
-| Annual contracts | Needs a renewal and dunning story that does not exist. |
-| Per-seat pricing | Seats cost nothing marginal; charging pushes teams to share logins and destroys review attribution. |
-| Credit rollover | Every rollover scheme creates end-of-period gaming. |
-| Free-trial-of-paid | The free tier *is* the trial, with no card and no expiry cliff. |
-
-## 7. Sequence, once you have decided
-
-1. Confirm tiers, prices and the research quota.
-2. Migration for `workspace_subscriptions`.
-3. `plan_limits.py` beside `private_alpha.py`, same `LimitExceeded` pattern.
-4. Research quota check at `research_account` and run creation.
-5. Stripe Checkout, webhook, portal.
-6. Read-only mode.
-7. Billing section on Settings, next to the retention statement.
-
-**Blocked first:** none of this matters until OIDC sign-in works, because billing
-attaches to an authenticated identity. Sign-in is the prerequisite.
-
-## 8. One risk worth naming
-
-Billing pushes toward *more* research — it is the meter. The product's argument is
-that **not** researching, and saying "unknown" or "no signal", is often the right
-answer. If quota pressure ever nudges the product toward researching more accounts
-more shallowly, the meter has damaged the thing being sold.
-
-**Mitigation:** meter accounts researched, never facts produced or signals found.
-Nothing in the plan model should reward finding *more*, only researching *more
-companies*.
+Metering fetches is the closest proxy to cost, so it stays. But the pricing page
+should not encourage researching more — and the product should keep making it
+easy to *not* research an account, which is what the import validation and
+identity gates already do before a single fetch is spent.

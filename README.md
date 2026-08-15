@@ -157,6 +157,20 @@ anything the product acts on. See
 [docs/architecture](docs/architecture) for the rest — data model, agent/workflow
 architecture, and the research gateway's request handling.
 
+## Building on this
+
+If you want to use this as the foundation for your own GTM tooling rather than
+run it as-is, **[docs/EXTENDING.md](docs/EXTENDING.md)** maps the five seams —
+adding a research source, changing the scoring formula, changing what counts as
+valid evidence, changing qualification states, and adding an API endpoint — with
+the exact file and function for each, plus the four invariants the test suite
+will hold you to.
+
+The short version of what's worth taking: the evidence pipeline. Turning a
+domain into attributed, identity-checked evidence and a number you can defend is
+the part that's genuinely hard, and it's the part that works without any paid
+provider.
+
 ## Repository layout
 
 ```

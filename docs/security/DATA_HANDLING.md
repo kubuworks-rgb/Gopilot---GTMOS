@@ -1,8 +1,8 @@
-# GoPilot — Private Alpha Data Handling
+# GoPilot — Data Handling
 
-**Scope:** what the private alpha stores, for how long, what it never stores, and
-how to delete it. Written for an operator answering a founder who asks "what do you
-have on my company, and can you remove it?"
+**Scope:** what a GoPilot deployment stores, for how long, what it never stores, and
+how to delete it. Written for whoever operates a deployment and needs to answer
+"what do you have on my company, and can you remove it?"
 
 ---
 
@@ -50,19 +50,18 @@ a fetched page cannot instruct the system.
 
 ## 3. Retention
 
-At alpha there is **no automatic expiry**. Data persists until deleted, because
-silently discarding a founder's evidence would be worse than keeping it.
-
 | Data | Retention |
 |---|---|
-| Everything in section 1 | until workspace or account deletion |
+| Retrieved pages and evidence derived from them | `RESEARCH_RETENTION_DAYS` (default 180), then eligible for deletion |
+| Accounts, briefs, review notes | until you delete them — no automatic expiry |
 | Redis job queue | transient; entries vanish once a job settles |
 | Dead-letter queue | until manually drained |
 | Container logs | Docker's default rotation |
 
-Before general availability this needs a documented per-tenant retention window.
-Tracked as a post-alpha item; the alpha is small enough and invite-only, so the
-exposure is bounded and known.
+Nothing is deleted automatically even after the retention window passes:
+`RETENTION_AUTO_DELETE=true` is refused at startup by design. Run
+`scripts/apply_retention.py`, which previews what has aged past the window before
+it deletes anything.
 
 ---
 
@@ -73,7 +72,7 @@ touch anything outside the workspace it is given.
 
 ```bash
 # Preview - always run this first; it writes nothing
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   exec api python scripts/delete_workspace_data.py --workspace-id <uuid> --dry-run
 
 # Delete one account and everything derived from it

@@ -323,14 +323,16 @@ dependency, and the never-used `job_leases` table (migration `0008`).
 - **Nav still shows ten items** including ICP studio and Research, which carry little
   meaning in a BYOA-first product (§28 says nav should reflect what is real).
 
-## Private Alpha Scope
+## Production Deployment Scope
 
-Invite-only, BYOA only, bounded usage, human-reviewed output, safe export,
-autonomous discovery disabled. Deployable via `docker-compose.private-alpha.yml`
-with a runbook and a smoke test.
+BYOA only, bounded usage, human-reviewed output, safe export, autonomous discovery
+disabled by default. Optional invite-gating for anyone who wants to run a closed
+deployment rather than an open one. Deployable via
+`deploy/docker-compose.production.yml` with a runbook and a smoke test.
 
-**One blocker remains: browser sign-in.** Production requires `AUTH_MODE=oidc`, so
-every invited user would arrive through an unverified front door.
+Browser sign-in (Authorization Code with PKCE against any standard OIDC issuer,
+including logout, refresh, and tenant isolation) is implemented and verified live —
+see `scripts/verify_oidc_flow.py`.
 
 ## Later Roadmap
 
@@ -340,7 +342,8 @@ every invited user would arrive through an unverified front door.
 2. Dashboard deltas, which need historical snapshots.
 3. Router consolidation behind a repository protocol.
 4. Splitting the research monolith.
-5. Per-tenant data retention windows — currently no automatic expiry.
+5. Automatic deletion once past the retention window — currently preview-only via
+   `scripts/apply_retention.py`, by design, until an operator confirms each run.
 6. Re-evaluating autonomous discovery quality.
 7. CRM import, explicitly out of scope for alpha.
 

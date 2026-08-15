@@ -4,35 +4,39 @@
 if a step is skipped.
 
 The operational runbook — startup order, backups, incidents, invites — is
-[PRIVATE_ALPHA_DEPLOYMENT_RUNBOOK.md](PRIVATE_ALPHA_DEPLOYMENT_RUNBOOK.md). This
-document covers exposure only.
+[DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md). This document covers exposure only.
+
+None of this is required to try GoPilot. It only applies if you choose to run a
+deployment reachable from outside your own machine — see the repository root
+README for the zero-setup local quickstart.
 
 ---
 
-## The three requirements
+## The requirements
 
-Public exposure needs all three. **None of them is optional, and none is a default.**
+Public exposure needs the first two. **Neither is optional, and neither is a
+default.** The third is optional — only relevant if you want a closed deployment.
 
 | # | Requirement | Without it |
 |---|---|---|
 | 1 | Reverse proxy with TLS | Credentials and evidence cross the internet in plaintext |
 | 2 | Real OIDC credentials | The app refuses to start; there is no way in |
-| 3 | Invite list | Startup fails rather than admitting everyone |
+| 3 | Invite list (optional) | Anyone can sign in and use the deployment |
 
 ### 1 · Reverse proxy with TLS
 
-`docker-compose.private-alpha.yml` publishes `web` on a plain HTTP port. That is
+`deploy/docker-compose.production.yml` publishes `web` on a plain HTTP port. That is
 correct for `localhost` and **wrong for anything else**.
 
 ```bash
-# in .env.private-alpha
+# in .env
 DOMAIN=gopilot.example.com
 ACME_EMAIL=ops@example.com
 ```
 
 ```bash
-docker compose -f docker-compose.private-alpha.yml -f docker-compose.tls.yml \
-  --env-file .env.private-alpha up -d
+docker compose -f deploy/docker-compose.production.yml \
+  -f deploy/docker-compose.tls.yml --env-file .env up -d
 ```
 
 The overlay adds Caddy, which obtains and renews certificates automatically, and
@@ -66,11 +70,17 @@ Register `https://<DOMAIN>/auth/callback` as a redirect URI. The browser flow is
 Authorization Code with PKCE, so **there is no client secret** — if a provider hands
 you one for this client, you have configured a confidential client by mistake.
 
-> **Known gap.** The browser sign-in flow has never completed against a real issuer.
-> The API's token verification is complete and tested; the front door is not
-> verified. Do not invite users until it has been.
+The full browser flow — sign-in, logout, token refresh, expiry, and tenant
+isolation — is implemented and verified against a real OIDC issuer;
+`scripts/verify_oidc_flow.py` drives all of it programmatically and
+`services/dev_oidc` lets you reproduce it locally without registering with a
+provider. What is *not* verified is your specific chosen provider's redirect and
+CORS configuration — test sign-in once after switching it on (see the checklist).
 
-### 3 · Invite list
+### 3 · Invite list (optional)
+
+Only needed if you want a closed deployment rather than an open one. Skip this
+section entirely to run publicly.
 
 ```bash
 PRIVATE_ALPHA_ENABLED=true
@@ -79,8 +89,8 @@ PRIVATE_ALPHA_ALLOWED_SUBJECTS=<oidc subject>,<another>
 PRIVATE_ALPHA_ALLOWED_EMAILS=founder@example.com
 ```
 
-Both empty with the private alpha on is a startup error, not a warning: an empty
-list would admit nobody, which is far more likely a mistake than an intent.
+Both empty with this switched on is a startup error, not a warning: an empty list
+would admit nobody, which is far more likely a mistake than an intent.
 
 ---
 
@@ -96,7 +106,7 @@ running in a degraded mode.
 | `AUTH_MODE=oidc` missing issuer/audience/JWKS | Refuses to start |
 | An HMAC algorithm in `JWT_ALGORITHMS` | Refuses to start |
 | Production without `RESEARCH_GATEWAY_TOKEN` | Gateway refuses to start |
-| Private alpha with both invite lists empty | Refuses to start |
+| Invite-gating on with both invite lists empty | Refuses to start |
 | `RETENTION_AUTO_DELETE=true` | Refuses to start — not implemented |
 | A gateway token under 32 characters | Refuses to start |
 | Production with `http://` in `JWT_ISSUER`, `JWKS_URL` or `AGENT_REACH_GATEWAY_URL` | Refuses to start |
@@ -132,17 +142,18 @@ the service is answering in plaintext. Do not announce the URL.
 
 - [ ] TLS overlay running; `http://` redirects to `https://`
 - [ ] `web` is the only service with published ports
-- [ ] `AUTH_MODE=oidc` against a real issuer, redirect URI registered
-- [ ] **Browser sign-in completed end to end at least once** ← currently unverified
-- [ ] Invite list populated with real identities
+- [ ] `AUTH_MODE=oidc` against your real issuer, redirect URI registered
+- [ ] Browser sign-in tested once against that specific issuer (the flow itself is
+      verified; your provider's redirect/CORS configuration is what you're checking)
+- [ ] If invite-gating: list populated with real identities
 - [ ] `RESEARCH_GATEWAY_TOKEN` set, 32+ characters, generated not reused
 - [ ] `POSTGRES_PASSWORD` generated, not the template default
 - [ ] Backup taken and a restore rehearsed
 - [ ] Retention window agreed and stated on the Settings screen
-- [ ] `docker compose ... exec api python scripts/private_alpha_smoke.py --user <invited>` passes
+- [ ] `docker compose ... exec api python scripts/private_alpha_smoke.py --user <identity>` passes
 
 ## Not covered
 
 Multi-host deployment, load balancing, log shipping, uptime monitoring and paging
-are out of scope for a private alpha and are not configured. A single host with
-backups is the intended shape.
+are not configured here. A single host with backups is the shape this repository
+ships; scaling beyond that is a real project of its own.

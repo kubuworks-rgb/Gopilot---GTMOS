@@ -1,7 +1,8 @@
-# GoPilot — Private Alpha Deployment Runbook
+# GoPilot — Deployment Runbook
 
-**Scope:** a limited, invite-only private alpha of `BYOA_CORE` on a single host.
-Not a public launch. Not an autonomous-discovery release.
+**Scope:** running `BYOA_CORE` on a single host, for anyone who wants a real
+deployment rather than a local checkout. Invite-gating is optional. Not an
+autonomous-discovery release.
 
 This runbook has been executed end to end, not merely written. Where a step has a
 known caveat, it says so.
@@ -24,8 +25,9 @@ known caveat, it says so.
 request; if it were reachable from outside the compose network it would be an open
 fetch service. Keep it internal.
 
-`docker-compose.yml` remains the local-development file (infrastructure only).
-`docker-compose.private-alpha.yml` runs the whole product.
+`deploy/docker-compose.dev-infra.yml` remains the local-development file
+(infrastructure only). `deploy/docker-compose.production.yml` runs the whole
+product.
 
 ---
 
@@ -42,7 +44,7 @@ fetch service. Keep it internal.
 ## 3. Configure
 
 ```bash
-cp .env.private-alpha.example .env.private-alpha
+cp .env.example .env
 ```
 
 Generate each secret locally. Never reuse a value from the template:
@@ -60,10 +62,10 @@ Fill in, at minimum:
 | `JWT_ISSUER`, `JWT_AUDIENCE`, `JWKS_URL` | from your OIDC issuer |
 | `PRIVATE_ALPHA_ALLOWED_SUBJECTS` or `PRIVATE_ALPHA_ALLOWED_EMAILS` | the invite list; **at least one must be non-empty** |
 
-`.env.private-alpha` is covered by `.gitignore`. Confirm before proceeding:
+`.env` is covered by `.gitignore`. Confirm before proceeding:
 
 ```bash
-git check-ignore -v .env.private-alpha
+git check-ignore -v .env
 ```
 
 ### Configuration that fails closed at startup
@@ -84,7 +86,7 @@ These are startup errors, not warnings. A misconfigured deployment does not boot
 ## 4. Deploy
 
 ```bash
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha up -d --build
+docker compose -f deploy/docker-compose.production.yml --env-file .env up -d --build
 ```
 
 Startup order is enforced by compose conditions, so nothing serves traffic against
@@ -98,8 +100,8 @@ postgres/redis healthy → migrate runs to completion → gateway → api → we
 Watch it settle:
 
 ```bash
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha ps
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha logs -f api worker
+docker compose -f deploy/docker-compose.production.yml --env-file .env ps
+docker compose -f deploy/docker-compose.production.yml --env-file .env logs -f api worker
 ```
 
 ---
@@ -108,11 +110,11 @@ docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha
 
 ```bash
 # API health (from inside the network; the port is not published)
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   exec api curl -fsS http://127.0.0.1:8000/health
 
 # Migrations are at head
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   exec api python -m alembic -c apps/api/alembic.ini current
 
 # UI
@@ -128,7 +130,7 @@ gate, review, export and tenant isolation.
 workspace call is correctly refused with `403`:
 
 ```bash
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   exec api python scripts/private_alpha_smoke.py --user <an invited subject>
 ```
 
@@ -137,15 +139,17 @@ remove it (section 11).
 
 ---
 
-## 6. Invites
+## 6. Invites (optional)
 
-Access is invite-only while `PRIVATE_ALPHA_ENABLED=true`. There is no public signup.
+Skip this section to run publicly. Set `PRIVATE_ALPHA_ENABLED=true` to gate access
+to a specific list of identities instead — useful for a deployment you're running
+for a closed group rather than the public.
 
 To invite someone, add their OIDC subject or email to
 `PRIVATE_ALPHA_ALLOWED_SUBJECTS` / `PRIVATE_ALPHA_ALLOWED_EMAILS`, then:
 
 ```bash
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   up -d api worker
 ```
 
@@ -153,14 +157,14 @@ Uninvited callers receive `403` even with a perfectly valid token. Revoking is t
 same edit in reverse; it takes effect on the next restart.
 
 **Caveat:** the invite list lives in configuration, so a change needs a service
-restart. That is acceptable at alpha scale and avoids a migration for a table that
-may not survive contact with real usage.
+restart. That avoids a migration and a table for something this simple; if the
+list needs to change often, that's a sign to build real invite management instead.
 
 ---
 
 ## 7. Limits
 
-All configurable in `.env.private-alpha`. Every one returns an explicit `429` with
+All configurable in `.env`. Every one returns an explicit `429` with
 a machine-readable `code`, `limit` and `attempted` — **nothing is silently
 truncated**, because a user who imports 300 accounts and receives 100 without being
 told has been given a wrong answer, not a partial one.
@@ -181,12 +185,12 @@ told has been given a wrong answer, not a partial one.
 
 ```bash
 # Backup
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   exec -T postgres pg_dump -U "$POSTGRES_USER" gtm | gzip > backup-$(date +%F).sql.gz
 
 # Restore into an empty database
 gunzip -c backup-YYYY-MM-DD.sql.gz | \
-  docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+  docker compose -f deploy/docker-compose.production.yml --env-file .env \
   exec -T postgres psql -U "$POSTGRES_USER" gtm
 ```
 
@@ -199,13 +203,13 @@ re-running research re-creates it. Back up PostgreSQL, not Redis.
 
 ```bash
 git checkout <previous-tag>
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha up -d --build
+docker compose -f deploy/docker-compose.production.yml --env-file .env up -d --build
 ```
 
 If the rollback crosses a migration, downgrade **before** starting the older code:
 
 ```bash
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   run --rm migrate python -m alembic -c apps/api/alembic.ini downgrade -1
 ```
 
@@ -221,15 +225,15 @@ in-flight list and released only once they settle, so an interrupted job is not
 lost. Restarting reclaims it:
 
 ```bash
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha restart worker
+docker compose -f deploy/docker-compose.production.yml --env-file .env restart worker
 ```
 
 Inspect the queues:
 
 ```bash
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   exec redis redis-cli llen gtm:research-jobs
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha \
+docker compose -f deploy/docker-compose.production.yml --env-file .env \
   exec redis redis-cli llen gtm:research-jobs:dead
 ```
 
@@ -250,7 +254,7 @@ one service.
 
 ## 11. Data handling and deletion
 
-See [PRIVATE_ALPHA_DATA_HANDLING.md](../security/PRIVATE_ALPHA_DATA_HANDLING.md).
+See [DATA_HANDLING.md](../security/DATA_HANDLING.md).
 
 ---
 
@@ -258,24 +262,22 @@ See [PRIVATE_ALPHA_DATA_HANDLING.md](../security/PRIVATE_ALPHA_DATA_HANDLING.md)
 
 ```bash
 # Stop, keep data
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha down
+docker compose -f deploy/docker-compose.production.yml --env-file .env down
 
 # Stop and destroy all data - irreversible, back up first
-docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha down -v
+docker compose -f deploy/docker-compose.production.yml --env-file .env down -v
 ```
 
 ---
 
-## 13. Known limitations at alpha
+## 13. Known limitations
 
 Stated plainly so nobody discovers them in production:
 
-1. **The web app has no login screen.** The API verifies bearer tokens correctly,
-   but the browser cannot yet obtain one. Until that lands, `AUTH_MODE=oidc` is not
-   usable end to end from the UI.
-2. **Single host, single worker.** No horizontal scaling, no load balancer.
-3. **No TLS termination in compose.** Put the host behind a reverse proxy with a
-   certificate before exposing it beyond localhost.
-4. **Invite changes require a restart** (section 6).
-5. **Autonomous discovery remains experimental** and is off by default. Do not
+1. **Single host, single worker.** No horizontal scaling, no load balancer.
+2. **No TLS termination in compose itself.** Put the host behind the TLS overlay
+   (section 1 of `DEPLOYMENT.md`) or your own reverse proxy before exposing it
+   beyond localhost — compose alone serves plain HTTP.
+3. **Invite changes require a restart**, if invite-gating is on (section 6).
+4. **Autonomous discovery remains experimental** and is off by default. Do not
    present it as production-quality.

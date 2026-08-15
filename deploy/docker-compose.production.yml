@@ -1,19 +1,21 @@
-# Full private-alpha stack: web, api, worker, research gateway, PostgreSQL, Redis.
+# The whole product: web, api, worker, research gateway, PostgreSQL, Redis. Run
+# this from the repository root, not from deploy/ -- the build context is the repo
+# root so the API and web images can see all of apps/ and services/.
 #
-# `docker-compose.yml` stays as the local-development file that runs infrastructure
-# only. This one runs the whole product.
+# `deploy/docker-compose.dev-infra.yml` is the separate local-development file that
+# runs infrastructure only (Postgres + Redis), for use with `npm run dev:live`.
 #
-#   docker compose -f docker-compose.private-alpha.yml --env-file .env.private-alpha up -d --build
+#   docker compose -f deploy/docker-compose.production.yml --env-file .env up -d --build
 #
 # Only the web port is published. The API, worker and gateway stay on the internal
 # network: the gateway in particular retrieves arbitrary public URLs on request and
 # must never be reachable from outside the compose network.
 
-name: gopilot-private-alpha
+name: gopilot-production
 
 x-python-service: &python-service
   build:
-    context: .
+    context: ..
     dockerfile: Dockerfile.python
   restart: unless-stopped
   environment: &python-env
@@ -134,7 +136,7 @@ services:
 
   web:
     build:
-      context: .
+      context: ..
       dockerfile: apps/web/Dockerfile
       args:
         # Build-time, not runtime: Next.js bakes rewrites() and every

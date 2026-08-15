@@ -244,6 +244,10 @@ class ScoreComponent(BaseModel):
 class ScoreBreakdown(BaseModel):
     score: int = Field(ge=0, le=100)
     components: list[ScoreComponent]
+    # False only when every factor in this dimension was unknown. `score` is still
+    # 0 in that case for schema compatibility, but callers must check this flag
+    # before presenting it -- an undetermined dimension is not a confident zero.
+    determined: bool = True
 
 
 class AccountScores(BaseModel):

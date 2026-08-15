@@ -25,43 +25,44 @@ attributed, scores computed, briefs generated, statuses changed, list exported.
 
 ---
 
-## 2. P0 — Unknown fit is scored as zero, and it changes the ranking
+## 2. P0 — Unknown fit was scored as zero, and it changed the ranking (FIXED)
 
-**This is the one finding that should block a claim of "ready".** It is not a
-crash and no test catches it; the system produces a confident, wrong number.
+**Status: fixed.** This was the one finding that blocked a claim of "ready". It
+was not a crash and no test caught it; the system produced a confident, wrong
+number. It is now pinned by a regression test built from this exact case.
 
-### What happens
+### What was happening
 
 `_breakdown_missing_aware` ([scoring.py:25](../../apps/api/app/services/scoring.py:25))
 exists precisely so that an unknown criterion is never treated as a negative one.
 It drops unknown components and renormalises the remaining weights. But when
-*every* component of a dimension is unknown, it falls through to:
+*every* component of a dimension was unknown, it fell through to:
 
 ```python
 if known_weight <= 0:
     return ScoreBreakdown(score=0, components=[])
 ```
 
-A score of **0 with an empty component list**. That is the same defect the
-function was written to prevent, one level up: unknown has become zero for the
+A score of **0 with an empty component list**. That was the same defect the
+function was written to prevent, one level up: unknown had become zero for the
 whole dimension.
 
 ### Observed on the live run
 
-| Account | Fit | Components | What 0 actually means |
+| Account | Fit | Components | What 0 actually meant |
 |---|---|---|---|
 | `supabase.com` | 50 | `Industry match 50` | evaluated |
 | `neon.tech` | 0 | `Industry match 0`, `Geography match 0` | **evaluated, genuinely 0** |
 | `fly.io` | 0 | *(none)* | **not determined** |
 | `render.com` | 0 | *(none)* | **not determined** |
 
-`neon.tech` and `fly.io` both render as "Fit 0". One is a verdict; the other is
-an absence of a verdict. Nothing in the API response or the UI distinguishes
+`neon.tech` and `fly.io` both rendered as "Fit 0". One was a verdict; the other
+was an absence of a verdict. Nothing in the API response or the UI distinguished
 them.
 
-### Why it matters beyond display
+### Why it mattered beyond display
 
-Priority is computed from the zero:
+Priority was computed from the zero:
 
 ```python
 priority = round((fit.score * 0.55 + intent.score * 0.45) * confidence.score / 100)
@@ -73,28 +74,45 @@ For `fly.io` — intent 70, confidence 91, fit *unknown*:
 - Renormalised as the design intends (intent carries the full weight when fit is
   unknown): `70 × 0.91` = **64**
 
-The account is ranked **less than half as urgent as its own evidence supports**,
-and 29 vs 64 is the difference between "below the fold" and "top of the list".
-The founder never learns that fit was never determined; they see a low number and
-move on.
+The account was ranked **less than half as urgent as its own evidence
+supported**, and 29 vs 64 is the difference between "below the fold" and "top of
+the list". The founder never learned that fit was never determined; they saw a
+low number and moved on.
 
-This also silently interacts with the new §14 score filters: a "Fit 60+" filter
-hides every account whose fit could not be determined, presenting them as
-positively poor-fit.
+### The fix
 
-### Why this is reported rather than patched
+`ScoreBreakdown` gained a `determined: bool` field
+([models.py:244](../../apps/api/app/domain/models.py:244)), `False` only when
+every factor in a dimension was unknown. `_breakdown_missing_aware` sets it
+rather than silently returning a confident 0
+([scoring.py:25](../../apps/api/app/services/scoring.py:25)), and a new
+`_priority_from` composes priority the same missing-aware way its own
+components are composed: an undetermined dimension is excluded from the
+weighted sum and the other's weight is renormalised to compensate, instead of
+multiplying by a phantom 0
+([scoring.py:49](../../apps/api/app/services/scoring.py:49)). The UI, account
+table, and CSV export now render "Not determined" instead of a bare `0` for an
+undetermined dimension ([score.tsx](../../apps/web/components/score.tsx),
+[exports.py](../../apps/api/app/services/exports.py)) — this was never about
+hiding that it's missing, only about not letting the absence act as a negative
+signal in the math.
 
-Fixing it properly means a dimension score has to be able to say "not
-determined", which is a `float | None` through the domain model, the API schema,
-the web types, the accounts table, sorting, the new filters, and the CSV export —
-plus a product decision on what priority should even mean when a dimension is
-missing (renormalise onto the remaining dimensions, or refuse to rank at all).
-That is a design change, not a repair, so it is on the table rather than in the
-code.
+`apps/api/tests/test_security_and_scoring.py` pins this with a fixture built
+from the exact fly.io numbers above (`test_a_fully_unknown_fit_is_excluded_rather_than_scored_zero`,
+expects priority 64, not 29) plus a unit-level check on `_priority_from` in
+isolation. Both were confirmed to fail against the reverted code before the fix
+was restored.
 
-**Recommendation:** renormalise priority across known dimensions the same way
-components are renormalised within one, and render an undetermined dimension as
-"Not determined" rather than 0.
+**Live re-verification (re-running `scripts/verify_e2e_scenario.py` against the
+same real stack, same fly.io account): see the "Live scoring-fix re-verification"
+addendum below.**
+
+This also affected the §14 score filters: a "Fit 60+" filter hid every account
+whose fit could not be determined, presenting them as positively poor-fit rather
+than as unevaluated. That specific interaction is not yet addressed — a filter
+floor still excludes an undetermined account rather than treating it as its own
+category — and is a smaller residual worth a follow-up, not a re-opening of this
+P0.
 
 ---
 
@@ -183,5 +201,39 @@ open web genuinely served a different number of pages on the second pass. A
 confidence score that did *not* move under those conditions would be the
 suspicious one.
 
-The P0 in §2 reproduced identically across both runs: `fly.io` and `render.com`
-returned fit 0 with an empty component list each time.
+The P0 in §2 (now fixed) reproduced identically across both runs: `fly.io` and
+`render.com` returned fit 0 with an empty component list each time.
+
+---
+
+## 6. Live scoring-fix re-verification
+
+**Date:** 2026-08-15. Same driver, same standard, fresh real stack: Postgres and
+Redis brought up from `deploy/docker-compose.dev-infra.yml`, migrations applied
+from empty, gateway/API/worker/OIDC issuer running live, no `EXA_API_KEY` or
+`TAVILY_API_KEY`. `scripts/verify_e2e_scenario.py` walked the full scenario
+again end to end: **PASS 31, FAIL 0** (identical to the original run).
+
+`fly.io` reproduced the fully-unknown-fit case again on this run —
+`F 0 I 70 C 95`, an empty fit component list — and the fix held:
+
+- **Priority as shown: 66.** `round(70 × 0.95) = 66` — intent carries the full
+  weight because fit is excluded and renormalized, not multiplied by 0.
+- **What the old formula would have produced on this same run:**
+  `round((0×0.55 + 70×0.45) × 0.95) = round(29.925) = 30`.
+
+This run's confidence (95) differs from the original run's (91) — retrieval
+coverage varies run to run against the live web, which is expected and already
+documented in §5 — so the absolute before/after numbers differ from the
+originally reported 29 → 64. The mechanism is the same and the direction and
+magnitude of the correction are consistent: fit being undetermined no longer
+costs the account more than half its priority.
+
+`render.com` also reproduced its fully-unknown case (`F 0 I 0 C 95`, both
+weighted dimensions undetermined) and correctly scored **priority 0** — there is
+nothing to renormalize onto when both fit and intent are undetermined, which is
+the documented fallback in `_priority_from`, not a bug.
+
+The two founder-experience flags from §3 (fit/intent contradiction not
+explained; confidence read as a verdict) are unchanged by this fix and remain
+open — they are about explanation, not about the math being wrong.

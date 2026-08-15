@@ -1,7 +1,7 @@
 export type ClaimStatus = "supported" | "partially_supported" | "hypothesis" | "contradicted";
 
 export interface ScoreComponent { label: string; value: number; weight: number; contribution: number; evidence_ids: string[] }
-export interface ScoreBreakdown { score: number; components: ScoreComponent[] }
+export interface ScoreBreakdown { score: number; components: ScoreComponent[]; determined: boolean }
 export interface Scores { fit: ScoreBreakdown; intent: ScoreBreakdown; confidence: ScoreBreakdown; priority: number }
 export type QualificationStatus = "QUALIFIED" | "QUALIFIED_WITH_UNCERTAINTY" | "BORDERLINE" | "DISQUALIFIED" | "INSUFFICIENT_EVIDENCE";
 export type CompanySizeStatus = "VERIFIED" | "ESTIMATED" | "UNKNOWN";

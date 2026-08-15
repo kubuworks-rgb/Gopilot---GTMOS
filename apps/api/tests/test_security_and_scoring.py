@@ -62,6 +62,83 @@ def test_scoring_is_deterministic_and_fit_is_separate_from_intent() -> None:
     )
 
 
+def test_a_fully_unknown_fit_is_excluded_rather_than_scored_zero() -> None:
+    """The fly.io case from the live-mode run (docs/qa/LIVE_E2E_FINDINGS.md #2).
+
+    All three fit factors were unknown. Before the fix, `_breakdown_missing_aware`
+    fell through to a confident-looking fit of 0, and priority was computed as
+    though a 0-fit account had been evaluated and found wanting --
+    (0*0.55 + 70*0.45) * 0.91 = 29 -- instead of excluding fit and renormalizing
+    priority onto intent alone -- 70 * 0.91 = 64. The account was ranked less
+    than half as urgent as its own evidence supported.
+    """
+    scores = score_account(
+        industry_match=None,
+        size_match=None,
+        geography_match=None,
+        signal_strength=70,
+        signal_recency=70,
+        evidence_coverage=90,
+        source_quality=90,
+        retrieval_coverage=94,
+        fit_evidence=[],
+        signal_evidence=["intent"],
+    )
+
+    assert scores.fit.determined is False
+    assert scores.fit.components == []
+    assert scores.intent.determined is True
+    assert scores.intent.score == 70
+    assert scores.confidence.score == 91
+    assert scores.priority == 64  # not 29
+
+
+def test_a_partially_unknown_fit_still_renormalizes_as_before() -> None:
+    """The fix must not disturb the case that already worked: one known factor
+    carries the full weight rather than the dimension itself becoming
+    undetermined."""
+    scores = score_account(
+        industry_match=80,
+        size_match=None,
+        geography_match=None,
+        signal_strength=50,
+        signal_recency=50,
+        evidence_coverage=80,
+        source_quality=80,
+        retrieval_coverage=80,
+        fit_evidence=["fit"],
+        signal_evidence=["intent"],
+    )
+
+    assert scores.fit.determined is True
+    assert scores.fit.score == 80
+
+
+def test_priority_renormalizes_onto_intent_when_fit_is_undetermined() -> None:
+    """A unit-level check on the composition, independent of score_account's
+    particular weightings, so this fails on its own if the renormalization
+    regresses even if the fixture numbers above ever drift."""
+    from apps.api.app.domain.models import ScoreBreakdown
+    from apps.api.app.services.scoring import _priority_from
+
+    fit = ScoreBreakdown(score=0, components=[], determined=False)
+    intent = ScoreBreakdown(score=80, components=[], determined=True)
+    confidence = ScoreBreakdown(score=100, components=[], determined=True)
+
+    assert _priority_from(fit, intent, confidence) == 80  # not 36
+
+
+def test_priority_is_zero_when_every_weighted_dimension_is_undetermined() -> None:
+    from apps.api.app.domain.models import ScoreBreakdown
+    from apps.api.app.services.scoring import _priority_from
+
+    fit = ScoreBreakdown(score=0, components=[], determined=False)
+    intent = ScoreBreakdown(score=0, components=[], determined=False)
+    confidence = ScoreBreakdown(score=100, components=[], determined=True)
+
+    assert _priority_from(fit, intent, confidence) == 0
+
+
 def test_old_signals_decay() -> None:
     recent = signal_decay(datetime.now(UTC) - timedelta(days=1))
     old = signal_decay(datetime.now(UTC) - timedelta(days=90))

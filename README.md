@@ -1,283 +1,193 @@
-# GoPilot — GTM OS
+# GoPilot
 
-GoPilot is an evidence-backed GTM research and account-intelligence operating
-system for founder-led B2B teams. Its core MVP is **Bring Your Own Accounts
-(BYOA)**: import known company domains, validate their identity, research allowed
-official sources, calculate deterministic scores, inspect opportunity briefs,
-review the result, and export approved records.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/kubuworks-rgb/Gopilot---GTMOS/actions/workflows/ci.yml/badge.svg)](https://github.com/kubuworks-rgb/Gopilot---GTMOS/actions/workflows/ci.yml)
 
-GoPilot exposes two product modes:
+An evidence-backed GTM (go-to-market) research tool. Give it a list of companies
+you're already interested in and it researches each one against its own official
+website, scores it with a deterministic (non-LLM) formula, and produces a brief
+where every material claim links back to the exact passage and source it came
+from. It answers one question, rigorously: *out of the companies I could target,
+which deserve my attention, why, and how confident should I be?*
 
-- `BYOA_CORE` is the default and works without Exa, Tavily, or another search
-  provider.
-- `AUTONOMOUS_DISCOVERY_EXPERIMENTAL` is a separate, secondary workflow. It
-  requires a configured search provider, is explicitly labelled Experimental,
-  and requires human review of every discovered account.
+It is not a lead scraper, a company database, a chatbot, or a CRM.
 
-The repository has two deliberately separate modes:
+```
+Import accounts → Verify identity → Research → Evidence → Score
+                → Opportunity brief → Human review → Export
+```
 
-- `fixture`: the default offline product demo. Every fixture source is marked
-  `DEMO DATA`.
-- `live`: PostgreSQL persistence, Redis jobs, an isolated public-source gateway,
-  normalized source documents, exact-passage evidence, and no fixture fallback.
+## Why this exists
 
-Live mode never converts an upstream failure into demo output. A run records a
-typed failed or partial state instead. A successful search with no relevant
-articles completes explicitly at `no_relevant_results`.
+The claim isn't "we're better at everything." It's narrower, and the parts of it
+that are actually load-bearing are tested, not just asserted:
 
-Runtime data mode (`fixture` or `live`) is separate from product mode
-(`BYOA_CORE` or `AUTONOMOUS_DISCOVERY_EXPERIMENTAL`). Live BYOA uses the supplied
-official domains directly and never substitutes fixture accounts.
+**No paid data provider required.** BYOA (Bring Your Own Accounts) — importing
+companies you already have and researching them against their own domain — needs
+zero API keys. Not a trial tier, not "some features work" — the core loop runs
+with `EXA_API_KEY` and `TAVILY_API_KEY` both unset, verified by CI at the
+workflow level so the property can't silently regress. Most comparable tools
+require a paid key before you can research a single account.
 
-## Product contract
+**It won't confuse one company for another.** Entity resolution runs 10 relation
+types (same entity, subsidiary, acquired-by, sister brand, unrelated, ...)
+against 6 claim scopes, and a claim from the wrong entity is rejected rather than
+silently attached to your target. 22 tests cover 17 real near-miss pairs — the
+kind of company-name collision ("Optivian" the fintech vs. "Optivian" the totally
+unrelated firm two letters off) that has burned other tools in production.
 
-The primary unit of value is an `AccountOpportunityBrief`, not a scraped lead.
-Each brief contains:
+**It won't tell you something it doesn't know.** When evidence for a scoring
+dimension is missing, the score renormalizes across what *is* known instead of
+defaulting the unknown to zero — whether that's one factor within a dimension or
+every factor in it. A live run against 20 real companies found the second case
+unhandled: when a dimension was *entirely* unknown, it fell through to a
+confident-looking `0` instead of "not determined," which measurably changed one
+account's ranking (`fly.io` scored priority 29 instead of 64 because an unknown
+fit was silently treated as a confirmed poor one). Found, fixed, pinned by a
+regression test built from that exact case, and re-verified against a fresh live
+run — full history in
+[docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md#2-p0--unknown-fit-was-scored-as-zero-and-it-changed-the-ranking-fixed).
+It's kept in the README rather than quietly dropped from history, because a
+repo claiming unknown-aware reasoning should show its work when that property
+was once broken, not just assert it now holds.
 
-- separate Fit, Intent, Confidence, and confidence-gated Priority scores;
-- editable score factors with their inputs, weights, contributions, and evidence;
-- evidence-linked “Why it fits” and “Why now” claims;
-- current signals only when a persisted source passage supports them;
-- source URLs, retrieval timestamps, hashes, and provenance;
-- explicit hypotheses where evidence is absent;
-- explicit ICP matches, mismatches, and unknown criteria;
-- ambiguous or rejected evidence that cannot affect scoring;
-- one of `FOUNDER_READY`, `RESEARCH_CANDIDATE`, `MONITOR`,
-  `IDENTITY_REVIEW_REQUIRED`, or `DO_NOT_TARGET`;
-- an editable draft only when the brief is `FOUNDER_READY`.
+Full honest comparison against Clay, Common Room, 6sense, and others — including
+where GoPilot is *not* differentiated — is in
+[docs/product/COMPETITOR_POSITIONING.md](docs/product/COMPETITOR_POSITIONING.md).
 
-Human approval is mandatory before outbound use. GoPilot does not autonomously
-send outreach.
+## Quickstart — zero API keys, zero signup, under 5 minutes
+
+```bash
+git clone https://github.com/kubuworks-rgb/Gopilot---GTMOS.git
+cd Gopilot---GTMOS
+pip install -r apps/api/requirements-dev.txt
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. That's it — no `.env` file to copy, no Docker, no
+database, no API key entered anywhere. Every config value has a working default:
+the API runs in **fixture mode** (a deterministic offline dataset — one seeded
+company, fully researched, scored, and briefed) with **demo auth** (the browser
+never redirects to a sign-in screen). You're looking at the real product surface
+against real evidence-linked scoring logic, just not live network calls yet.
+
+Import your own companies against real, live research — no API key here either —
+takes one more step: Postgres and Redis need to be running.
+
+```bash
+docker compose -f deploy/docker-compose.dev-infra.yml up -d   # Postgres + Redis only
+npm run dev:live
+```
+
+This runs the real pipeline: import a domain, the gateway fetches that company's
+actual public pages, extracts evidence, scores it, and produces a brief — with
+`EXA_API_KEY`/`TAVILY_API_KEY` unset the whole time. This is the mode
+`scripts/verify_e2e_scenario.py` and `docs/qa/LIVE_E2E_FINDINGS.md` exercise.
+
+To try real browser sign-in (Authorization Code + PKCE against an OIDC issuer)
+without registering with a provider:
+
+```bash
+npm run dev:oidc
+```
+
+This starts `services/dev_oidc`, a bundled test issuer that authenticates
+nobody and refuses to start outside development — see its module docstring. It
+exists so the sign-in flow is reproducible without a real identity provider.
+Production points `JWT_ISSUER` at a real one; see
+[docs/operations/DEPLOYMENT_RUNBOOK.md](docs/operations/DEPLOYMENT_RUNBOOK.md).
+
+## What's actually verified
+
+Not marketing language — these are the actual current numbers, reproducible with
+`npm run test`:
+
+- **456 backend tests passing** (`pytest`, 9 skipped because they need a live
+  Postgres/Redis not present in the default fixture-mode run — set
+  `RUN_LIVE_DB_TESTS=1` / `RUN_LIVE_REDIS_TESTS=1` to include them), **43 web
+  tests passing** (Node's built-in test runner against the real TypeScript
+  modules, not reimplementations of them).
+- **A real scoring bug was found on a live run, fixed, and the fix was
+  re-verified live, not just unit-tested.** An account whose fit was entirely
+  unknown was scored as a confident 0 instead of being excluded and
+  renormalized, silently costing it more than half its priority. Fixed in
+  `_priority_from` ([scoring.py](apps/api/app/services/scoring.py)), pinned by
+  `test_a_fully_unknown_fit_is_excluded_rather_than_scored_zero`, and confirmed
+  by tearing down and rebuilding the live stack from an empty database and
+  re-running the full scenario — full before/after in
+  [docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md#6-live-scoring-fix-re-verification).
+- **22 tests over 17 real confusable company-name pairs**
+  (`apps/api/tests/test_confusable_pairs.py`) for entity resolution. Confirmed
+  to actually catch regressions: deliberately reintroducing naive brand-token
+  matching broke 6 of them, including the specific case the suite was built to
+  prevent.
+- **A real authentication bypass was found and fixed during development, not
+  hypothesized.** The invite-gate (`assert_invited`) was enforced by only one
+  of the two API routers; a validly-signed but uninvited identity reached the
+  fixture-mode router unchallenged. Fixed, and
+  `test_both_routers_enforce_the_invite_gate` in
+  `apps/api/tests/test_router_contract_parity.py` now fails the build if that
+  class of bug reappears — confirmed by reverting the fix and watching the test
+  go red before restoring it. Full writeup in [SECURITY.md](SECURITY.md).
+- **The live-mode end-to-end scenario has actually been run against real
+  infrastructure** — real Postgres, real Redis, a real worker, real HTTP
+  requests to real company websites — not just fixture data. Results, including
+  what passed and what didn't, are in
+  [docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md).
+- **`scripts/verify_oidc_flow.py`** drives the whole browser sign-in protocol
+  programmatically — PKCE enforcement, code replay rejection, refresh, logout,
+  tenant isolation — 12 groups, all passing, reproducible with one command
+  against the bundled dev issuer.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    Web["Next.js command center"] --> API["FastAPI /api/v1"]
-    API --> DB["PostgreSQL"]
-    API --> Queue["Redis typed jobs"]
-    Queue --> Worker["Bounded worker"]
-    Worker --> Gateway["Research Gateway"]
-    Gateway --> WebSearch["General web search"]
-    Gateway --> GDELT["GDELT news intelligence"]
-    Gateway --> HTTP["Safe public webpage fetch"]
-    Gateway --> GitHub["Public GitHub via gh"]
-    Gateway --> RSS["RSS and Atom"]
-    Gateway --> YouTube["YouTube metadata and public subtitles"]
-    Gateway --> Reach["Agent Reach capability health"]
+Two runtime modes share one API contract:
+
+```
+Next.js → FastAPI → fixture repository                         (fixture mode)
+               \-> PostgreSQL repository -> Redis -> worker    (live mode)
+                                                   \-> gateway -> public adapters
 ```
 
-Application requests cannot install tools or execute arbitrary commands. Retrieved
-text is untrusted data and never gains tool authority. Agent Reach is a reviewed,
-pinned capability router; source retrieval uses separately allow-listed adapters.
+Scoring, identity resolution, and access control are deterministic code, never
+an LLM. An LLM is only used for summarization and brief composition — never for
+anything the product acts on. See
+[ARCHITECTURE.md](ARCHITECTURE.md) for the one-page version and
+[docs/architecture](docs/architecture) for the rest — data model, agent/workflow
+architecture, and the research gateway's request handling.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md),
-[SYSTEM_DESIGN.md](docs/architecture/SYSTEM_DESIGN.md), and
-[SOURCE_POLICY.md](docs/security/SOURCE_POLICY.md).
+## Repository layout
 
-## Repository structure
-
-```text
-apps/web/                    Next.js command center and live actions
-apps/api/                    FastAPI routes, domain services, repositories, migrations
-services/research_gateway/   Public-source adapters and URL/content policy
-services/worker/             Typed Redis job consumer
-scripts/live_smoke.ps1       End-to-end public-source smoke harness
-scripts/gdelt_control_smoke.py  Isolated known-positive GDELT control
-docs/                        Product, architecture, security, and execution plans
+```
+apps/
+  api/        FastAPI backend — routes, domain services, migrations, tests
+  web/        Next.js command center
+services/
+  research_gateway/   the only thing allowed to make outbound HTTP fetches
+  worker/             async job consumer for live-mode research runs
+  dev_oidc/           test OIDC issuer for local dev and CI — not for production
+deploy/       Docker Compose files and the Caddy TLS reverse-proxy config
+docs/
+  product/       what GoPilot is, why it's scoped this way, competitor positioning
+  architecture/   how the system fits together
+  operations/     deployment runbook, TLS/exposure requirements
+  security/       data handling, threat model, source policy
+  qa/             evaluation history and live-verification findings
+scripts/      operational tooling — retention, deletion, verification, secret scan
 ```
 
-## Local setup
+## Contributing
 
-Prerequisites: Node.js 22+, Python 3.11+, npm, and Docker Desktop.
+See [CONTRIBUTING.md](CONTRIBUTING.md) — including the non-negotiable design
+principles (deterministic scoring, evidence-backed claims, fail-closed limits,
+no autonomous outbound action) that a PR is checked against regardless of how
+well-written it otherwise is.
 
-```powershell
-python -m pip install -r apps/api/requirements-dev.txt
-npm.cmd install
-docker compose up -d
-python -m alembic -c apps/api/alembic.ini upgrade head
-```
+## Security
 
-Fixture mode remains the default:
+See [SECURITY.md](SECURITY.md) for how to report a vulnerability.
 
-```powershell
-npm.cmd run dev
-```
+## License
 
-Open [http://localhost:3000](http://localhost:3000). The API listens on
-[http://127.0.0.1:8000](http://127.0.0.1:8000).
-
-## Live mode
-
-Copy `.env.example` to `.env`, then set at least:
-
-```text
-RESEARCH_MODE=live
-DEMO_AUTH_ENABLED=true
-DATABASE_URL=postgresql+asyncpg://gtm:gtm@127.0.0.1:5432/gtm
-REDIS_URL=redis://127.0.0.1:6379/0
-AGENT_REACH_ENABLED=true
-AGENT_REACH_GATEWAY_URL=http://127.0.0.1:8010
-```
-
-`DEMO_AUTH_ENABLED=true` and `AUTH_MODE=demo` are only for local live development.
-Production startup rejects demo auth and fixture research, and requires
-`AUTH_MODE=oidc`.
-
-## Authentication
-
-`AUTH_MODE=oidc` verifies bearer tokens against any OIDC issuer's JWKS document —
-the product is not tied to one identity vendor, and the vendor choice lives in
-configuration rather than in domain logic. Set `JWT_ISSUER`, `JWT_AUDIENCE` and
-`JWKS_URL`; see `.env.example` for an example issuer.
-
-Verification is fail-closed. The signing algorithm is taken from the configured
-allowlist and never from the token, so unsigned (`alg: none`) and HMAC-signed
-tokens are rejected before any signature check. Only asymmetric algorithms may be
-configured, because a JWKS public key must never be usable as an HMAC secret.
-Issuer, audience, `exp`, `nbf` and `sub` are all required. Signing keys are cached
-with a TTL, refreshed once across a key rotation, and rate-limited so unknown key
-IDs cannot amplify requests against the issuer.
-
-Under `AUTH_MODE=oidc` the `X-Demo-User` header is ignored entirely.
-
-Run the services in separate terminals:
-
-```powershell
-python -m uvicorn services.research_gateway.app.main:app --port 8010
-python -m uvicorn apps.api.app.main:app --port 8000
-python -m services.worker.app.main
-npm.cmd run dev --workspace apps/web
-```
-
-The primary UI workflow is:
-
-```text
-Import Accounts -> Validate Accounts -> Research Accounts ->
-Review Priorities -> Inspect Opportunity Briefs ->
-Approve or Change Status -> Export
-```
-
-Single-company, pasted-domain-list, and CSV imports are supported. Imported and
-discovered provenance are displayed separately. When no search provider is
-configured, the UI states: “Account research is available. Automatic account
-discovery requires a configured search provider.”
-
-The public-source smoke harness sends the confirmed product and target-market query
-to the configured search provider and fetches returned public URLs:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/live_smoke.ps1
-```
-
-Review that egress before running it in a controlled environment.
-
-Search transports are configured explicitly and are optional for BYOA enrichment.
-Automatic discovery requires `EXA_API_KEY` or `TAVILY_API_KEY`; Exa is primary
-when both are configured. The production path does not depend on anonymous MCP
-capacity. Requests with the `news` purpose may route to GDELT for time-sensitive
-company events. GDELT is never used as a replacement for official-site, pricing,
-careers, product, or technical-documentation discovery.
-
-## Research lifecycle
-
-1. Store a user-confirmed product profile.
-2. Create a `BYOA_CORE` run and select the user-confirmed ICP.
-3. Import and validate company names and public official domains.
-4. Fetch bounded, allowed official pages through the gateway without web search.
-5. Canonicalize URLs, normalize text, hash and deduplicate documents, and chunk
-   durable content.
-6. Attach claims only when exact evidence belongs to the supplied company.
-7. Separate verified facts, unknowns, hypotheses, and rejected evidence.
-8. Detect current signals only when supported and dated.
-9. Calculate deterministic Fit, Intent, Confidence, and Priority scores.
-10. Generate a stateful opportunity brief for human review and safe export.
-
-The separate Experimental workflow adds provider-backed account discovery before
-steps 4-10. It never implies that discovered accounts are founder-ready.
-
-Every run persists counters, stage, errors, agent runs, tool calls, and audit events.
-
-## Agent Reach
-
-Agent Reach is pinned to release `v1.4.2`, full commit
-`97e9e63f42c89cbf527386343723c1fde610b4cb`. The dependency is installed during
-controlled project setup, never by an application request.
-
-The gateway runs `agent-reach doctor --json` through an argument-vector subprocess
-with a sanitized environment, timeouts, output limits, validated JSON, and a cache
-TTL. On Windows it safely falls back to `python -m agent_reach.cli` when the user
-Scripts directory is not on `PATH`.
-
-## Gateway routes
-
-All routes are under `/internal/v1`:
-
-- `GET /health`
-- `GET /capabilities`
-- `POST /search`
-- `POST /fetch`
-- `POST /github`
-- `POST /rss`
-- `POST /youtube`
-- `POST /fetch/validate`
-
-Set `RESEARCH_GATEWAY_TOKEN` on both API and gateway to require an internal header.
-
-## Verification
-
-```powershell
-npm.cmd run test
-npm.cmd run lint
-npm.cmd run typecheck
-npm.cmd run build
-python -m alembic -c apps/api/alembic.ini upgrade head --sql
-```
-
-With migrated PostgreSQL and Redis running:
-
-```powershell
-$env:RUN_LIVE_DB_TESTS="1"
-python -m pytest apps/api/tests/test_live_database_integration.py
-```
-
-The integration suite proves durable product/run/source/evidence/ICP/account/score/
-brief records and a Redis job round trip using a test-only controlled transport.
-It does not claim that a public-web smoke occurred.
-
-## Security invariants
-
-- Resolve membership server-side before tenant data access.
-- Reject cross-workspace resources.
-- Reject fixture research and demo auth in production.
-- Require evidence IDs for supported findings and claims.
-- Keep numeric scoring deterministic and outside LLM output.
-- Block localhost, private/link-local addresses, URL credentials, unsafe schemes,
-  DNS rebinding, and lookalike platform domains.
-- Revalidate every redirect.
-- Do not bypass CAPTCHAs, paywalls, authentication, robots, or platform controls.
-- Do not scrape private personal data or reuse social cookies.
-- Do not send outreach autonomously.
-- Neutralize CSV formula prefixes.
-
-## Current limitations
-
-- The browser sign-in flow is not built yet: the API verifies bearer tokens, but the
-  web app has no login screen and must be handed a token. Local live mode uses the
-  explicitly enabled demo principal.
-- The current extraction and brief generator are deterministic and conservative;
-  no live LLM or embedding provider is required.
-- Automatic discovery is unavailable until an authenticated search provider is
-  configured; BYOA import, research, review, and export remain available.
-- Account identity, industry, geography, and employee size remain `Unverified`
-  unless source text proves them.
-- Public search availability and result quality depend on the configured upstream.
-- The no-key Exa tier is rate-limited; production workloads should configure an
-  API key and retain explicit partial/failure behavior.
-- The public-web smoke must only run in an environment that explicitly permits
-  sending its queries to the configured provider.
-
-## License and notices
-
-No repository license has been granted unless the owner adds one. Third-party
-details are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[MIT](LICENSE).

@@ -25,17 +25,52 @@ def _breakdown(items: list[tuple[str, float, float, list[str]]]) -> ScoreBreakdo
 def _breakdown_missing_aware(
     items: list[tuple[str, float | None, float, list[str]]],
 ) -> ScoreBreakdown:
-    """Renormalize known factors; unknown is never treated as a negative."""
+    """Renormalize known factors; unknown is never treated as a negative.
+
+    When every factor is unknown there is nothing left to renormalize onto, so
+    the dimension itself is undetermined rather than a confident zero -- the
+    same principle this function already applies to a single missing factor,
+    one level up. A live run against 20 real companies found exactly this case
+    (fly.io, render.com) silently ranking below accounts with genuinely poor
+    fit; see docs/qa/LIVE_E2E_FINDINGS.md.
+    """
 
     known_weight = sum(weight for _, value, weight, _ in items if value is not None)
     if known_weight <= 0:
-        return ScoreBreakdown(score=0, components=[])
+        return ScoreBreakdown(score=0, components=[], determined=False)
     normalized = [
         (label, value, weight / known_weight, evidence_ids)
         for label, value, weight, evidence_ids in items
         if value is not None
     ]
     return _breakdown(normalized)  # type: ignore[arg-type]
+
+
+def _priority_from(
+    fit: ScoreBreakdown, intent: ScoreBreakdown, confidence: ScoreBreakdown
+) -> int:
+    """Compose priority the same missing-aware way its inputs are composed.
+
+    fit and intent are weighted terms exactly like the factors inside one
+    breakdown, so an undetermined one is excluded and the other's weight is
+    renormalized to compensate -- not multiplied by a phantom 0. confidence is
+    a damping multiplier rather than a weighted term; if it were ever
+    undetermined too, treating it as "no penalty" (1.0) keeps an absence of
+    evidence from acting as the strongest possible negative signal, consistent
+    with why the weighted terms are renormalized instead of zeroed.
+    """
+
+    weighted = [(fit.score, 0.55, fit.determined), (intent.score, 0.45, intent.determined)]
+    known_weight = sum(weight for _, weight, determined in weighted if determined)
+    if known_weight <= 0:
+        return 0  # both dimensions undetermined: nothing to rank on
+    composite = sum(
+        score * (weight / known_weight)
+        for score, weight, determined in weighted
+        if determined
+    )
+    confidence_factor = confidence.score / 100 if confidence.determined else 1.0
+    return round(composite * confidence_factor)
 
 
 def signal_decay(observed_at: datetime, half_life_days: int = 45) -> float:
@@ -91,7 +126,7 @@ def score_account(
             ("Retrieval coverage", retrieval_coverage, 0.25, []),
         ]
     )
-    priority = round((fit.score * 0.55 + intent.score * 0.45) * confidence.score / 100)
+    priority = _priority_from(fit, intent, confidence)
     return AccountScores(fit=fit, intent=intent, confidence=confidence, priority=priority)
 
 

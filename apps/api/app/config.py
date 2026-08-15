@@ -41,8 +41,6 @@ class Settings:
     agent_reach_enabled: bool = (
         os.getenv("AGENT_REACH_ENABLED", "false").lower() == "true"
     )
-    openai_api_key: str | None = os.getenv("OPENAI_API_KEY") or None
-    openai_model: str = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
     github_token: str | None = os.getenv("GITHUB_TOKEN") or None
     firmographic_provider: str = os.getenv(
         "FIRMOGRAPHIC_PROVIDER", "public_evidence"

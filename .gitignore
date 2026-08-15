@@ -19,3 +19,4 @@ tmp/
 *.tsbuildinfo
 .playwright-cli/
 !.env.oidc-dev
+!.env.live-dev

@@ -1,7 +1,7 @@
-# TLS overlay for the private-alpha stack.
+# TLS overlay for the production stack. Run both from the repository root:
 #
-#   docker compose -f docker-compose.private-alpha.yml -f docker-compose.tls.yml \
-#     --env-file .env.private-alpha up -d
+#   docker compose -f deploy/docker-compose.production.yml \
+#     -f deploy/docker-compose.tls.yml --env-file .env up -d
 #
 # Caddy terminates TLS and is the only service with published ports. The web
 # container stops publishing 3000 directly, so skipping this overlay cannot leave
@@ -18,7 +18,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

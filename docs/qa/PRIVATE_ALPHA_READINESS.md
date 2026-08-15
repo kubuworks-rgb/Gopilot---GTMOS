@@ -1,5 +1,11 @@
 # GoPilot — Private Alpha Readiness Assessment
 
+> **Historical record.** This is a point-in-time snapshot. The blocker it
+> describes (browser sign-in never exercised against a real issuer) was resolved
+> later the same effort — see `scripts/verify_oidc_flow.py` and
+> `docs/operations/DEPLOYMENT_RUNBOOK.md`. Left as-is rather than rewritten, as a
+> record of what was verified when.
+
 **Date:** 2026-08-08
 **Branch:** `feature/private-alpha-hardening` (`5b2c2f3`)
 **Base:** `develop` (`e5d1598`, PR #1 merged)

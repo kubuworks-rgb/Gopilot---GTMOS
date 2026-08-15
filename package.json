@@ -15,6 +15,6 @@
     "dev:oidc": "concurrently -k -n oidc,api,web -c yellow,cyan,magenta \"python -m uvicorn services.dev_oidc.main:app --port 9000\" \"python -m uvicorn apps.api.app.main:app --reload --reload-dir apps/api/app --port 8000 --env-file .env.oidc-dev\" \"npm run dev --workspace apps/web\""
   },
   "devDependencies": {
-    "concurrently": "9.2.1"
+    "concurrently": "^9.2.4"
   }
 }

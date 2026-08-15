@@ -16,10 +16,3 @@ controlled build/setup operation and is never request-triggered.
 Agent Reach v1.4.2 is MIT licensed. Its optional downstream tools and services retain
 their own licenses and terms; GoPilot does not install them from application
 requests.
-
-## LangGraph
-
-- Package: `langgraph`
-- Pinned version: `1.2.9`
-- License: MIT
-- Use: fixed-stage checkpointable research workflow; no autonomous swarm.

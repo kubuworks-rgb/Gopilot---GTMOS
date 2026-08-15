@@ -1047,7 +1047,7 @@ async def _create_icps(
                 name=str(variant["name"])[:120],
                 description=str(variant["description"]),
                 definition={
-                    "criteria_version": "supportpilot-icp-v2",
+                    "criteria_version": "gopilot-icp-v2",
                     "criteria": [
                         {
                             "key": "official_domain",

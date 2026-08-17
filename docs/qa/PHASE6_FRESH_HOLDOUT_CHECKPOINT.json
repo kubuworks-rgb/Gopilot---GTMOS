@@ -1,0 +1,51 @@
+{
+  "status": "PAUSED_AFTER_FRESH_HOLDOUT",
+  "classification": "B - IMPROVED BUT NOT READY",
+  "research_run_id": "3a699420-ea2e-47f5-8056-679ba0ef4709",
+  "workspace_id": "cf3addea-dcd6-40e1-945d-06c4402882b9",
+  "provider_work_complete": true,
+  "provider_rerun_required": false,
+  "provider": {
+    "exa_rest": "AUTHENTICATED_PASS",
+    "exa_mcp": "AUTHENTICATED_PASS",
+    "anonymous_mcp_capacity": false,
+    "tavily": "NOT_CONFIGURED",
+    "reliability_queries_passed": 5,
+    "reliability_queries_total": 5,
+    "positive_signal_control_passed": true
+  },
+  "funnel": {
+    "raw_candidates": 60,
+    "prequalified": 5,
+    "prequalified_with_uncertainty": 33,
+    "review_required": 22,
+    "rejected_prequalification": 0,
+    "deeply_researched": 7,
+    "final_accounts": 7,
+    "qualified": 0,
+    "qualified_with_uncertainty": 6,
+    "disqualified": 1
+  },
+  "manual_qa": {
+    "real_company_rate_percent": 100.0,
+    "canonical_domain_correctness_percent": 100.0,
+    "useful_icp_rate_percent": 71.43,
+    "founder_yes_plus_maybe_percent": 71.43,
+    "false_entity_attachment_percent": 0.0,
+    "supported_important_claims_percent": 85.71,
+    "unsupported_important_claims_percent": 14.29,
+    "evidence_link_reachability_percent": 97.56,
+    "duplicate_rate_percent": 0.0,
+    "signal_precision_percent": 75.0,
+    "mean_brief_usefulness_out_of_3": 2.0
+  },
+  "primary_fix_verified": "No optivian.ai evidence or signal attached to optivian.cloud.",
+  "remaining_work": [
+    "Verify secure-runner cleanup completed.",
+    "Run the ordered-dictionary gate-result regression and final local gates.",
+    "Create the Phase 6 final report and product decision.",
+    "Commit safe B-classification evidence locally only."
+  ],
+  "next_stage": "credential-free final reporting and local checkpoint",
+  "release_allowed": false
+}

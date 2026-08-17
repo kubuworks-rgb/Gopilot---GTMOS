@@ -3,7 +3,18 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -14,9 +25,13 @@ class Base(DeclarativeBase):
 
 class WorkspaceRow(Base):
     __tablename__ = "workspaces"
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     name: Mapped[str] = mapped_column(String(120))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class MembershipRow(Base):
@@ -30,7 +45,9 @@ class MembershipRow(Base):
 
 class TenantRecord(Base):
     __abstract__ = True
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
     )
@@ -81,6 +98,31 @@ class ResearchTaskRow(TenantRecord):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ResearchCandidateRow(TenantRecord):
+    __tablename__ = "research_candidates"
+    research_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="CASCADE"), index=True
+    )
+    discovered_url: Mapped[str] = mapped_column(Text)
+    hostname: Mapped[str] = mapped_column(String(255))
+    registrable_domain: Mapped[str] = mapped_column(String(255), index=True)
+    canonical_company_domain: Mapped[str | None] = mapped_column(String(255))
+    page_role: Mapped[str] = mapped_column(String(48))
+    candidate_score: Mapped[int] = mapped_column(Integer)
+    stage: Mapped[str] = mapped_column(String(32), index=True)
+    query_provenance: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    provider_provenance: Mapped[list[str]] = mapped_column(JSONB, default=list)
+    diagnostics: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
+    __table_args__ = (
+        Index(
+            "uq_candidate_run_domain",
+            "research_run_id",
+            "registrable_domain",
+            unique=True,
+        ),
+    )
+
+
 class SourceDocumentRow(TenantRecord):
     __tablename__ = "source_documents"
     research_run_id: Mapped[uuid.UUID] = mapped_column(
@@ -94,7 +136,9 @@ class SourceDocumentRow(TenantRecord):
     title: Mapped[str] = mapped_column(Text)
     author: Mapped[str | None] = mapped_column(String(255))
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    retrieved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     language: Mapped[str | None] = mapped_column(String(16))
     content_hash: Mapped[str] = mapped_column(String(64))
     cleaned_text: Mapped[str] = mapped_column(Text)
@@ -105,7 +149,13 @@ class SourceDocumentRow(TenantRecord):
     provenance: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
     source_metadata: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
     __table_args__ = (
-        Index("uq_source_run_hash", "research_run_id", "content_hash", unique=True),
+        Index(
+            "uq_source_run_hash",
+            "research_run_id",
+            "content_hash",
+            "canonical_url",
+            unique=True,
+        ),
         Index("ix_source_documents_canonical_url", "canonical_url"),
     )
 
@@ -121,11 +171,13 @@ class SourceChunkRow(TenantRecord):
     token_estimate: Mapped[int] = mapped_column(Integer)
     embedding: Mapped[list[float] | None] = mapped_column(JSONB)
     __table_args__ = (
-        Index(
-            "uq_source_chunk_ordinal",
-            "source_document_id",
-            "ordinal",
-            unique=True,
+        # A UniqueConstraint, matching migration 0002, which creates it inline in
+        # create_table. PostgreSQL backs it with a unique index of the same name,
+        # so this is equivalent to Index(..., unique=True) at runtime -- but
+        # `alembic check` compares object kinds, and declaring the index form
+        # made it report drift against a database that was already correct.
+        UniqueConstraint(
+            "source_document_id", "ordinal", name="uq_source_chunk_ordinal"
         ),
     )
 
@@ -187,7 +239,9 @@ class ICPProfileRow(TenantRecord):
 class AccountRow(TenantRecord):
     __tablename__ = "accounts"
     icp_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("icps.id"))
-    icp_profile_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("icp_profiles.id"))
+    icp_profile_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("icp_profiles.id")
+    )
     name: Mapped[str] = mapped_column(String(180))
     domain: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text)
@@ -298,7 +352,9 @@ class OpportunityBriefRow(TenantRecord):
     payload: Mapped[dict[str, object]] = mapped_column(JSONB)
     evidence_ids: Mapped[list[str]] = mapped_column(JSONB)
     version: Mapped[int] = mapped_column(Integer, default=1)
-    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class CampaignRow(TenantRecord):
@@ -385,12 +441,37 @@ class AuditEventRow(TenantRecord):
     payload: Mapped[dict[str, object]] = mapped_column(JSONB, default=dict)
 
 
-class JobLeaseRow(TenantRecord):
-    __tablename__ = "job_leases"
-    research_task_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("research_tasks.id", ondelete="CASCADE"), index=True
+class FeedbackEventRow(TenantRecord):
+    __tablename__ = "feedback_events"
+    actor_id: Mapped[str] = mapped_column(String(128))
+    target_type: Mapped[str] = mapped_column(String(32), index=True)
+    target_id: Mapped[str] = mapped_column(String(128), index=True)
+    rating: Mapped[str] = mapped_column(String(32), index=True)
+    reason: Mapped[str | None] = mapped_column(String(500))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
+class QAEvaluationRow(TenantRecord):
+    __tablename__ = "qa_evaluations"
+    research_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="CASCADE"), index=True
     )
-    worker_id: Mapped[str] = mapped_column(String(128))
-    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("accounts.id", ondelete="CASCADE"), index=True
+    )
+    evaluator_id: Mapped[str] = mapped_column(String(128))
+    company_validity: Mapped[str] = mapped_column(String(32))
+    domain_correctness: Mapped[str] = mapped_column(String(32))
+    icp_relevance: Mapped[int] = mapped_column(Integer)
+    evidence_correctness: Mapped[str] = mapped_column(String(32))
+    signal_relevance: Mapped[int] = mapped_column(Integer)
+    brief_usefulness: Mapped[int] = mapped_column(Integer)
+    evidence_links_working: Mapped[bool] = mapped_column(Boolean)
+    unsupported_important_claim: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
+# JobLeaseRow was removed in migration 0008. A lease table was modelled for worker
+# reliability but never read or written: the worker claims jobs with Redis BLMOVE
+# into a per-worker in-flight list instead, which is where that concern actually
+# lives.

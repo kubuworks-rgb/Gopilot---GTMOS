@@ -10,8 +10,11 @@ from apps.api.app.services.live_research import (
     _evidence_passages,
 )
 from services.research_gateway.app.adapters.search import (
+    _exa_datetime,
+    _exa_result_blocks,
     _gdelt_datetime,
     _gdelt_query,
+    _is_exa_relevant,
     _is_throttle_response,
     _is_relevant,
     _retry_after_seconds,
@@ -121,6 +124,37 @@ def test_gdelt_query_quotes_hyphenated_terms_only() -> None:
     query = "Evidence-backed GTM for Founder-led B2B SaaS in India"
 
     assert (
-        _gdelt_query(query)
-        == '"Evidence-backed" GTM for "Founder-led" B2B SaaS India'
+        _gdelt_query(query) == '"Evidence-backed" GTM for "Founder-led" B2B SaaS India'
     )
+
+
+def test_exa_mcp_text_is_parsed_into_bounded_results() -> None:
+    payload = {
+        "content": [
+            {
+                "type": "text",
+                "text": (
+                    "Title: Acme Support\n"
+                    "URL: https://acme.example/about\n"
+                    "Published: 2026-07-01T10:00:00Z\n"
+                    "Highlights:\n"
+                    "Acme builds customer support software for India B2B SaaS.\n"
+                    "\n---\n\n"
+                    "Title: Other\n"
+                    "URL: https://other.example/\n"
+                    "Published: N/A\n"
+                    "Highlights:\n"
+                    "Another support platform."
+                ),
+            }
+        ]
+    }
+
+    blocks = _exa_result_blocks(payload)
+
+    assert len(blocks) == 2
+    assert blocks[0]["title"] == "Acme Support"
+    assert blocks[0]["url"] == "https://acme.example/about"
+    assert _exa_datetime(blocks[0]["published"]) is not None
+    assert _exa_datetime("N/A") is None
+    assert _is_exa_relevant("India B2B SaaS", blocks[0]["highlights"])

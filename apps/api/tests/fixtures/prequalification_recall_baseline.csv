@@ -1,0 +1,61 @@
+rank,candidate_name,discovered_url,canonical_domain,page_role,old_score,old_decision,query_provenance,provider,identity_confidence,manual_label
+1,BizBMS,https://bizbms.com/,bizbms.com,OFFICIAL_ROOT,46,ACCEPTED,Bengaluru B2B SaaS enterprise software official company website|Mumbai B2B cloud software official company website|Pune enterprise SaaS platform official company website,exa,0.88,USEFUL_RAW_CANDIDATE
+2,BiggerWide,https://biggerwide.com/,biggerwide.com,OFFICIAL_ROOT,36,REJECTED_PREQUALIFICATION,India logistics SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+3,OpenHR,https://openhr.tech/,openhr.tech,OFFICIAL_ROOT,36,REJECTED_PREQUALIFICATION,India HR SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+4,ComplyZero,https://www.complyzero.com/,complyzero.com,OFFICIAL_ROOT,36,REJECTED_PREQUALIFICATION,India compliance SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+5,Optivian,https://optivian.cloud/,optivian.cloud,OFFICIAL_ROOT,36,REJECTED_PREQUALIFICATION,India developer tools SaaS companies official websites,exa,0.88,NOT_USEFUL_RAW_CANDIDATE
+6,Cxorbi,https://cxorbi.com/,cxorbi.com,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,India product analytics SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+7,UJSS,https://ujss.in/,ujss.in,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,Mumbai B2B cloud software official company website,exa,0.88,NOT_USEFUL_RAW_CANDIDATE
+8,Quantum Stack,https://quantum-stack.com/,quantum-stack.com,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,Pune enterprise SaaS platform official company website,exa,0.88,USEFUL_RAW_CANDIDATE
+9,greytHR,https://www.greythr.com/,greythr.com,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,India HR SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+10,MetaPort,https://metaport.in/,metaport.in,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,India logistics SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+11,ArthVed,https://arthved.com/,arthved.com,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,India revenue intelligence SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+12,AJSaaS,https://ajsaas.com/,ajsaas.com,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,Pune enterprise SaaS platform official company website,exa,0.88,UNCERTAIN
+13,IMAST,https://www.imast.in/,imast.in,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,Bengaluru B2B SaaS enterprise software official company website,exa,0.88,USEFUL_RAW_CANDIDATE
+14,Indobase,https://indobase.in/,indobase.in,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,India developer tools SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+15,Shypfy,https://shypfy.com/,shypfy.com,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,India logistics SaaS companies official websites,exa,0.88,UNCERTAIN
+16,Foresiet,https://foresiet.com/,foresiet.com,OFFICIAL_ROOT,33,REJECTED_PREQUALIFICATION,India cybersecurity SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+17,AS Intellect,https://asintellect.com/,asintellect.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India revenue intelligence SaaS companies official websites,exa,0.88,UNCERTAIN
+18,ComplyArk,https://complyark.com/,complyark.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India compliance SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+19,Bachao,https://www.bachao.ai/,bachao.ai,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India cybersecurity SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+20,dcomply,https://dcomply.in/,dcomply.in,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India compliance SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+21,ComplyDP,https://www.complydp.com/,complydp.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India compliance SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+22,Ricago,https://www.ricago.com/,ricago.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India compliance SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+23,DPDPA Shield,https://dpdpashield.in/,dpdpashield.in,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India compliance SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+24,ProsperoIQ,https://prosperoiq.com/,prosperoiq.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India revenue intelligence SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+25,Zeeks,https://www.zeeks.in/,zeeks.in,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India compliance SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+26,Sumasu,https://sumasu.co/,sumasu.co,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India revenue intelligence SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+27,Statwide,https://statwide.ai/,statwide.ai,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India product analytics SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+28,The TruPoint,https://thetrupoint.in/,thetrupoint.in,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India product analytics SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+29,FireAI,https://fireai.in/,fireai.in,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,India product analytics SaaS companies official websites,exa,0.88,USEFUL_RAW_CANDIDATE
+30,HROne,https://go.hrone.cloud/,hrone.cloud,OFFICIAL_SUBDOMAIN,31,REJECTED_PREQUALIFICATION,India HR SaaS companies official websites,exa,0.80,USEFUL_RAW_CANDIDATE
+31,PeppyPro,https://peppypro.com/,peppypro.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,Bengaluru B2B SaaS enterprise software official company website,exa,0.88,
+32,ezupp,https://ezupp.com/,ezupp.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,Bengaluru B2B SaaS enterprise software official company website,exa,0.88,
+33,T3 Softwares,https://www.t3softwares.com/,t3softwares.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,Mumbai B2B cloud software official company website,exa,0.88,
+34,BAAP Company,https://baapcompany.com/,baapcompany.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,Pune enterprise SaaS platform official company website,exa,0.88,
+35,Infonoxe,https://www.infonoxe.com/,infonoxe.com,OFFICIAL_ROOT,31,REJECTED_PREQUALIFICATION,Pune enterprise SaaS platform official company website,exa,0.88,
+36,Apriori,https://apriori.work/,apriori.work,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India product analytics SaaS companies official websites,exa,0.88,
+37,Syteos Labs,https://syteoslabs.com/,syteoslabs.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,Pune enterprise SaaS platform official company website,exa,0.88,
+38,EktaHR,https://ektahr.com/,ektahr.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India HR SaaS companies official websites,exa,0.88,
+39,ClaveHR,https://www.clavehr.in/,clavehr.in,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India HR SaaS companies official websites,exa,0.88,
+40,ZingHR,https://www.zinghr.com/,zinghr.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India HR SaaS companies official websites,exa,0.88,
+41,GoodsPly,https://goodsply.com/,goodsply.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India logistics SaaS companies official websites,exa,0.88,
+42,CleverTap,https://clevertap.com/,clevertap.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India product analytics SaaS companies official websites,exa,0.88,
+43,WonderMove,https://wondermove.in/,wondermove.in,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India logistics SaaS companies official websites,exa,0.88,
+44,IQInvoice,https://iqinvoice.com/,iqinvoice.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India revenue intelligence SaaS companies official websites,exa,0.88,
+45,DevPilot,https://devpilot.co.in/,devpilot.co.in,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India developer tools SaaS companies official websites,exa,0.88,
+46,BharatBuild,https://bharatbuild.ai/,bharatbuild.ai,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India developer tools SaaS companies official websites,exa,0.88,
+47,Sarvam,https://www.sarvam.ai/,sarvam.ai,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India developer tools SaaS companies official websites,exa,0.88,
+48,Flowspace,https://flowspace.co.in/,flowspace.co.in,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India developer tools SaaS companies official websites,exa,0.88,
+49,Daxor,https://www.daxor.in/,daxor.in,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,Bengaluru B2B SaaS enterprise software official company website,exa,0.88,
+50,Bangalore Softsell,https://bangaloresoftsell.com/,bangaloresoftsell.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,Bengaluru B2B SaaS enterprise software official company website,exa,0.88,
+51,Vratex,https://www.vratex.com/,vratex.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India compliance SaaS companies official websites,exa,0.88,
+52,Octopyder,https://www.octopyder.com/,octopyder.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India cybersecurity SaaS companies official websites,exa,0.88,
+53,CyberVahak,https://www.cybervahak.ai/,cybervahak.ai,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India cybersecurity SaaS companies official websites,exa,0.88,
+54,Zindagi Tech,https://zindagitech.com/,zindagitech.com,OFFICIAL_ROOT,28,REJECTED_PREQUALIFICATION,India cybersecurity SaaS companies official websites,exa,0.88,
+55,FleetFox,https://www.fleetfox.co.in/,fleetfox.co.in,OFFICIAL_ROOT,25,REJECTED_PREQUALIFICATION,India logistics SaaS companies official websites,exa,0.88,
+56,ForceSight,https://www.forcesight.ai/,forcesight.ai,OFFICIAL_ROOT,25,REJECTED_PREQUALIFICATION,India revenue intelligence SaaS companies official websites,exa,0.88,
+57,Clicentrix,https://clicentrix.com/,clicentrix.com,OFFICIAL_ROOT,25,REJECTED_PREQUALIFICATION,Pune enterprise SaaS platform official company website,exa,0.88,
+58,EaseDesk,https://www.easedesk.com/,easedesk.com,OFFICIAL_ROOT,25,REJECTED_PREQUALIFICATION,Mumbai B2B cloud software official company website,exa,0.88,
+59,TerrapinCRM,https://www.terrapincrm.com/,terrapincrm.com,OFFICIAL_ROOT,25,REJECTED_PREQUALIFICATION,Pune enterprise SaaS platform official company website,exa,0.88,
+60,GST Agent,https://gstagent.in/,gstagent.in,OFFICIAL_ROOT,25,REJECTED_PREQUALIFICATION,India revenue intelligence SaaS companies official websites,exa,0.88,

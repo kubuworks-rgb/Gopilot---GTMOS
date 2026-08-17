@@ -1,0 +1,108 @@
+{
+  "phase": 6,
+  "classification": "B - IMPROVED BUT NOT READY",
+  "release_allowed": false,
+  "research_run_id": "3a699420-ea2e-47f5-8056-679ba0ef4709",
+  "workspace_id": "cf3addea-dcd6-40e1-945d-06c4402882b9",
+  "provider": {
+    "exa_rest": "AUTHENTICATED_PASS",
+    "exa_mcp": "AUTHENTICATED_PASS",
+    "anonymous_mcp_capacity": false,
+    "tavily": "NOT_CONFIGURED",
+    "reliability_queries_passed": 5,
+    "reliability_queries_total": 5,
+    "relevant_results": 25,
+    "total_results": 25,
+    "fixture_fallback": false,
+    "positive_signal_control_precision_percent": 100.0,
+    "positive_signal_control_recall_percent": 100.0
+  },
+  "phase5_replay": {
+    "external_searches": 0,
+    "documents": 76,
+    "facts": 144,
+    "old_account_attachments": 109,
+    "run_level_unattached_facts": 35,
+    "retained_attachments": 86,
+    "ambiguous_or_related_only_removed": 23,
+    "false_attachments_after_replay": 0,
+    "old_signals": 8,
+    "retained_signals": 4,
+    "signal_precision_percent": 100.0,
+    "supported_important_claims_percent": 100.0,
+    "unsupported_important_claims_percent": 0.0,
+    "mean_structural_brief_usefulness_out_of_3": 2.0
+  },
+  "candidate_precision_control": {
+    "dataset": "preserved first-30 development labels",
+    "labelled_count": 27,
+    "uncertain_excluded": 3,
+    "precision_percent": 92.59,
+    "recall_percent": 100.0,
+    "false_negative_rate_percent": 0.0
+  },
+  "fresh_holdout": {
+    "searches_used": 58,
+    "documents": 72,
+    "facts": 136,
+    "funnel": {
+      "raw_candidates": 60,
+      "prequalified": 5,
+      "prequalified_with_uncertainty": 33,
+      "review_required": 22,
+      "rejected_prequalification": 0,
+      "shortlisted_for_deep_research": 38,
+      "deeply_researched": 7,
+      "final_accounts": 7,
+      "qualified": 0,
+      "qualified_with_uncertainty": 6,
+      "disqualified": 1
+    },
+    "manual_qa": {
+      "accounts_reviewed": 7,
+      "real_company_rate_percent": 100.0,
+      "canonical_domain_correctness_percent": 100.0,
+      "useful_icp_rate_percent": 71.43,
+      "founder_yes_plus_maybe_percent": 71.43,
+      "false_entity_attachment_percent": 0.0,
+      "supported_important_claims_percent": 85.71,
+      "unsupported_important_claims_percent": 14.29,
+      "evidence_link_reachability_percent": 97.56,
+      "duplicate_rate_percent": 0.0,
+      "signal_precision_percent": 75.0,
+      "mean_brief_usefulness_out_of_3": 2.0
+    },
+    "brief_states": {
+      "FOUNDER_READY": 0,
+      "RESEARCH_CANDIDATE": 2,
+      "MONITOR": 3,
+      "IDENTITY_REVIEW_REQUIRED": 1,
+      "DO_NOT_TARGET": 1
+    },
+    "primary_fix_verified": "No optivian.ai evidence or signal attached to optivian.cloud."
+  },
+  "engineering_gates": {
+    "python_tests": "155 passed, 2 skipped",
+    "postgres_redis_integration": "2 passed",
+    "gateway_security": "12 passed",
+    "acceptance_orchestration": "7 passed",
+    "frontend_tests": "2 passed",
+    "ruff": "passed",
+    "mypy": "passed, 51 source files",
+    "eslint": "passed",
+    "typescript": "passed",
+    "next_build": "passed",
+    "alembic": "0006_intelligence_quality (head)",
+    "docker_compose": "valid",
+    "powershell_acceptance_scripts": "3 parsed",
+    "mock_orchestration": "all required stages reached",
+    "tldextract": "5.3.0",
+    "secret_assignment_matches": 0,
+    "git_diff_check": "passed"
+  },
+  "product_decision": {
+    "choice": "C",
+    "label": "both, with autonomous discovery marked experimental",
+    "reason": "Bring-your-own-account research now has deterministic entity safety and useful evidence gating. Broad discovery still misses the required useful-account, founder-value, claim-support, evidence-link, and signal-precision targets, so it is not ready to be the default production promise."
+  }
+}

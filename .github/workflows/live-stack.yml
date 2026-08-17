@@ -94,16 +94,10 @@ jobs:
       - name: Walk the §40 scenario against real websites
         run: python scripts/verify_e2e_scenario.py --accounts-to-research 3
 
-      - name: Confirm no search provider was used
-        run: |
-          curl -s http://127.0.0.1:8000/api/v1/product-modes > modes.json
-          cat modes.json
-          python -c "
-          import json
-          d = json.load(open('modes.json'))
-          assert d.get('search_provider_configured') is False, d
-          print('confirmed: search_provider_configured = False')
-          "
+      # The BYOA-without-a-provider claim is already asserted by step [16] of
+      # the scenario above, from inside an authenticated session. An extra
+      # unauthenticated curl here only proved that /product-modes requires a
+      # token, which is a different (and already tested) property.
 
       - name: Service logs
         if: always()

@@ -1,6 +1,9 @@
 {
   "name": "gtm-intelligence-os",
   "private": true,
+  "bin": {
+    "gopilot": "cli/gopilot.mjs"
+  },
   "workspaces": [
     "apps/web"
   ],

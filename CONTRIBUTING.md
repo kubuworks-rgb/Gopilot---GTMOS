@@ -58,6 +58,25 @@ It reports only the file and line of a match, never the value, so a false
 positive doesn't compound into a leak — see it in `scripts/secret_scan.py` for
 the exact patterns.
 
+## Manual QA before a release or tag
+
+One thing is deliberately not automated. The setup wizard's prompts only render
+when stdin is a real terminal, and driving a genuine TTY from CI would mean
+adding a native dependency (`node-pty` or similar) purely to test it. That is a
+bad trade for a project that otherwise ships with zero runtime dependencies of
+its own, so it is a human check instead:
+
+```bash
+npx gopilot --reconfigure
+```
+
+Run it in a real terminal and confirm the wizard renders, the arrow of
+questions responds to input, an invalid choice falls back to Demo, and the
+selected mode actually starts. Everything either side of the prompts — version
+gates, config round-tripping, dependency detection, readiness checking — is
+covered by `cli/tests/` and by a cross-platform CI job that runs
+`npx gopilot -y` on Linux, macOS and Windows.
+
 ## Code conventions actually used in this codebase
 
 - **No comments unless the *why* is non-obvious.** A comment that restates what

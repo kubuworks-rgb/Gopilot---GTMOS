@@ -1,0 +1,170 @@
+name: Live stack (Docker)
+
+# Deliberately NOT on every push.
+#
+# This workflow makes real HTTP requests to real third-party company websites.
+# Running it on every push would hammer sites that never asked to be part of
+# this project's CI, make the build's colour depend on whether someone else's
+# marketing page is up, and add minutes to every commit. Weekly plus on-demand
+# gives the same signal without any of that.
+#
+# It still runs with no search-provider credentials: EXA_API_KEY and
+# TAVILY_API_KEY are explicitly empty, because "BYOA works without a paid
+# provider" is the claim under test.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays, 06:00 UTC
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "22"
+  PYTHONPATH: ${{ github.workspace }}
+  EXA_API_KEY: ""
+  TAVILY_API_KEY: ""
+
+jobs:
+  # The blueprint §40 scenario against real infrastructure: Postgres and Redis
+  # in Docker, a real worker consuming the queue, the gateway making real
+  # outbound requests. Previously only ever run on a laptop.
+  live-research:
+    name: Real research run (Postgres, Redis, worker, gateway)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - run: pip install -r apps/api/requirements-dev.txt
+
+      - name: Start Postgres and Redis
+        run: |
+          docker compose -f deploy/docker-compose.dev-infra.yml up -d
+          for _ in $(seq 1 60); do
+            id=$(docker compose -f deploy/docker-compose.dev-infra.yml ps -q postgres)
+            [ -n "$id" ] && [ "$(docker inspect --format '{{.State.Health.Status}}' "$id")" = "healthy" ] && break
+            sleep 2
+          done
+          docker compose -f deploy/docker-compose.dev-infra.yml ps
+
+      - name: Apply migrations
+        run: python -m alembic -c apps/api/alembic.ini upgrade head
+
+      - name: Configure live mode
+        run: |
+          # Same values as the committed dev-issuer config, but live research.
+          # No secrets: the issuer is localhost and the client is public (PKCE).
+          sed 's/^RESEARCH_MODE=.*/RESEARCH_MODE=live/' .env.oidc-dev > .env.ci-live
+          echo "AGENT_REACH_ENABLED=false" >> .env.ci-live
+          cat .env.ci-live
+
+      - name: Start the stack
+        run: |
+          set -a; . ./.env.ci-live; set +a
+          python -m uvicorn services.dev_oidc.main:app --port 9000 > oidc.log 2>&1 &
+          python -m uvicorn services.research_gateway.app.main:app --port 8010 > gateway.log 2>&1 &
+          python -m uvicorn apps.api.app.main:app --port 8000 > api.log 2>&1 &
+          python -m services.worker.app.main > worker.log 2>&1 &
+          for _ in $(seq 1 60); do
+            oidc=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:9000/.well-known/openid-configuration || true)
+            api=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/api/v1/product-modes || true)
+            if [ "$oidc" = "200" ] && [ -n "$api" ] && [ "$api" != "000" ]; then break; fi
+            sleep 2
+          done
+          echo "issuer=$oidc api=$api"
+
+      - name: Walk the §40 scenario against real websites
+        run: python scripts/verify_e2e_scenario.py --accounts-to-research 3
+
+      - name: Confirm no search provider was used
+        run: |
+          curl -s http://127.0.0.1:8000/api/v1/product-modes > modes.json
+          cat modes.json
+          python -c "
+          import json
+          d = json.load(open('modes.json'))
+          assert d.get('search_provider_configured') is False, d
+          print('confirmed: search_provider_configured = False')
+          "
+
+      - name: Service logs
+        if: always()
+        run: |
+          for f in oidc gateway api worker; do
+            echo "===== $f ====="; tail -n 40 "$f.log" 2>/dev/null || true
+          done
+          docker compose -f deploy/docker-compose.dev-infra.yml logs --tail 30 || true
+
+  # The CLI's Docker branch had only ever been logic-tested. Driving it through
+  # a saved config exercises the real code path -- detectDocker,
+  # startDockerInfra, applyMigrations, then the live stack -- against a real
+  # daemon, without needing a TTY to answer the wizard.
+  cli-docker-path:
+    name: CLI "Live research + Docker" against a real daemon
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: pip install -r apps/api/requirements-dev.txt
+      - run: npm ci
+
+      - name: Docker is really available to the CLI
+        run: |
+          node --input-type=module -e "
+            import { detectDocker } from './cli/lib/prereqs.mjs';
+            const d = detectDocker();
+            console.log('detectDocker ->', JSON.stringify(d));
+            if (!d.available) { console.error('CLI could not see the Docker daemon'); process.exit(1); }
+          "
+
+      - name: Choose the Docker mode the way the wizard would
+        run: |
+          printf '%s\n' \
+            'RESEARCH_MODE=live' \
+            'GOPILOT_DOCKER_INFRA=true' > .env.gopilot
+          cat .env.gopilot
+
+      - name: Run the CLI and reach a serving stack
+        run: |
+          npx gopilot --no-open > gopilot.log 2>&1 &
+          ready=0
+          for _ in $(seq 1 150); do
+            api=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/api/v1/product-modes || true)
+            web=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:3000 || true)
+            if [ -n "$api" ] && [ "$api" != "000" ] && [ "$web" = "200" ]; then ready=1; break; fi
+            sleep 2
+          done
+          echo "----- gopilot output -----"; cat gopilot.log; echo "--------------------------"
+          if [ "$ready" != "1" ]; then echo "::error::CLI Docker path never reached a serving state"; exit 1; fi
+
+      - name: The CLI actually started the containers and migrated
+        run: |
+          docker compose -f deploy/docker-compose.dev-infra.yml ps
+          test -n "$(docker compose -f deploy/docker-compose.dev-infra.yml ps -q postgres)" \
+            || { echo "::error::no postgres container"; exit 1; }
+          python -m alembic -c apps/api/alembic.ini current
+          grep -q "Applying database migrations" gopilot.log \
+            || { echo "::error::CLI did not run migrations"; exit 1; }
+          grep -q "Live mode" gopilot.log \
+            || { echo "::error::CLI did not report live mode"; exit 1; }
+          echo "confirmed: Docker infra started and migrations applied by the CLI"
+
+      - name: Logs
+        if: always()
+        run: |
+          tail -n 60 gopilot.log 2>/dev/null || true
+          docker compose -f deploy/docker-compose.dev-infra.yml logs --tail 30 || true

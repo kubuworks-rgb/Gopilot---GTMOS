@@ -32,6 +32,8 @@ from services.research_gateway.app.security.url_policy import (
 )
 
 
+settings.validate()
+
 app = FastAPI(title="GTM Research Gateway", version="1.0.0")
 search_adapter = SearchAdapter()
 webpage_adapter = WebPageAdapter()
@@ -44,9 +46,16 @@ def require_internal_token(
     x_gateway_token: Annotated[str | None, Header()] = None,
 ) -> None:
     expected = settings.internal_token
-    if expected and (
-        not x_gateway_token or not hmac.compare_digest(x_gateway_token, expected)
-    ):
+    if not expected:
+        # Startup validation forbids this outside local development. The check is
+        # repeated here so a later configuration change cannot silently reopen the
+        # gateway to unauthenticated callers.
+        if settings.app_env == "production":
+            raise HTTPException(
+                status_code=503, detail="Gateway authentication is not configured"
+            )
+        return
+    if not x_gateway_token or not hmac.compare_digest(x_gateway_token, expected):
         raise HTTPException(status_code=401, detail="Gateway authentication required")
 
 
@@ -113,7 +122,7 @@ async def search(request: SearchRequest, _: Internal) -> SearchResponse:
     try:
         results, diagnostics = await search_adapter.search(request)
         return SearchResponse(
-            status="completed",
+            status=diagnostics.completion_status,
             backend=search_adapter.backend,
             results=results,
             diagnostics=diagnostics,

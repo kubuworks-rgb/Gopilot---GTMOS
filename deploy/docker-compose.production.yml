@@ -1,0 +1,159 @@
+# The whole product: web, api, worker, research gateway, PostgreSQL, Redis. Run
+# this from the repository root, not from deploy/ -- the build context is the repo
+# root so the API and web images can see all of apps/ and services/.
+#
+# `deploy/docker-compose.dev-infra.yml` is the separate local-development file that
+# runs infrastructure only (Postgres + Redis), for use with `npm run dev:live`.
+#
+#   docker compose -f deploy/docker-compose.production.yml --env-file .env up -d --build
+#
+# Only the web port is published. The API, worker and gateway stay on the internal
+# network: the gateway in particular retrieves arbitrary public URLs on request and
+# must never be reachable from outside the compose network.
+
+name: gopilot-production
+
+x-python-service: &python-service
+  build:
+    context: ..
+    dockerfile: Dockerfile.python
+  restart: unless-stopped
+  environment: &python-env
+    APP_ENV: ${APP_ENV:-production}
+    RESEARCH_MODE: ${RESEARCH_MODE:-live}
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-gtm}
+    REDIS_URL: redis://redis:6379/0
+    AGENT_REACH_GATEWAY_URL: http://gateway:8010
+    RESEARCH_GATEWAY_TOKEN: ${RESEARCH_GATEWAY_TOKEN:?set RESEARCH_GATEWAY_TOKEN}
+    DEMO_AUTH_ENABLED: ${DEMO_AUTH_ENABLED:-false}
+    AUTH_MODE: ${AUTH_MODE:-oidc}
+    JWT_ISSUER: ${JWT_ISSUER:-}
+    JWT_AUDIENCE: ${JWT_AUDIENCE:-}
+    JWKS_URL: ${JWKS_URL:-}
+    JWT_ALGORITHMS: ${JWT_ALGORITHMS:-RS256}
+    JWKS_CACHE_TTL_SECONDS: ${JWKS_CACHE_TTL_SECONDS:-600}
+    PRIVATE_ALPHA_ENABLED: ${PRIVATE_ALPHA_ENABLED:-true}
+    PRIVATE_ALPHA_ALLOWED_SUBJECTS: ${PRIVATE_ALPHA_ALLOWED_SUBJECTS:-}
+    PRIVATE_ALPHA_ALLOWED_EMAILS: ${PRIVATE_ALPHA_ALLOWED_EMAILS:-}
+    ALLOW_EXPERIMENTAL_DISCOVERY: ${ALLOW_EXPERIMENTAL_DISCOVERY:-false}
+    MAX_ACCOUNTS_PER_IMPORT: ${MAX_ACCOUNTS_PER_IMPORT:-100}
+    MAX_ACCOUNTS_PER_WORKSPACE: ${MAX_ACCOUNTS_PER_WORKSPACE:-500}
+    MAX_IMPORTS_PER_DAY: ${MAX_IMPORTS_PER_DAY:-20}
+    MAX_CONCURRENT_RESEARCH_RUNS: ${MAX_CONCURRENT_RESEARCH_RUNS:-2}
+    MAX_WORKSPACES_PER_USER: ${MAX_WORKSPACES_PER_USER:-3}
+    MAX_EXPORT_ROWS: ${MAX_EXPORT_ROWS:-1000}
+    MAX_PAGES_PER_ACCOUNT: ${MAX_PAGES_PER_ACCOUNT:-8}
+    CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://127.0.0.1:3000}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-gtm}
+    volumes: ["gopilot_postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["gopilot_redis:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Runs to completion before api and worker start, so no service ever serves
+  # traffic against a schema that has not been migrated.
+  migrate:
+    <<: *python-service
+    restart: "no"
+    command: ["python", "-m", "alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"]
+
+  gateway:
+    <<: *python-service
+    command:
+      ["python", "-m", "uvicorn", "services.research_gateway.app.main:app",
+       "--host", "0.0.0.0", "--port", "8010"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8010/openapi.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  api:
+    <<: *python-service
+    command:
+      ["python", "-m", "uvicorn", "apps.api.app.main:app",
+       "--host", "0.0.0.0", "--port", "8000"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      gateway:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  worker:
+    <<: *python-service
+    command: ["python", "-m", "services.worker.app.main"]
+    environment:
+      <<: *python-env
+      WORKER_NAME: ${WORKER_NAME:-worker-1}
+      WORKER_MAX_ATTEMPTS: ${WORKER_MAX_ATTEMPTS:-3}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      gateway:
+        condition: service_started
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Build-time, not runtime: Next.js bakes rewrites() and every
+        # NEXT_PUBLIC_* value into the bundle, so runtime values arrive too late.
+        API_PROXY_TARGET: http://api:8000
+        NEXT_PUBLIC_AUTH_MODE: ${AUTH_MODE:-oidc}
+        NEXT_PUBLIC_OIDC_ISSUER: ${JWT_ISSUER:-}
+        NEXT_PUBLIC_OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+        NEXT_PUBLIC_OIDC_SCOPE: ${OIDC_SCOPE:-openid profile email}
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: /api/v1
+    ports: ["${WEB_PORT:-3000}:3000"]
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  gopilot_postgres:
+  gopilot_redis:

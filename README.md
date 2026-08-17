@@ -60,30 +60,47 @@ where GoPilot is *not* differentiated — is in
 ```bash
 git clone https://github.com/kubuworks-rgb/Gopilot---GTMOS.git
 cd Gopilot---GTMOS
-pip install -r apps/api/requirements-dev.txt
-npm install
-npm run dev
+npm install && npx gopilot
 ```
 
-Open `http://localhost:3000`. That's it — no `.env` file to copy, no Docker, no
-database, no API key entered anywhere. Every config value has a working default:
-the API runs in **fixture mode** (a deterministic offline dataset — one seeded
-company, fully researched, scored, and briefed) with **demo auth** (the browser
-never redirects to a sign-in screen). You're looking at the real product surface
-against real evidence-linked scoring logic, just not live network calls yet.
+That's it. `gopilot` checks your Node and Python versions, installs whatever is
+missing, asks up to three short questions, starts the stack, waits until it is
+genuinely serving, and opens your browser at `http://localhost:3000`.
 
-Import your own companies against real, live research — no API key here either —
-takes one more step: Postgres and Redis need to be running.
+In a hurry, or scripting it? `npx gopilot -y` skips the questions and goes
+straight to demo mode. Later runs remember your answers and start immediately —
+`npx gopilot --reconfigure` if you want to change them.
+
+The default needs **no API keys, no Docker, and no database.** It runs in
+**fixture mode** (a deterministic offline dataset — seeded companies, fully
+researched, scored, and briefed) with **demo auth**, so the browser never
+redirects to a sign-in screen. You are looking at the real product surface and
+the real evidence-linked scoring logic, just not live network calls yet.
+
+The wizard offers two other modes. **Live research** runs the real pipeline —
+import a domain, the gateway fetches that company's actual public pages,
+extracts evidence, scores it, produces a brief — still with no search-provider
+key. It needs Postgres and Redis; if Docker is running, the CLI offers to start
+them for you, and that option is hidden entirely when Docker is not available.
+
+### Manual setup
+
+If you would rather see exactly what is happening than run a wizard, the CLI is
+a convenience wrapper and nothing depends on it:
 
 ```bash
-docker compose -f deploy/docker-compose.dev-infra.yml up -d   # Postgres + Redis only
-npm run dev:live
+pip install -r apps/api/requirements-dev.txt
+npm install
+npm run dev                                                    # demo / fixture mode
 ```
 
-This runs the real pipeline: import a domain, the gateway fetches that company's
-actual public pages, extracts evidence, scores it, and produces a brief — with
-`EXA_API_KEY`/`TAVILY_API_KEY` unset the whole time. This is the mode
-`scripts/verify_e2e_scenario.py` and `docs/qa/LIVE_E2E_FINDINGS.md` exercise.
+```bash
+docker compose -f deploy/docker-compose.dev-infra.yml up -d    # Postgres + Redis
+npm run dev:live                                               # live research
+```
+
+This is the mode `scripts/verify_e2e_scenario.py` and
+[docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md) exercise.
 
 To try real browser sign-in (Authorization Code + PKCE against an OIDC issuer)
 without registering with a provider:
@@ -97,6 +114,13 @@ nobody and refuses to start outside development — see its module docstring. It
 exists so the sign-in flow is reproducible without a real identity provider.
 Production points `JWT_ISSUER` at a real one; see
 [docs/operations/DEPLOYMENT_RUNBOOK.md](docs/operations/DEPLOYMENT_RUNBOOK.md).
+
+### Requirements
+
+**Node 20.9+** (Next.js 16 requires it; 22.6+ if you want to run `npm run test`,
+which uses `--experimental-strip-types`) and **Python 3.11+** (the API uses
+`StrEnum` and `datetime.UTC`). `npx gopilot` checks both and tells you exactly
+what to upgrade rather than failing halfway through.
 
 ## What's actually verified
 
@@ -174,6 +198,7 @@ provider.
 ## Repository layout
 
 ```
+cli/          `npx gopilot` — prerequisite checks, setup wizard, process supervision
 apps/
   api/        FastAPI backend — routes, domain services, migrations, tests
   web/        Next.js command center

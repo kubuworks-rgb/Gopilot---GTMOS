@@ -60,6 +60,8 @@ jobs:
         run: npm run typecheck --workspace apps/web
       - name: Tests
         run: npm run test --workspace apps/web
+      - name: Setup CLI tests
+        run: node --test cli/tests/*.test.mjs
       - name: Next.js build
         run: npm run build --workspace apps/web
 

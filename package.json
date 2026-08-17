@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,magenta \"python -m uvicorn apps.api.app.main:app --reload --port 8000\" \"npm run dev --workspace apps/web\"",
     "start": "concurrently -k -n api,web -c cyan,magenta \"python -m uvicorn apps.api.app.main:app --host 127.0.0.1 --port 8000\" \"npm run start --workspace apps/web -- --hostname 127.0.0.1 --port 3000\"",
-    "test": "python -m pytest apps/api/tests services/research_gateway/tests && npm run test --workspace apps/web",
+    "test": "python -m pytest apps/api/tests services/research_gateway/tests && npm run test --workspace apps/web && node --test cli/tests/*.test.mjs",
     "lint": "python -m ruff check apps/api services/research_gateway services/worker services/dev_oidc && npm run lint --workspace apps/web",
     "typecheck": "python -m mypy apps/api/app services/research_gateway/app services/worker/app services/dev_oidc && npm run typecheck --workspace apps/web",
     "build": "npm run build --workspace apps/web",

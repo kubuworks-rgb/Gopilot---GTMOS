@@ -52,22 +52,20 @@ export function installPythonDeps(root, python) {
   );
   if (result.status === 0) return true;
 
-  // The requirements pin `agent-reach` to a GitHub archive URL, and GitHub
-  // rate-limits (HTTP 429) often enough that a first-time install can fail on
-  // it alone. It is an external CLI used only for the research gateway's
-  // capability report -- the gateway does not even start in demo mode -- so if
-  // everything the app actually imports is present, that is not a reason to
-  // refuse to start.
+  // A partial failure is not necessarily a fatal one: a single transient
+  // network error can fail the whole pip run while leaving everything the
+  // application actually imports installed. Refusing to start in that case
+  // would be stricter than the situation warrants.
   if (pythonDepsInstalled(root, python)) {
     console.warn(
       [
         "",
-        "  Some optional dependencies did not install (see above), but every",
-        "  package the application imports is present, so setup is continuing.",
+        "  Some dependencies did not install (see above), but every package the",
+        "  application imports is present, so setup is continuing.",
         "",
-        "  Most likely `agent-reach`, which installs from a GitHub URL that",
-        "  rate-limits. It only affects the research gateway's capability",
-        "  report in live mode. Demo mode does not use it at all.",
+        "  If you need the research gateway's Agent Reach capability report,",
+        "  install the optional extra separately once the network settles:",
+        "    pip install -r apps/api/requirements-gateway.txt",
         "",
       ].join("\n"),
     );
@@ -109,13 +107,25 @@ export async function startDockerInfra(root) {
     );
     return false;
   }
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    const health = spawnSync(
-      "docker",
-      ["inspect", "--format", "{{.State.Health.Status}}", "deploy-postgres-1"],
-      { encoding: "utf8", windowsHide: true },
-    );
-    if ((health.stdout ?? "").trim() === "healthy") return true;
+  // Resolve the container through compose rather than assuming a name.
+  // Compose derives the project name from the file's directory, so a
+  // hard-coded "deploy-postgres-1" is only correct by coincidence and breaks
+  // the moment someone runs this from a differently-named checkout.
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    const id = spawnSync("docker", ["compose", "-f", compose, "ps", "-q", "postgres"], {
+      cwd: root,
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    const container = (id.stdout ?? "").trim().split("\n")[0];
+    if (container) {
+      const health = spawnSync(
+        "docker",
+        ["inspect", "--format", "{{.State.Health.Status}}", container],
+        { encoding: "utf8", windowsHide: true },
+      );
+      if ((health.stdout ?? "").trim() === "healthy") return true;
+    }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   console.error("Postgres did not become healthy in time.");

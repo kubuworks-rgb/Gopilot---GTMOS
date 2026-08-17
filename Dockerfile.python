@@ -10,9 +10,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# git is needed only to resolve the agent-reach archive dependency at build time.
+# curl backs the compose healthchecks. git is no longer needed: the only
+# archive-URL dependency (agent-reach) moved to the optional
+# requirements-gateway.txt, so the image no longer builds a VCS toolchain --
+# or fails when GitHub rate-limits -- for a package that is off by default.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git curl \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY apps/api/requirements.txt /app/apps/api/requirements.txt

@@ -9,4 +9,6 @@ redis==6.2.0
 httpx==0.28.1
 pyjwt[crypto]==2.10.1
 tldextract==5.3.0
-agent-reach @ https://github.com/Panniantong/Agent-Reach/archive/97e9e63f42c89cbf527386343723c1fde610b4cb.zip
+# agent-reach is deliberately NOT here. It is an optional external CLI that
+# installs from a GitHub archive URL, which rate-limits; see
+# requirements-gateway.txt.

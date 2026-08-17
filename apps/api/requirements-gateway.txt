@@ -1,0 +1,18 @@
+# Optional. Not needed to run GoPilot.
+#
+# Agent Reach is an external CLI the research gateway shells out to for its
+# capability report. It is not imported as a library, it is disabled by default
+# (AGENT_REACH_ENABLED=false), and when it is missing the gateway reports the
+# channel as `unavailable` and carries on. Nothing in the core BYOA workflow --
+# import accounts, research them against their own websites, score, brief --
+# touches it.
+#
+# It lives here rather than in requirements.txt because it installs from a
+# GitHub archive URL, and GitHub rate-limits (HTTP 429). That turned a transient
+# network condition into a hard failure of the documented setup step, over a
+# package the default path never loads.
+#
+#   pip install -r apps/api/requirements-gateway.txt
+#
+# Installing it also requires git on PATH to resolve the archive.
+agent-reach @ https://github.com/Panniantong/Agent-Reach/archive/97e9e63f42c89cbf527386343723c1fde610b4cb.zip

@@ -94,6 +94,14 @@ npm install
 npm run dev                                                    # demo / fixture mode
 ```
 
+Everything the application imports is in that file. One optional extra —
+`apps/api/requirements-gateway.txt` — installs Agent Reach, an external CLI the
+research gateway shells out to for its capability report. It is off by default
+(`AGENT_REACH_ENABLED=false`), the gateway reports the channel as `unavailable`
+without it, and no part of the core workflow uses it. It is kept separate
+because it installs from a GitHub archive URL that rate-limits, and a transient
+429 should not fail the documented setup step.
+
 ```bash
 docker compose -f deploy/docker-compose.dev-infra.yml up -d    # Postgres + Redis
 npm run dev:live                                               # live research

@@ -3,3 +3,9 @@ pytest==9.0.2
 pytest-asyncio==1.4.0
 ruff==0.12.2
 mypy==1.16.1
+# services/dev_oidc serves its authorize/token endpoints as HTML forms, and
+# FastAPI needs python-multipart to accept Form() data. It is dev-only: nothing
+# in the production API or gateway uses Form or UploadFile. Like feedparser,
+# this arrived transitively via agent-reach until that moved to the optional
+# gateway requirements, so it was never actually declared.
+python-multipart==0.0.22

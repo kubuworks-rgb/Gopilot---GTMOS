@@ -73,11 +73,23 @@ jobs:
           python -m services.worker.app.main > worker.log 2>&1 &
           for _ in $(seq 1 60); do
             oidc=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:9000/.well-known/openid-configuration || true)
+            # Any status proves the API is listening; /product-modes requires
+            # auth and answers 401 unauthenticated, which is still "up".
             api=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/api/v1/product-modes || true)
-            if [ "$oidc" = "200" ] && [ -n "$api" ] && [ "$api" != "000" ]; then break; fi
+            gw=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8010/openapi.json || true)
+            if [ "$oidc" = "200" ] && [ "$api" != "000" ] && [ -n "$api" ] && [ "$gw" != "000" ] && [ -n "$gw" ]; then break; fi
             sleep 2
           done
-          echo "issuer=$oidc api=$api"
+          echo "issuer=$oidc api=$api gateway=$gw"
+          # Fail here, where the service logs explain why, rather than letting
+          # the scenario fail later with an opaque connection error.
+          if [ "$oidc" != "200" ] || [ -z "$api" ] || [ "$api" = "000" ] || [ -z "$gw" ] || [ "$gw" = "000" ]; then
+            echo "::error::stack did not come up (issuer=$oidc api=$api gateway=$gw)"
+            for f in oidc gateway api worker; do
+              echo "===== $f ====="; tail -n 30 "$f.log" 2>/dev/null || true
+            done
+            exit 1
+          fi
 
       - name: Walk the §40 scenario against real websites
         run: python scripts/verify_e2e_scenario.py --accounts-to-research 3

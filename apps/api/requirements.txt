@@ -9,6 +9,11 @@ redis==6.2.0
 httpx==0.28.1
 pyjwt[crypto]==2.10.1
 tldextract==5.3.0
+# The RSS and search adapters import feedparser directly. It used to arrive
+# only as a transitive dependency of agent-reach, which meant the declared
+# requirements never actually described what the code imports; moving
+# agent-reach out surfaced that. Declared explicitly now.
+feedparser==6.0.12
 # agent-reach is deliberately NOT here. It is an optional external CLI that
 # installs from a GitHub archive URL, which rate-limits; see
 # requirements-gateway.txt.

@@ -65,6 +65,101 @@ jobs:
       - name: Next.js build
         run: npm run build --workspace apps/web
 
+  # The setup path is the first five minutes of anyone's experience with this
+  # repo, and it was previously verified only on the maintainer's Windows
+  # machine, where Python packages were already installed. Runners are fresh by
+  # definition, so this is also the only place a truthful "clone to running"
+  # number can come from.
+  #
+  # Every step runs under bash, which GitHub provides on all three runners, so
+  # one script covers the matrix rather than three shell dialects.
+  cross-platform:
+    name: Setup CLI (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Deliberately uncached: a cache hit would measure the cache, not the
+      # experience someone actually has on a clean machine.
+      - name: Install Python dependencies (fresh, timed)
+        shell: bash
+        run: |
+          start=$(date +%s)
+          pip install -r apps/api/requirements-dev.txt
+          echo "PY_INSTALL=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Install JavaScript dependencies (fresh, timed)
+        shell: bash
+        run: |
+          start=$(date +%s)
+          npm ci
+          echo "NPM_INSTALL=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Full test suite
+        shell: bash
+        run: |
+          python -m pytest apps/api/tests services/research_gateway/tests -q
+          npm run test --workspace apps/web
+          node --test cli/tests/*.test.mjs
+
+      - name: npx gopilot -y reaches a serving stack
+        shell: bash
+        run: |
+          start=$(date +%s)
+          npx gopilot -y --no-open > gopilot.log 2>&1 &
+          ready=0
+          for _ in $(seq 1 120); do
+            api=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:8000/api/v1/bootstrap || true)
+            web=$(curl -s -o /dev/null -w "%{http_code}" --max-time 2 http://127.0.0.1:3000 || true)
+            if [ "$api" = "200" ] && [ "$web" = "200" ]; then ready=1; break; fi
+            sleep 2
+          done
+          elapsed=$(( $(date +%s) - start ))
+          echo "----- gopilot output -----"
+          cat gopilot.log || true
+          echo "--------------------------"
+          if [ "$ready" != "1" ]; then
+            echo "::error::npx gopilot never reached a serving state on ${{ matrix.os }}"
+            exit 1
+          fi
+          # Serving is not enough; assert it served the real fixture payload.
+          curl -s --max-time 10 http://127.0.0.1:8000/api/v1/bootstrap > bootstrap.json
+          node -e "
+            const d = require('./bootstrap.json');
+            if (d.mode !== 'fixture') { console.error('mode was', d.mode); process.exit(1); }
+            if (!Array.isArray(d.accounts) || d.accounts.length === 0) { console.error('no accounts'); process.exit(1); }
+            if (d.accounts[0].scores.fit.determined === undefined) { console.error('determined flag missing'); process.exit(1); }
+            console.log('payload OK:', d.accounts.length, 'accounts, mode', d.mode);
+          "
+          echo "CLI_READY=${elapsed}" >> "$GITHUB_ENV"
+
+      - name: Record timings
+        shell: bash
+        run: |
+          total=$(( PY_INSTALL + NPM_INSTALL + CLI_READY ))
+          {
+            echo "### ${{ matrix.os }}"
+            echo ""
+            echo "| phase | seconds |"
+            echo "| --- | ---: |"
+            echo "| pip install (fresh) | ${PY_INSTALL} |"
+            echo "| npm ci (fresh) | ${NPM_INSTALL} |"
+            echo "| npx gopilot -y until serving | ${CLI_READY} |"
+            echo "| **total, checkout to serving** | **${total}** |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "TIMING ${{ matrix.os }}: py=${PY_INSTALL}s npm=${NPM_INSTALL}s cli=${CLI_READY}s total=${total}s"
+
   database:
     name: Database (alembic + integration)
     runs-on: ubuntu-latest

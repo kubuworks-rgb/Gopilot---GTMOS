@@ -2,13 +2,31 @@ param(
     [ValidateSet("Live", "Mock")]
     [string]$Mode = "Live",
     [string]$DiagnosticsPath = "",
+    [string]$PythonPath = "",
     [switch]$InjectMockFailure
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
-$python = "C:\Python313\python.exe"
+
+# The interpreter used to be the literal path it happened to live at on the
+# machine this harness was written on, which meant the harness only ran there --
+# it failed on a Windows CI runner, where Python sits under hostedtoolcache.
+# Resolution order keeps the original behaviour where that path exists, while
+# letting any other machine supply or discover its own.
+$python = if ($PythonPath) {
+    $PythonPath
+} elseif (Test-Path "C:\Python313\python.exe") {
+    "C:\Python313\python.exe"
+} else {
+    $discovered = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $discovered) { $discovered = Get-Command python3 -ErrorAction SilentlyContinue }
+    if ($discovered) { $discovered.Source } else { "" }
+}
+if (-not $python) {
+    throw "No Python interpreter found. Pass -PythonPath to point at one."
+}
 $phaseDir = if ($Mode -eq "Mock") {
     Join-Path $root "tmp\phase5-acceptance-mock-$PID"
 } else {
@@ -206,9 +224,13 @@ try {
     $env:GDELT_MAX_ATTEMPTS = "1"
 
     Set-Stage "RUNTIME_PREFLIGHT"
+    # Still a pin -- the interpreter that answers must be the one this harness
+    # invoked -- but compared against the resolved path rather than a literal,
+    # so the check keeps its meaning on a machine that installs Python
+    # somewhere else.
     & $python -c (
         "import sys,tldextract;" +
-        "assert sys.executable.lower()==r'C:\Python313\python.exe'.lower();" +
+        "assert sys.executable.lower()==r'$python'.lower();" +
         "assert tldextract.__version__=='5.3.0'"
     )
     Assert-ExitCode "PINNED_RUNTIME_FAILED" "Pinned Python runtime preflight failed."

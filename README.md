@@ -189,6 +189,26 @@ anything the product acts on. See
 [docs/architecture](docs/architecture) for the rest — data model, agent/workflow
 architecture, and the research gateway's request handling.
 
+## Use the parts, not just the whole
+
+The most reusable thing here isn't the GTM tool.
+
+**[`packages/entity-safety`](packages/entity-safety)** — the entity-safety gate
+as a standalone, dependency-free Python package. Any pipeline that gathers facts
+about a named entity retrieves documents about a *different* entity with a
+similar name, or a related-but-distinct one. Similarity scoring can't separate
+those; that's the problem. This answers one question with an auditable reason:
+may this passage support a claim about this entity?
+
+**[`packages/entity-safety/benchmark`](packages/entity-safety/benchmark)** — the
+adversarial cases as an open benchmark, so you can score *your* pipeline. 17
+cases, honestly a starting point rather than a standard. A naive brand-token
+matcher scores 17.6% with 14 contaminations against it.
+
+**[`services/mcp_server`](services/mcp_server)** — GoPilot over the Model
+Context Protocol, including the entity check as a tool that needs nothing
+running. Read-only by construction: no tool can approve, send, or promote.
+
 ## Building on this
 
 If you want to use this as the foundation for your own GTM tooling rather than

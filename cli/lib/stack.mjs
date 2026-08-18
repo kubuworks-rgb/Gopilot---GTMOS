@@ -35,9 +35,13 @@ export function installNodeDeps(root) {
 }
 
 export function pythonDepsInstalled(root, python) {
+  // entity_safety is the in-repo package installed from source. It is checked
+  // alongside the third-party imports because a machine can easily have the
+  // published dependencies and not the local one -- and skipping the install in
+  // that state fails later, at import, instead of here where it can be fixed.
   const result = spawnSync(
     python.command,
-    [...python.prefix, "-c", "import fastapi, uvicorn, pydantic"],
+    [...python.prefix, "-c", "import fastapi, uvicorn, pydantic, entity_safety"],
     { cwd: root, encoding: "utf8", timeout: 30_000, windowsHide: true },
   );
   return result.status === 0;

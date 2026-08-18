@@ -1,3 +1,7 @@
+# The entity-safety gate lives in this repo as a standalone, dependency-free
+# package. Installed from source (editable) so it is a real package boundary
+# rather than a directory the application happens to import.
+-e ./packages/entity-safety
 fastapi==0.138.2
 uvicorn[standard]==0.35.0
 pydantic==2.12.5

@@ -79,15 +79,27 @@ export function checkNode() {
 }
 
 /**
- * Find a usable interpreter. Order matters: `py -3` first on Windows because
- * bare `python` there is often the Store alias stub that exits non-zero.
+ * Find a usable interpreter.
+ *
+ * Order matters, and getting it wrong is not cosmetic. `py -3` was tried first
+ * on Windows to dodge the Microsoft Store alias stub, but the launcher resolves
+ * to a system-wide install and ignores both an activated virtualenv and
+ * whatever a CI runner has put on PATH. The result was the CLI checking one
+ * interpreter, finding the dependencies missing, and installing into it --
+ * which is how a Windows runner with everything already installed ended up
+ * trying to build wheels from source.
+ *
+ * PATH first is therefore correct on every platform: it is what a virtualenv
+ * activates, what CI configures, and what the rest of the toolchain uses. The
+ * Store stub needs no special case, because it exits non-zero and `tryRun`
+ * already discards anything that fails.
  */
 const PYTHON_CANDIDATES =
   process.platform === "win32"
     ? [
-        ["py", ["-3"]],
         ["python", []],
         ["python3", []],
+        ["py", ["-3"]],
       ]
     : [
         ["python3", []],

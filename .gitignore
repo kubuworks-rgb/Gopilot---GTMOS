@@ -20,3 +20,6 @@ tmp/
 .playwright-cli/
 !.env.oidc-dev
 !.env.live-dev
+*.egg-info/
+.eggs/
+build/

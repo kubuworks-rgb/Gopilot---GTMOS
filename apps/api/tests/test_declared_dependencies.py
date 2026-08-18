@@ -55,6 +55,15 @@ def test_every_third_party_import_is_declared() -> None:
         match.group(1).lower().replace("_", "-")
         for match in re.finditer(r"^([A-Za-z0-9_.-]+)\s*[=@]", declared_text, re.MULTILINE)
     }
+    # Local packages installed from source, e.g. `-e ./packages/entity-safety`.
+    # The directory name is the distribution name; the module it provides is the
+    # same with dashes as underscores.
+    declared |= {
+        match.group(1).lower()
+        for match in re.finditer(
+            r"^-e\s+\./packages/([A-Za-z0-9_-]+)", declared_text, re.MULTILINE
+        )
+    }
     # Distribution name differs from the module it installs.
     aliases = {"pyjwt": "jwt", "python-multipart": "multipart", "sqlalchemy": "sqlalchemy"}
     declared |= {module for module in aliases.values()}

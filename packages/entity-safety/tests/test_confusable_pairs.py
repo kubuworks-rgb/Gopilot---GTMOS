@@ -7,7 +7,7 @@ merge.
 
 Run just this file to see the guarantee:
 
-    python -m pytest apps/api/tests/test_confusable_pairs.py -v
+    python -m pytest packages/entity-safety/tests/test_confusable_pairs.py -v
 
 The headline invariant is `test_no_confusable_pair_contaminates_the_account`: across
 the whole matrix, not one unproven relationship produces an ATTACHED decision.
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from apps.api.app.services.entity_resolution import (
+from entity_safety import (
     AttachmentDecision,
     ClaimScope,
     CompanyIdentityRecord,

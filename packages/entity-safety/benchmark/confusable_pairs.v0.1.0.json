@@ -1,0 +1,465 @@
+{
+  "name": "confusable-entity-pairs",
+  "version": "0.1.0",
+  "description": "Adversarial near-miss company pairs for evidence-attachment decisions. Every case shares a brand token with the target, which is exactly why brand tokens must not drive attachment.",
+  "decisions": {
+    "ATTACHED": "may support a claim about the target entity",
+    "RELATED_ENTITY_ONLY": "known entity, but not the target",
+    "UNATTACHED_ENTITY_AMBIGUOUS": "could not establish who this is about"
+  },
+  "case_count": 17,
+  "cases": [
+    {
+      "id": "same-name-different-tld-the-historical-optivian-defect",
+      "label": "same name, different TLD (the historical Optivian defect)",
+      "category": "same_name_different_tld",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acme.ai/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "why": "different registrable domain, no proven relationship",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "same-name-.io",
+      "label": "same name, .io",
+      "category": "same_name_different_tld",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acme.io/company",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "why": "different registrable domain",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "same-name-country-tld",
+      "label": "same name, country TLD",
+      "category": "same_name_different_tld",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acme.co.uk/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "why": "a national namesake is a different company until proven otherwise",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "hyphenated-lookalike",
+      "label": "hyphenated lookalike",
+      "category": "near_miss_brand_token",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acme-inc.com/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "why": "legal-suffix variants are not automatically the same entity",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "typosquat",
+      "label": "typosquat",
+      "category": "near_miss_brand_token",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acmme.com/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "why": "near-miss spelling must never resolve to the account",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "brand-prefixed-unrelated-company",
+      "label": "brand-prefixed unrelated company",
+      "category": "shared_brand_token",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acmehealth.com/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "why": "shared prefix is not a relationship",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "claimed-subsidiary-with-no-evidence",
+      "label": "claimed subsidiary with no evidence",
+      "category": "corporate_tree",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "acme-labs.com",
+            "relation": "SUBSIDIARY_OF",
+            "evidence_backed": false
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acme-labs.com/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "why": "an unproven relationship carries no weight",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "claimed-product-domain-with-no-evidence",
+      "label": "claimed product domain with no evidence",
+      "category": "product_vs_company",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "acmecloud.com",
+            "relation": "PRODUCT_OF",
+            "evidence_backed": false
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acmecloud.com/product",
+        "role": "FIRST_PARTY",
+        "claim_scope": "PRODUCT_LEVEL"
+      },
+      "expected_decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+      "why": "an unproven PRODUCT_OF must not attach even at product scope",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "verified-second-official-domain",
+      "label": "verified second official domain",
+      "category": "verified_official_domain",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com",
+          "acme.net"
+        ],
+        "known_relationships": [],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acme.net/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "ATTACHED",
+      "why": "listed as an official domain of the same entity",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": false
+    },
+    {
+      "id": "proven-rebrand-company-level-claim",
+      "label": "proven rebrand, company-level claim",
+      "category": "rebrand",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "oldacme.com",
+            "relation": "REBRAND_OF",
+            "evidence_backed": true
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://oldacme.com/news",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "ATTACHED",
+      "why": "a rebrand is the same company under a former name",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": false
+    },
+    {
+      "id": "proven-product-domain-product-level-claim",
+      "label": "proven product domain, product-level claim",
+      "category": "product_vs_company",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "acmecloud.com",
+            "relation": "PRODUCT_OF",
+            "evidence_backed": true
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acmecloud.com/product",
+        "role": "FIRST_PARTY",
+        "claim_scope": "PRODUCT_LEVEL"
+      },
+      "expected_decision": "ATTACHED",
+      "why": "product-scope claims may attach through a proven PRODUCT_OF",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": false
+    },
+    {
+      "id": "proven-product-domain-company-level-claim",
+      "label": "proven product domain, company-level claim",
+      "category": "product_vs_company",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "acmecloud.com",
+            "relation": "PRODUCT_OF",
+            "evidence_backed": true
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acmecloud.com/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "RELATED_ENTITY_ONLY",
+      "why": "a product's page cannot establish a fact about the whole company",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "proven-parent-company-level-claim",
+      "label": "proven parent, company-level claim",
+      "category": "corporate_tree",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "acmegroup.com",
+            "relation": "PARENT_OF",
+            "evidence_backed": true
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acmegroup.com/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "RELATED_ENTITY_ONLY",
+      "why": "the parent's facts are not the subsidiary's facts",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "proven-subsidiary-company-level-claim",
+      "label": "proven subsidiary, company-level claim",
+      "category": "corporate_tree",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "acmesub.com",
+            "relation": "SUBSIDIARY_OF",
+            "evidence_backed": true
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acmesub.com/about",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "RELATED_ENTITY_ONLY",
+      "why": "a subsidiary's facts are not the parent's facts",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "proven-sister-brand",
+      "label": "proven sister brand",
+      "category": "sister_brand",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "siblingbrand.com",
+            "relation": "SISTER_BRAND",
+            "evidence_backed": true
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://siblingbrand.com/news",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "RELATED_ENTITY_ONLY",
+      "why": "shared ownership is not shared identity",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "proven-partner",
+      "label": "proven partner",
+      "category": "partner",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "partnerco.com",
+            "relation": "PARTNER_OF",
+            "evidence_backed": true
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://partnerco.com/press",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "RELATED_ENTITY_ONLY",
+      "why": "a partner's activity is not the account's buying intent",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    },
+    {
+      "id": "proven-acquirer",
+      "label": "proven acquirer",
+      "category": "other",
+      "target_entity": {
+        "name": "Acme",
+        "domain": "acme.com",
+        "verified_official_domains": [
+          "acme.com"
+        ],
+        "known_relationships": [
+          {
+            "subject_domain": "acquirer.com",
+            "relation": "ACQUIRED_BY",
+            "evidence_backed": true
+          }
+        ],
+        "known_aliases": []
+      },
+      "candidate_source": {
+        "url": "https://acquirer.com/press",
+        "role": "FIRST_PARTY",
+        "claim_scope": "COMPANY_LEVEL"
+      },
+      "expected_decision": "RELATED_ENTITY_ONLY",
+      "why": "the acquirer is a separate legal entity",
+      "naive_matcher_would_conclude": "ATTACHED",
+      "naive_matcher_is_wrong": true
+    }
+  ]
+}

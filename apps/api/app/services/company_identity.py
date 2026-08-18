@@ -4,43 +4,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 from urllib.parse import urlsplit
 
-try:
-    import tldextract  # type: ignore[import-not-found]
-except ModuleNotFoundError:  # Local sandbox may not permit dependency installation.
-    tldextract = None  # type: ignore[assignment]
-
-
-_extract = (
-    tldextract.TLDExtract(cache_dir=None, suffix_list_urls=())
-    if tldextract
-    else None
-)
-_FALLBACK_MULTILABEL_SUFFIXES = {
-    "co.in",
-    "co.uk",
-    "com.au",
-    "com.br",
-    "co.jp",
-    "co.nz",
-    "co.za",
-    "com.sg",
-    "com.mx",
-    "com.tr",
-    "com.cn",
-    "com.hk",
-    "com.tw",
-    "com.my",
-    "com.ph",
-    "com.pk",
-    "com.bd",
-    "com.np",
-    "org.uk",
-    "net.au",
-    "org.au",
-}
-_RESERVED_TEST_TLDS = {"example", "test", "invalid", "localhost"}
-
-
+# Registrable-domain extraction moved to the entity-safety package, where the
+# attachment gate needs it too. Re-exported so this module's callers are
+# unaffected; keeping a second copy here would let the two drift.
+from entity_safety import registrable_domain
 class ResultPageRole(StrEnum):
     OFFICIAL_ROOT = "OFFICIAL_ROOT"
     OFFICIAL_SUBDOMAIN = "OFFICIAL_SUBDOMAIN"
@@ -91,29 +58,6 @@ class CompanyDomainIdentity:
     official_subdomains: tuple[str, ...]
     confidence: float
     page_role: ResultPageRole
-
-
-def registrable_domain(value: str) -> str | None:
-    parsed = urlsplit(value if "://" in value else f"https://{value}")
-    host = (parsed.hostname or "").lower().strip(".")
-    if not host:
-        return None
-    if _extract is not None:
-        extracted = _extract(host)
-        registered = extracted.top_domain_under_public_suffix
-        if registered:
-            return registered.lower()
-        labels = host.split(".")
-        if len(labels) >= 2 and labels[-1] in _RESERVED_TEST_TLDS:
-            return ".".join(labels[-2:])
-        return None
-    labels = host.split(".")
-    if len(labels) < 2:
-        return None
-    suffix_length = 2 if ".".join(labels[-2:]) in _FALLBACK_MULTILABEL_SUFFIXES else 1
-    if len(labels) <= suffix_length:
-        return None
-    return ".".join(labels[-(suffix_length + 1) :])
 
 
 def _matches_domain(host: str, domain: str) -> bool:

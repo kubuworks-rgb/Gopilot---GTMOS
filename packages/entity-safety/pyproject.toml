@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "entity-safety"
+version = "0.1.0"
+description = "Stop evidence attaching to the wrong company in retrieval and agent pipelines."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+keywords = ["entity-resolution", "rag", "retrieval", "provenance", "agents"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Text Processing :: Linguistic",
+]
+
+# Intentionally none. The gate is deterministic string and structure work; a
+# library whose job is to be trusted should not drag a dependency tree behind
+# it. tldextract is used when present for correct public-suffix handling and
+# degraded gracefully when absent -- see domains.py.
+dependencies = []
+
+[project.optional-dependencies]
+# Correct public-suffix handling (co.uk is a suffix, .ai is not).
+suffix = ["tldextract>=5"]
+
+[project.urls]
+Homepage = "https://github.com/kubuworks-rgb/Gopilot---GTMOS"
+Source = "https://github.com/kubuworks-rgb/Gopilot---GTMOS/tree/main/packages/entity-safety"
+
+[tool.setuptools.packages.find]
+include = ["entity_safety*"]

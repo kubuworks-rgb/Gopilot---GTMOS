@@ -131,6 +131,27 @@ test("config parsing survives CRLF and stray whitespace", () => {
   }
 });
 
+test("interpreter discovery prefers PATH over the Windows launcher", async () => {
+  // `py -3` resolves to a system-wide install, ignoring an activated
+  // virtualenv and whatever CI put on PATH. Preferring it made the CLI check
+  // one interpreter and install into another; on a Windows runner with the
+  // dependencies already present that turned into a from-source wheel build.
+  const source = readFileSync(new URL("../lib/prereqs.mjs", import.meta.url), "utf8");
+  const block = source.slice(source.indexOf("PYTHON_CANDIDATES"));
+  const order = [...block.matchAll(/\["(python3?|py)"/g)].map((m) => m[1]);
+  assert.ok(order.length >= 3, "expected the candidate list to be found");
+  assert.ok(
+    order.indexOf("py") === -1 || order.indexOf("py") > order.indexOf("python"),
+    `the py launcher must be a fallback, not the first choice: ${order.join(" > ")}`,
+  );
+
+  // And the interpreter it finds must be a real, usable one.
+  const { findPython } = await import("../lib/prereqs.mjs");
+  const found = findPython();
+  assert.equal(found.ok, true, "no usable interpreter found on this machine");
+  assert.equal(atLeast(found.version, PYTHON_MIN), true);
+});
+
 test("every mode maps to a script that package.json actually defines", () => {
   const scripts = JSON.parse(
     readFileSync(new URL("../../package.json", import.meta.url), "utf8"),

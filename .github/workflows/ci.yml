@@ -38,9 +38,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r apps/api/requirements-dev.txt
       - name: Ruff
-        run: python -m ruff check apps/api services/research_gateway services/worker services/dev_oidc packages/entity-safety
+        run: python -m ruff check apps/api services/research_gateway services/worker services/dev_oidc services/mcp_server packages/entity-safety
       - name: Mypy
-        run: python -m mypy apps/api/app services/research_gateway/app services/worker/app services/dev_oidc packages/entity-safety/entity_safety
+        run: python -m mypy apps/api/app services/research_gateway/app services/worker/app services/dev_oidc services/mcp_server packages/entity-safety/entity_safety
       - name: Pytest
         run: python -m pytest apps/api/tests services/research_gateway/tests packages/entity-safety/tests -q
 

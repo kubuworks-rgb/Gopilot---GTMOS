@@ -140,8 +140,9 @@ A relationship counts only when backed by evidence IDs. A different registrable
 domain is hard-rejected without one — brand-token similarity is never consulted for
 first-party sources.
 
-**Verified:** `test_confusable_pairs.py`, 22 tests over seventeen near-miss pairs.
-Reintroducing brand-token matching turns 6 red, including the named Optivian case.
+**Verified:** `packages/entity-safety/tests/test_confusable_pairs.py` — seventeen
+near-miss pairs, covered by 22 tests. Removing the different-domain rejection turns
+11 red, including the named Optivian case.
 
 ## Evidence Model
 
@@ -290,8 +291,8 @@ asserted equally:
 
 ## Current Implementation
 
-433 tests passing, 9 skipped. CI green across backend, frontend, database and
-security. Deployed stack of six services verified end to end against real company
+528 tests passing, 9 skipped. CI green across backend, frontend, database and
+security. Deployed stack of seven services verified end to end against real company
 websites. Schema at migration `0008`; `alembic check` reports no drift.
 
 ## Missing Features

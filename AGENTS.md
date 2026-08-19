@@ -30,4 +30,5 @@ python -m pytest apps/api/tests services/research_gateway/tests
 ```
 
 See `ARCHITECTURE.md`, `docs/architecture/SYSTEM_DESIGN.md`, and
-`docs/exec-plans/active/MVP_BUILD_PLAN.md` before changing boundaries.
+`docs/EXTENDING.md` before changing boundaries. Historical build plans are
+archived in `docs/exec-plans/history/`.

@@ -103,10 +103,9 @@ independent axes before it may support a claim:
 A funding claim about a parent company is not a funding claim about the
 subsidiary you are researching. `claim_scope_is_compatible()` encodes which
 relation may carry which scope. Loosen it and
-`apps/api/tests/test_confusable_pairs.py` (22 tests over 17 real near-miss
-company pairs) will tell you what you broke — that suite was built by
-deliberately reintroducing naive brand-token matching and confirming 6 tests
-went red.
+`packages/entity-safety/tests/test_confusable_pairs.py` (17 real near-miss
+company pairs, covered by 22 tests) will tell you what you broke — removing the
+different-domain rejection fails 11 of them.
 
 Rejected evidence is surfaced to the user with its reason, not silently dropped
 (`RejectedEvidencePanel` in the web app). Keep that if you change this — the
@@ -163,7 +162,7 @@ around the tests — they are the reason the numbers here mean anything.
 ## Verifying your changes
 
 ```bash
-npm run test        # 456 backend, 43 web
+npm run test        # 474 Python, 43 web, 11 CLI
 npm run lint
 npm run typecheck
 ```

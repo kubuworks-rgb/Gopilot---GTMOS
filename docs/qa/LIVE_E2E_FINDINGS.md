@@ -33,7 +33,7 @@ number. It is now pinned by a regression test built from this exact case.
 
 ### What was happening
 
-`_breakdown_missing_aware` ([scoring.py:25](../../apps/api/app/services/scoring.py:25))
+`_breakdown_missing_aware` ([scoring.py:25](../../apps/api/app/services/scoring.py#L25))
 exists precisely so that an unknown criterion is never treated as a negative one.
 It drops unknown components and renormalises the remaining weights. But when
 *every* component of a dimension was unknown, it fell through to:
@@ -82,15 +82,15 @@ low number and moved on.
 ### The fix
 
 `ScoreBreakdown` gained a `determined: bool` field
-([models.py:244](../../apps/api/app/domain/models.py:244)), `False` only when
+([models.py:244](../../apps/api/app/domain/models.py#L244)), `False` only when
 every factor in a dimension was unknown. `_breakdown_missing_aware` sets it
 rather than silently returning a confident 0
-([scoring.py:25](../../apps/api/app/services/scoring.py:25)), and a new
+([scoring.py:25](../../apps/api/app/services/scoring.py#L25)), and a new
 `_priority_from` composes priority the same missing-aware way its own
 components are composed: an undetermined dimension is excluded from the
 weighted sum and the other's weight is renormalised to compensate, instead of
 multiplying by a phantom 0
-([scoring.py:49](../../apps/api/app/services/scoring.py:49)). The UI, account
+([scoring.py:49](../../apps/api/app/services/scoring.py#L49)). The UI, account
 table, and CSV export now render "Not determined" instead of a bare `0` for an
 undetermined dimension ([score.tsx](../../apps/web/components/score.tsx),
 [exports.py](../../apps/api/app/services/exports.py)) — this was never about

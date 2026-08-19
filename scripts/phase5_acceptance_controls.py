@@ -193,7 +193,7 @@ async def _positive_control(adapter: SearchAdapter) -> dict[str, object]:
 
 def _development_precision(root: Path) -> dict[str, object]:
     payload = json.loads(
-        (root / "docs/qa/PREQUALIFICATION_RECALL_REPLAY.json").read_text(
+        (root / "docs/qa/history/PREQUALIFICATION_RECALL_REPLAY.json").read_text(
             encoding="utf-8"
         )
     )

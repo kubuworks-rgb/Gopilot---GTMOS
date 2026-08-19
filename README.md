@@ -135,11 +135,12 @@ what to upgrade rather than failing halfway through.
 Not marketing language — these are the actual current numbers, reproducible with
 `npm run test`:
 
-- **456 backend tests passing** (`pytest`, 9 skipped because they need a live
+- **528 tests passing**: 452 backend and gateway plus 22 in the
+  entity-safety package (`pytest`, 9 skipped because they need a live
   Postgres/Redis not present in the default fixture-mode run — set
-  `RUN_LIVE_DB_TESTS=1` / `RUN_LIVE_REDIS_TESTS=1` to include them), **43 web
-  tests passing** (Node's built-in test runner against the real TypeScript
-  modules, not reimplementations of them).
+  `RUN_LIVE_DB_TESTS=1` / `RUN_LIVE_REDIS_TESTS=1` to include them), **43 web**
+  (Node's built-in test runner against the real TypeScript modules, not
+  reimplementations of them), and **11 covering the setup CLI**.
 - **A real scoring bug was found on a live run, fixed, and the fix was
   re-verified live, not just unit-tested.** An account whose fit was entirely
   unknown was scored as a confident 0 instead of being excluded and
@@ -149,11 +150,12 @@ Not marketing language — these are the actual current numbers, reproducible wi
   by tearing down and rebuilding the live stack from an empty database and
   re-running the full scenario — full before/after in
   [docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md#6-live-scoring-fix-re-verification).
-- **22 tests over 17 real confusable company-name pairs**
-  (`apps/api/tests/test_confusable_pairs.py`) for entity resolution. Confirmed
-  to actually catch regressions: deliberately reintroducing naive brand-token
-  matching broke 6 of them, including the specific case the suite was built to
-  prevent.
+- **17 real confusable company-name pairs, covered by 22 tests** (the pairs
+  plus five whole-matrix invariants) in
+  `packages/entity-safety/tests/test_confusable_pairs.py`. Confirmed to actually
+  catch regressions: removing the different-domain rejection — the historical
+  defect the suite was built for — fails 11 of the 22, including the invariant
+  that no unproven relationship ever produces `ATTACHED`.
 - **A real authentication bypass was found and fixed during development, not
   hypothesized.** The invite-gate (`assert_invited`) was enforced by only one
   of the two API routers; a validly-signed but uninvited identity reached the

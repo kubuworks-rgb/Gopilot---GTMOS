@@ -128,9 +128,9 @@ regress.
 **3 · Entity-safe research — arguably the strongest technical claim.**
 Ocean.io is a documented public counter-example of the failure mode. No competitor
 reviewed claims a guarantee here.
-*Verified:* `test_confusable_pairs.py`, 22 tests over seventeen near-miss pairs.
-Confirmed to catch regressions by deliberately reintroducing brand-token matching —
-6 tests failed, including the named Optivian case.
+*Verified:* `packages/entity-safety/tests/test_confusable_pairs.py` — seventeen
+near-miss pairs, covered by 22 tests. Confirmed to catch regressions: removing the
+different-domain rejection fails 11 of them, including the named Optivian case.
 
 **2 · Unknown-aware reasoning — defensible.**
 Rare in the market; most competitors' business models depend on filling every field,
@@ -219,7 +219,7 @@ Every GoPilot claim in this document, and how it was checked:
 
 | Claim | How verified |
 |---|---|
-| Entity-safety holds under near-miss pressure | `pytest apps/api/tests/test_confusable_pairs.py` — 22 tests; 6 fail when brand-token matching is reintroduced |
+| Entity-safety holds under near-miss pressure | `pytest packages/entity-safety/tests` — 17 pairs, 22 tests; 11 fail when the different-domain rejection is removed |
 | BYOA needs no provider keys | Smoke test passes with both keys unset; CI pins them empty |
 | Unknown is not scored as false | `None` renormalises in `_breakdown_missing_aware`; covered by `test_evidence_quality.py` |
 | Scoring is deterministic | No LLM in the scoring path; per-factor breakdown asserted in tests |

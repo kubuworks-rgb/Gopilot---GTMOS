@@ -398,7 +398,7 @@ const RETRIEVAL_LABELS: Record<RetrievalOutcome, string> = {
 /**
  * What the research actually managed to read. Without this a brief built from one
  * page out of eight was indistinguishable from one built from all eight, and the
- * failures -- which the gateway distinguishes into nine outcomes -- were visible
+ * failures -- which the gateway distinguishes into ten outcomes -- were visible
  * nowhere in the product.
  */
 function RetrievalPanel({ retrieval }: { retrieval: Brief["retrieval"] }) {

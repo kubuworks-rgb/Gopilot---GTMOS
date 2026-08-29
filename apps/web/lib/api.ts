@@ -57,15 +57,31 @@ export class UnauthenticatedError extends Error {
 }
 
 async function send(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
+  try {
+    return await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders(),
+        ...(init?.headers ?? {}),
+      },
+      cache: "no-store",
+    });
+  } catch {
+    // fetch() rejects (rather than resolving with a bad status) only when the
+    // request never reached a server at all -- refused connection, DNS
+    // failure, or CORS. Through the default relative API_BASE that request is
+    // same-origin and Next's own rewrite proxy turns a dead backend into a
+    // real HTTP response instead, so a raw rejection here means something
+    // more specific bypassed that proxy: almost always an absolute
+    // NEXT_PUBLIC_API_BASE_URL from a stray apps/web/.env.local or .env.
+    const hint = API_BASE.startsWith("http")
+      ? ` API_BASE is set to an absolute URL (${API_BASE}), so the browser is ` +
+        "calling it directly instead of going through the app's own proxy. " +
+        "If that wasn't intentional, delete apps/web/.env.local (or .env) and reload."
+      : " The API server does not appear to be running.";
+    throw new Error(`Could not reach the API at ${API_BASE}.${hint}`);
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

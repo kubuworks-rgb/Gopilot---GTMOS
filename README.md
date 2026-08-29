@@ -17,17 +17,81 @@ Import accounts → Verify identity → Research → Evidence → Score
                 → Opportunity brief → Human review → Export
 ```
 
+## Use it from an AI agent (MCP)
+
+GoPilot ships an [MCP server](services/mcp_server) that speaks the protocol over
+stdio, so it works with any MCP client — Claude Code, Claude Desktop, Cursor,
+Windsurf, Zed, Cline, Continue.
+
+```json
+{
+  "mcpServers": {
+    "gopilot": {
+      "command": "python",
+      "args": ["-m", "services.mcp_server.main"],
+      "cwd": "/absolute/path/to/Gopilot---GTMOS",
+      "env": { "PYTHONPATH": "/absolute/path/to/Gopilot---GTMOS" }
+    }
+  }
+}
+```
+
+Three tools. The interesting one, `check_entity_attachment`, **needs nothing
+running** — no server, no database, no keys — because it is the entity-safety
+gate on its own:
+
+> **You:** I found a Series B announcement on optivian.cloud. Can I use it as
+> evidence about optivian.ai?
+>
+> **Agent** *(calls `check_entity_attachment`)*:
+> ```json
+> { "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
+>   "reason": "Different first-party domain has no verified account relationship.",
+>   "relation": "UNKNOWN", "identity_compatible": false }
+> ```
+> No — same brand token, different registrable domain, and no proven
+> relationship between them. Attaching it would report a funding round that
+> optivian.ai never raised.
+
+The other two (`list_accounts`, `get_account_brief`) read from a running
+GoPilot; in demo mode that is `npx gopilot -y` with no keys.
+
+**Read-only by construction.** No tool can approve, send, or promote anything —
+not because a check rejects it, but because no such tool exists and the server
+can only issue `GET`. Tests assert both from outside.
+
+*Verified against the protocol directly (handshake, `tools/list`, `tools/call`
+against a live API) rather than against each client above; they are listed
+because the server implements standard MCP stdio, not because each was
+individually tested.*
+
 ## Why this exists
 
 The claim isn't "we're better at everything." It's narrower, and the parts of it
 that are actually load-bearing are tested, not just asserted:
 
-**No paid data provider required.** BYOA (Bring Your Own Accounts) — importing
-companies you already have and researching them against their own domain — needs
-zero API keys. Not a trial tier, not "some features work" — the core loop runs
-with `EXA_API_KEY` and `TAVILY_API_KEY` both unset, verified by CI at the
-workflow level so the property can't silently regress. Most comparable tools
-require a paid key before you can research a single account.
+**Free, with nothing metered underneath it.** There is a common shape in
+open-source tooling where the code is free but the thing it does is not: you
+clone it, then discover it needs a key for a paid search, data, or model API
+before it will do anything useful. The software is free; running it is not.
+
+GoPilot's core does not have that layer. Not "no subscription" — *no paid
+third-party dependency of any kind*:
+
+| | |
+|---|---|
+| Search provider | none. It reads the company's own website directly. |
+| LLM / model API | **none at all.** Scoring is deterministic arithmetic and briefs are composed from templates, so there is no token bill. |
+| Enrichment provider | none. The default derives firmographics from public evidence. |
+| Database / queue | none for the default path — demo mode needs no Postgres, Redis, or Docker. |
+
+Nothing is metered, so there is nothing for anyone to mark up. `EXA_API_KEY` and
+`TAVILY_API_KEY` exist only for the experimental discovery workflow, which is off
+by default; the core loop runs with both unset and CI pins them empty so the
+property cannot silently regress.
+
+That is the whole design, not a pricing decision: reading a company's own site is
+the point, and a site you were going to read anyway costs nothing to read.
 
 **It won't confuse one company for another.** Entity resolution runs 10 relation
 types (same entity, subsidiary, acquired-by, sister brand, unrelated, ...)
@@ -224,6 +288,48 @@ The short version of what's worth taking: the evidence pipeline. Turning a
 domain into attributed, identity-checked evidence and a number you can defend is
 the part that's genuinely hard, and it's the part that works without any paid
 provider.
+
+### Fork it for your own vertical
+
+MIT, and forking is an expected outcome rather than a tolerated one. The
+architecture — entity-safety gate, evidence chain, deterministic scoring, human
+review — is not specific to sales. What is specific is the ICP model and which
+sources count as evidence, and those are the two things the seams exist to
+change.
+
+Three directions someone could take it, with the actual work named:
+
+**Recruiting / candidate research.** Entities become companies-as-employers
+rather than prospects. Evidence sources shift to careers pages, engineering
+blogs, and public repos; the ICP model becomes team shape, stack, and hiring
+signals. The entity-safety gate matters *more* here, not less — "Anthropic" the
+AI lab versus a similarly-named consultancy is the same collision, and a hiring
+decision made on the wrong company's engineering blog is a worse outcome than a
+mistargeted email. Seams 1 (add a source), 2 (rescore), 4 (states become
+`SHORTLIST` / `WATCH` / `PASS`).
+
+**VC deal sourcing.** Scoring reweights toward traction and funding-stage
+signals. The `claim_scope` distinction becomes the core feature rather than a
+safeguard: a raise announced by a *parent* company is not a raise by the
+subsidiary you are evaluating, and conflating them misstates a portfolio. The
+`RELATED_ENTITY_ONLY` decision — "we know exactly whose fact this is, and it
+isn't your target" — is worth surfacing directly in the UI. Seams 2, 3
+(`claim_scope_is_compatible`), 4.
+
+**Real-estate or franchise lead qualification.** Entities become operators or
+franchisees, evidence becomes location pages, permit filings, and local
+listings. The near-miss problem is acute: regional licensees and franchisees
+routinely share a brand token with a parent they are legally distinct from,
+which is exactly the `SISTER_BRAND` / `SUBSIDIARY_OF` distinction the gate
+already models. Mostly Seam 1 plus a geography dimension in Seam 2.
+
+In each case the parts worth keeping are the same: evidence attaches to the
+right entity or is refused with a reason, scores are arithmetic you can audit,
+unknown never becomes a confident zero, and nothing acts without a human. Those
+are enforced by tests that will hold your fork to them too.
+
+If you build something on this, an issue saying so is welcome — not required by
+the licence, just genuinely interesting.
 
 ## Repository layout
 

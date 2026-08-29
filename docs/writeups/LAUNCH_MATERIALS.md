@@ -62,12 +62,25 @@ has only ever passed. Removing the different-domain rejection fails 11 of
 to substring - broke nothing, which turned out to be a real gap in
 coverage. Found by trying to break it, not by reading it.
 
-The package has no dependencies. The wider project it came from is an
-evidence-backed account research tool; it runs from a clone with no API
-keys (npm install && npx gopilot -y). There's also a write-up of three
-bugs from it that all produced confident, wrong answers rather than
-crashing - wrong-entity contamination, unknown silently becoming a
-confident zero, and authentication being mistaken for authorization.
+The package has no dependencies. There's also an MCP server, so an agent
+can call the gate directly - that tool needs nothing running, no server
+and no keys.
+
+The wider project it came from is an evidence-backed account research
+tool. It runs from a clone with no paid dependency of any kind: no search
+provider, no enrichment provider, and no LLM at all - scoring is
+deterministic arithmetic and briefs are templated, so there's no token
+bill either. npm install && npx gopilot -y.
+
+I mention that because "free but needs a paid API key underneath" is a
+common shape and I wanted to be specific that this isn't it. Nothing in
+the core loop is metered. Reading a company's own website is the whole
+mechanism.
+
+There's also a write-up of three bugs from it that all produced
+confident, wrong answers rather than crashing - wrong-entity
+contamination, unknown silently becoming a confident zero, and
+authentication being mistaken for authorization.
 
 https://github.com/kubuworks-rgb/Gopilot---GTMOS
 ```
@@ -128,5 +141,6 @@ on purpose to confirm the tests go red.
   half its priority (30 → 66); re-verified against a rebuilt live stack, not
   only in unit tests.
 - 528 tests; CI green on Linux, macOS and Windows; one-command setup from a
-  clean clone in 34s with no API keys, verified on fresh CI runners rather than
-  a developer machine.
+  clean clone in 34s with no paid dependency of any kind — no search provider,
+  no enrichment provider, and no LLM — verified on fresh CI runners rather than
+  a developer machine. Exposed over MCP for use directly from coding agents.

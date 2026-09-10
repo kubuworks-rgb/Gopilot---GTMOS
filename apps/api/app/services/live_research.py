@@ -324,6 +324,29 @@ def _target_geography_terms(target_market: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(terms))
 
 
+def _matched_geography(lowered_text: str, target_market: str) -> str | None:
+    """The founder's target region, only when the page actually evidences it.
+
+    Returns None -- surfaced as "Unverified" -- rather than guessing. A bare
+    country mention is not a location claim, so this only fires for a region the
+    founder is actually targeting, and reports that region rather than inventing
+    a more precise one the evidence does not support.
+    """
+
+    terms = _target_geography_terms(target_market)
+    if not terms:
+        return None
+    lowered_market = target_market.lower()
+    for region, vocabulary in GEOGRAPHY_VOCABULARY.items():
+        if region not in lowered_market and not any(
+            term in lowered_market for term in vocabulary
+        ):
+            continue
+        if any(term in lowered_text for term in vocabulary):
+            return region.title()
+    return None
+
+
 BRIEF_STATE_OPENERS: dict[str, str] = {
     "FOUNDER_READY": "{name} is ready for founder review.",
     "RESEARCH_CANDIDATE": "{name} is a research candidate.",
@@ -3500,23 +3523,14 @@ async def research_account(
             )
             else None
         )
-        account.location = (
-            "India"
-            if any(
-                term in lowered_text
-                for term in (
-                    "india",
-                    "bengaluru",
-                    "bangalore",
-                    "hyderabad",
-                    "pune",
-                    "mumbai",
-                    "gurugram",
-                    "chennai",
-                )
-            )
-            else None
-        )
+        # Geography comes from the founder's own target market, not a hardcoded
+        # country. This previously asserted "India" whenever the word appeared
+        # anywhere in a page, so US companies whose sites merely mention India
+        # -- a region selector, a customer story, an office list -- were labelled
+        # India-based. A country name occurring somewhere in a document is not
+        # evidence of where the company is, and stating it as though it were is
+        # exactly the unfounded inference this codebase exists to refuse.
+        account.location = _matched_geography(lowered_text, product.target_market)
         account.employee_band = employee_band
         account.evidence_ids = list(dict.fromkeys(str(item.id) for item in facts))
         account.attributes = {

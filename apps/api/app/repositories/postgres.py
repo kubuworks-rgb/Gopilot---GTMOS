@@ -283,7 +283,17 @@ class PostgresRepository:
             statement = statement.where(
                 MembershipRow.workspace_id == _uuid(workspace_id)
             )
-        statement = statement.order_by(MembershipRow.workspace_id).limit(1)
+        # With no workspace requested, fall back to the most recently created
+        # one. Ordering by workspace_id sorted UUIDs, which is arbitrary: a user
+        # who had more than one workspace landed in whichever happened to sort
+        # first, so creating a workspace was no guarantee of then seeing it.
+        statement = (
+            statement.join(
+                WorkspaceRow, WorkspaceRow.id == MembershipRow.workspace_id
+            )
+            .order_by(WorkspaceRow.created_at.desc(), MembershipRow.workspace_id)
+            .limit(1)
+        )
         return await session.scalar(statement)
 
     async def create_workspace(

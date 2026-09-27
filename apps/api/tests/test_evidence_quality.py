@@ -18,6 +18,7 @@ from apps.api.app.services.live_research import (
     _target_geography_terms,
     _usable_passages,
 )
+from apps.api.app.services.firmographics import AttributePrecision
 from apps.api.app.services.scoring import score_account
 
 
@@ -173,3 +174,56 @@ def test_geography_follows_the_founders_target_market(
 
 def test_a_market_naming_no_geography_yields_no_terms() -> None:
     assert _target_geography_terms("Developer tooling companies") == ()
+
+
+# --------------------------------------------- firmographic geography must be stated
+
+# A place name on a page is not evidence of where a company is. This asserted
+# "India" at EXACT precision with source IDs attached whenever an Indian city or
+# the country appeared anywhere in the text, so US companies offering an India
+# region were labelled India-based and the guess arrived looking sourced.
+
+
+def _geography(text: str):
+    import asyncio
+
+    from apps.api.app.services.firmographics import PublicEvidenceFirmographicProvider
+
+    result = asyncio.run(
+        PublicEvidenceFirmographicProvider().enrich(
+            company_name="Example",
+            domain="example.com",
+            public_text=text,
+            source_ids=("source-1",),
+        )
+    )
+    return result.geography
+
+
+def test_a_place_name_in_passing_is_not_a_company_location() -> None:
+    geography = _geography(
+        "Vercel is the platform for frontend developers.\n"
+        "Choose your region: United States, Europe, India, Singapore.\n"
+        "Read how a customer in Mumbai scaled their app."
+    )
+
+    assert geography.value is None
+    assert geography.precision is AttributePrecision.UNKNOWN
+    assert geography.confidence == 0
+    assert geography.source_ids == (), "an unfounded guess must not cite sources"
+
+
+def test_an_explicit_location_statement_is_taken() -> None:
+    assert _geography(
+        "Vercel is headquartered in San Francisco, California."
+    ).value == "San Francisco, California"
+
+
+def test_the_location_is_read_rather_than_assumed() -> None:
+    """Any stated location, not one hardcoded region."""
+    assert _geography("Zerodha is based in Bengaluru, India.").value == "Bengaluru, India"
+    assert _geography("Basecamp is headquartered in Chicago.").value == "Chicago"
+
+
+def test_no_location_claim_stays_unknown() -> None:
+    assert _geography("We build developer tools for modern teams.").value is None

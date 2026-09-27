@@ -96,31 +96,42 @@ class PublicEvidenceFirmographicProvider:
                 (),
                 "No compatible company-level employee evidence.",
             )
-        india_terms = (
-            "india",
-            "bengaluru",
-            "bangalore",
-            "hyderabad",
-            "pune",
-            "mumbai",
-            "gurugram",
-            "chennai",
-            "noida",
+        # Geography must come from an explicit statement about where the company
+        # is, not from a place name appearing somewhere on the page. A region
+        # selector, a customer story, or a list of served markets all name places
+        # the company is not based in.
+        #
+        # This previously matched a fixed list of Indian city names anywhere in
+        # the text and asserted "India" at EXACT precision with the source IDs
+        # attached -- so an unfounded inference arrived looking evidence-backed.
+        # It mislabelled US companies whose sites merely offer an India region.
+        # The rule now mirrors employee_count directly above: an explicit
+        # statement, or UNKNOWN.
+        location_match = re.search(
+            r"\b(?:headquartered|headquarters|head office|based|located)\s+"
+            r"(?:in|at)\s+"
+            r"([A-Z][A-Za-z.\-']+(?:[ ,]+[A-Z][A-Za-z.\-']+){0,3})",
+            public_text,
         )
-        geography = FirmographicAttribute(
-            "geography",
-            "India" if any(item in text for item in india_terms) else None,
-            (
-                AttributePrecision.EXACT
-                if any(item in text for item in india_terms)
-                else AttributePrecision.UNKNOWN
-            ),
-            0.82 if any(item in text for item in india_terms) else 0,
-            source_ids if any(item in text for item in india_terms) else (),
-            "Location terms found in public company evidence."
-            if any(item in text for item in india_terms)
-            else "Geography remains unknown.",
-        )
+        if location_match:
+            geography = FirmographicAttribute(
+                "geography",
+                location_match.group(1).strip(" ,."),
+                AttributePrecision.EXACT,
+                0.82,
+                source_ids,
+                "Explicit company-location statement in public evidence.",
+            )
+        else:
+            geography = FirmographicAttribute(
+                "geography",
+                None,
+                AttributePrecision.UNKNOWN,
+                0,
+                (),
+                "No explicit company-location statement; a place name appearing "
+                "on a page is not evidence of where the company is.",
+            )
         software = any(
             item in text
             for item in (

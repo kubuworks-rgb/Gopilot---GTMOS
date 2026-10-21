@@ -162,7 +162,8 @@ def test_imported_and_discovered_provenance_are_separate() -> None:
     account_id = response.json()["imported"][0]["id"]
     accounts = client.get("/api/v1/accounts", headers=HEADERS).json()
     imported = next(item for item in accounts if item["id"] == account_id)
-    discovered = next(item for item in accounts if item["id"] != account_id)
+    # The demo holds imported accounts too; pick one nobody imported.
+    discovered = next(item for item in accounts if item["import_source"] is None)
     assert imported["provenance"] == "IMPORTED"
     assert imported["import_source"] == "SINGLE"
     assert discovered["provenance"] == "DISCOVERED"

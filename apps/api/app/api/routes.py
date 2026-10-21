@@ -91,6 +91,10 @@ def bootstrap(principal: Current) -> dict[str, object]:
             1
             for b in repository.briefs.values()
             if b.account.workspace_id == principal.workspace_id
+            # Only a FOUNDER_READY draft can be approved; counting the empty
+            # placeholder drafts of other accounts advertised work that the
+            # approve endpoint refuses. Matches PostgresRepository.approval_count.
+            and b.brief_state == "FOUNDER_READY"
             and b.campaign.status == "draft"
         ),
     }

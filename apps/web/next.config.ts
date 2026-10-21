@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // The floating dev badge sits on top of the sidebar footer in `npm run dev`.
+  devIndicators: false,
   // Standalone emits a self-contained server bundle so the runtime image needs
   // neither node_modules nor a package install.
   output: "standalone",

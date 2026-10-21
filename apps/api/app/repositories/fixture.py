@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from threading import RLock
 from uuid import uuid4
-
-from pydantic import HttpUrl
 
 from apps.api.app.domain.models import (
     Account,
@@ -14,19 +12,15 @@ from apps.api.app.domain.models import (
     AuditEvent,
     CampaignDraft,
     ClaimStatus,
-    EvidenceClaim,
-    EvidenceFact,
     Finding,
     ICP,
     ProductProfile,
     ProductMode,
-    QualificationStatus,
     ResearchRun,
-    Signal,
-    SourceDocument,
     Workspace,
 )
-from apps.api.app.services.scoring import score_account, signal_decay
+from apps.api.app.repositories.demo_accounts import build_demo_accounts
+from apps.api.app.services.scoring import score_account
 
 
 def _id(prefix: str) -> str:
@@ -162,22 +156,7 @@ class FixtureRepository:
         return selected
 
     def _create_accounts(self, icp: ICP) -> None:
-        now = datetime.now(UTC)
-        templates = [
-            ("NovaLedger", "novaledger.example", "B2B SaaS", "Bengaluru, India", "21-50", 94, 90, 100, 86, now - timedelta(days=8), "Three GTM roles opened this month"),
-            ("SignalForge AI", "signalforge.example", "AI SaaS", "Pune, India", "11-20", 91, 96, 100, 78, now - timedelta(days=18), "Launched a new enterprise product tier"),
-            ("CloudKite", "cloudkite.example", "Developer SaaS", "Hyderabad, India", "21-50", 88, 92, 100, 70, now - timedelta(days=34), "Announced expansion into Southeast Asia"),
-        ]
-        for idx, (name, domain, industry, location, band, industry_match, size_match, geo, strength, observed, signal_text) in enumerate(templates, 1):
-            source_id, fit_ev, intent_ev = _id("src"), _id("ev"), _id("ev")
-            source = SourceDocument(id=source_id, workspace_id=icp.workspace_id, platform="web", source_type="webpage", backend="fixture", url=HttpUrl(f"https://{domain}/company-update"), canonical_url=HttpUrl(f"https://{domain}/company-update"), title=f"{name} public company update", published_at=observed, trust_score=.88, demo_data=True)
-            fit_fact = EvidenceFact(id=fit_ev, workspace_id=icp.workspace_id, source_id=source_id, passage=f"{name} describes itself as a {industry} company based in {location} with an approximately {band} person team.", claim=f"{name} matches the selected industry, geography, and employee band.", confidence=.91, status=ClaimStatus.SUPPORTED, observed_at=observed)
-            intent_fact = EvidenceFact(id=intent_ev, workspace_id=icp.workspace_id, source_id=source_id, passage=f"Demo public update: {signal_text}.", claim=signal_text, confidence=.86, status=ClaimStatus.SUPPORTED, observed_at=observed)
-            signal = Signal(id=_id("sig"), signal_type="growth", description=signal_text, observed_at=observed, strength=strength / 100, evidence_ids=[intent_ev])
-            scores = score_account(industry_match=industry_match, size_match=size_match, geography_match=geo, signal_strength=strength, signal_recency=signal_decay(observed) * 100, evidence_coverage=92 - idx, source_quality=88, fit_evidence=[fit_ev], signal_evidence=[intent_ev])
-            account = Account(id=_id("acct"), workspace_id=icp.workspace_id, icp_id=icp.id, name=name, domain=domain, industry=industry, location=location, employee_band=band, scores=scores, top_signal=signal_text, recommended_action="Review the opportunity brief and tailor a founder-led research pilot offer.", last_researched_at=now, qualification_status=QualificationStatus.QUALIFIED, brief_state="FOUNDER_READY")
-            campaign = CampaignDraft(id=_id("camp"), account_id=account.id, subject=f"A more defensible GTM shortlist for {name}", body=f"Hi {name} team,\n\nYour recent public update suggests a timely GTM planning moment. Kubu Works helps small teams rank accounts with inspectable evidence before committing to outbound.\n\nWould a short, human-reviewed pilot around your next segment be useful?\n\nThis draft is based only on the linked demo evidence and has not been sent.", evidence_ids=[intent_ev])
-            brief = AccountOpportunityBrief(account=account, why_it_fits=[EvidenceClaim(statement=f"Matches the selected {icp.name} firmographics.", status=ClaimStatus.SUPPORTED, confidence=.91, evidence_ids=[fit_ev])], why_now=[EvidenceClaim(statement=signal_text, status=ClaimStatus.SUPPORTED, confidence=.86, evidence_ids=[intent_ev])], pain_hypotheses=[EvidenceClaim(statement="The team may need a repeatable way to validate account priorities as GTM activity grows.", status=ClaimStatus.HYPOTHESIS, confidence=.62, evidence_ids=[])], recommended_problem="Turn scattered public signals into a defensible account-priority decision.", recommended_offer="A human-reviewed evidence-backed account research pilot.", recommended_action=account.recommended_action, risks=["Fixture source: confirm against live public sources before external use.", "Pain remains a hypothesis until discovery."], evidence=[fit_fact, intent_fact], sources=[source], signals=[signal], campaign=campaign, brief_state="FOUNDER_READY")
+        for account, brief in build_demo_accounts(icp, datetime.now(UTC)):
             self.accounts[account.id] = account
             self.briefs[account.id] = brief
 
@@ -245,6 +224,10 @@ class FixtureRepository:
                 product_mode=ProductMode.BYOA_CORE,
                 import_source=import_source,
                 provenance="IMPORTED",
+                # Live mode keeps these; dropping them here made the demo ignore
+                # columns the import form says it accepts.
+                owner=record.owner,
+                tags=list(record.tags),
             )
             campaign = CampaignDraft(
                 id=_id("camp"),

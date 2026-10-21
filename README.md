@@ -1,27 +1,250 @@
+<div align="center">
+
 # GoPilot
+
+**Find out which companies are worth contacting, why, and how sure you can be.**
+
+GoPilot reads each company's own website, checks that what it found really is
+about *that* company, scores it with plain arithmetic, and gives you a brief
+where every claim links to the sentence it came from.
+**Free, open source, no API keys, no AI bill.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/kubuworks-rgb/Gopilot---GTMOS/actions/workflows/ci.yml/badge.svg)](https://github.com/kubuworks-rgb/Gopilot---GTMOS/actions/workflows/ci.yml)
+![Tests](https://img.shields.io/badge/tests-539%20passing-brightgreen)
+![API keys](https://img.shields.io/badge/API%20keys-none%20needed-blue)
 
-An evidence-backed GTM (go-to-market) research tool. Give it a list of companies
-you're already interested in and it researches each one against its own official
-website, scores it with a deterministic (non-LLM) formula, and produces a brief
-where every material claim links back to the exact passage and source it came
-from. It answers one question, rigorously: *out of the companies I could target,
-which deserve my attention, why, and how confident should I be?*
+[Try it in one command](#-try-it-in-one-command) ·
+[Take the tour](#-a-5-minute-tour) ·
+[Use your own companies](#-use-it-with-your-own-companies) ·
+[Use it from an AI agent](#-use-it-from-an-ai-agent-mcp)
 
-It is not a lead scraper, a company database, a chatbot, or a CRM.
+![GoPilot command center showing six ranked accounts](docs/assets/dashboard.png)
+
+<sub>Every company in these screenshots is made up and lives on a reserved
+<code>.example</code> domain. The app labels it <b>DEMO DATA</b>.</sub>
+
+</div>
+
+---
+
+## What it does
+
+You give it a list of companies you're thinking about selling to. For each one,
+GoPilot:
+
+| Step | What happens | Why it matters |
+|---|---|---|
+| 🔎 **Reads** | Fetches the company's own pages: homepage, about, careers, news | You see what the company says about itself, not a database guess |
+| 🛡️ **Checks identity** | Throws out evidence that belongs to a *different* company with a similar name | You never write to a company about funding it didn't raise |
+| 🧮 **Scores** | **Fit** (do they match who you sell to?), **Intent** (is something happening *now*?), **Confidence** (how much did we actually read?) | Plain arithmetic you can inspect. No AI makes up a number |
+| ❓ **Admits gaps** | Missing information shows as **"Not determined"**, never as a fake 0 | A company isn't marked as a poor fit just because its site was down |
+| 📝 **Writes a brief** | Summary, evidence, unknowns, risks, next step, plus a draft message only when the evidence supports one | Every sentence links to its source |
+| ✋ **Waits for you** | Nothing is ever sent. You edit, approve or reject | You stay in control |
 
 ```
-Import accounts → Verify identity → Research → Evidence → Score
-                → Opportunity brief → Human review → Export
+Your list → Read official sites → Check identity → Score → Brief → You decide → Export CSV
 ```
 
-## Use it from an AI agent (MCP)
+It is **not** a lead scraper, a contact database, a chatbot, or an email sender.
 
-GoPilot ships an [MCP server](services/mcp_server) that speaks the protocol over
-stdio, so it works with any MCP client — Claude Code, Claude Desktop, Cursor,
-Windsurf, Zed, Cline, Continue.
+---
+
+## 🚀 Try it in one command
+
+**You need:** [Node.js 20.9+](https://nodejs.org) and [Python 3.11+](https://www.python.org/downloads/).
+No Docker, no database, no accounts, no keys.
+
+```bash
+git clone https://github.com/kubuworks-rgb/Gopilot---GTMOS.git
+cd Gopilot---GTMOS
+npm install
+npx gopilot -y
+```
+
+After about a minute your browser opens at **http://localhost:3000** with a
+workspace of six made-up companies, already researched and scored.
+
+<details>
+<summary><b>What do these commands do?</b></summary>
+
+- `npm install` installs the web app and the small setup tool.
+- `npx gopilot` checks your Node and Python versions, installs Python packages
+  if they're missing, starts the API and the web app, waits until both are
+  actually responding, then opens your browser.
+- `-y` skips the setup questions and starts the demo. Leave it off to choose a
+  mode yourself. Later runs remember your choice. Use `--reconfigure` to change
+  it, or `--no-open` to stop it from opening a browser.
+- Press `Ctrl+C` to stop everything.
+
+</details>
+
+<details>
+<summary><b>Something went wrong?</b></summary>
+
+| What you see | What to do |
+|---|---|
+| `node` or `python` not found / too old | Install the versions above. `npx gopilot` names exactly what to upgrade. |
+| "Workspace setup needed / Failed to fetch" | The API isn't running. Stop with `Ctrl+C` and run `npx gopilot -y` again. It waits until the API answers before opening the browser. |
+| Port 3000 or 8000 already in use | Close whatever else is using it (often an earlier GoPilot still running), then start again. |
+| Still stuck | [Open an issue](https://github.com/kubuworks-rgb/Gopilot---GTMOS/issues) and paste what the terminal printed. |
+
+</details>
+
+---
+
+## 🧭 A 5-minute tour
+
+The demo has six made-up companies. Each one shows a different thing GoPilot
+does. Open **Review priorities** in the sidebar and click **Inspect** on any
+row.
+
+![The ranked accounts list](docs/assets/accounts.png)
+
+| Company | What it shows you | Look at |
+|---|---|---|
+| **NovaLedger** | 🟢 **Ready to contact.** Good fit, posted three sales jobs 8 days ago. Gets a draft message. | The brief and the draft at the bottom |
+| **SignalForge AI** | 🟢 Ready. Launched an enterprise tier 18 days ago. | How the *older* signal gives lower intent than NovaLedger's |
+| **CloudKite** | 🟢 Ready. Was **discovered** from your ideal-customer profile rather than imported. | The *Provenance* column |
+| **Brightwave Analytics** | 🟡 **Strong signal, unknown fit.** Hiring now, but its homepage timed out. | Fit says **"Not determined"**, not 0. GoPilot says to research first |
+| **Harbor Ledger** | ⚪ **Good fit, nothing happening.** No current event to mention. | "No current high-confidence signal": monitor, don't message |
+| **Quillfront** | 🔴 **Identity check caught a lookalike.** A "$25M Series B" headline came from a different domain. | The **rejected evidence** panel |
+
+### Every claim links to its source
+
+Open **NovaLedger**. Each section answers one question: why it fits, why now,
+what's verified, what's unknown, what could go wrong, and what to do next.
+Click **View evidence** on any claim to see the exact sentence and the page it
+came from.
+
+![NovaLedger's opportunity brief](docs/assets/brief.png)
+
+### It refuses evidence about the wrong company
+
+Open **Quillfront** and click **Show what was excluded**. Two passages were
+found, and both were kept out of the scores:
+
+![Rejected evidence on Quillfront](docs/assets/rejected-evidence.png)
+
+- `quillfront.test` uses the same name but has **no proven link** to
+  `quillfront.example`, so the Series B news is held back.
+- `quillfrontgroup.example` is the **verified parent company**. Its revenue
+  news is real, but it is about the parent, not this company.
+
+Both decisions come from the real identity-check code, not from hard-coded demo
+text. That code is [packaged separately](packages/entity-safety) so you can use
+it in your own projects.
+
+### "Not determined" is an honest answer
+
+Open **Brightwave Analytics**. Its homepage and about page timed out, so
+GoPilot doesn't know what the company sells. It doesn't guess and it doesn't
+score fit as 0. It says so and tells you what to retry.
+
+![Brightwave Analytics with fit not determined](docs/assets/unknown-fit.png)
+
+### Nothing is sent without you
+
+Only companies marked **FOUNDER READY** get a draft. You can edit it, approve
+it, or reject it. **GoPilot never sends anything.** Approving marks it ready
+for *you* to send from your own email. Approved accounts can be exported as a
+CSV from the account page.
+
+![A campaign draft awaiting human approval](docs/assets/draft.png)
+
+**Try these in the demo:** change a review state, leave a note, edit and approve
+a draft, or filter the list by owner, tag, signal or priority. To try importing,
+go to **Import accounts** and upload [`examples/accounts.csv`](examples/accounts.csv).
+
+---
+
+## 🏢 Use it with your own companies
+
+The demo shows what the app does. To research **real** companies, switch to live
+mode. It still needs **no API keys**, because it reads each company's own
+website directly.
+
+**1. Start live mode.** This also needs [Docker Desktop](https://www.docker.com/products/docker-desktop/),
+which runs the database:
+
+```bash
+npx gopilot --reconfigure
+```
+
+Choose **Live research**. If Docker is running, GoPilot offers to start the
+database for you.
+
+**2. Describe what you sell.** The first screen asks for your company, your
+product, and who you sell to (for example *"Founder-led B2B SaaS companies in
+India, 10–50 people"*). This is what **Fit** is measured against.
+
+**3. Click "Start live research"** on the **Product profile** page. This turns
+your description into the target profile your accounts are scored against.
+
+**4. Add companies.** Go to **Import accounts** and either:
+- type one company name and domain,
+- paste a list of domains (one per line), or
+- upload a CSV like [`examples/accounts.csv`](examples/accounts.csv):
+
+```csv
+company_name,domain,owner,tags
+PostHog,posthog.com,Asha,example
+Basecamp,basecamp.com,Asha,example
+```
+
+Only `company_name` and `domain` are required. You can also add `industry`,
+`country`, `employee_band`, `notes`, `crm_id`, `owner` and `tags`.
+
+**5. Let it research.** Each company's official pages are fetched, checked and
+scored in the background. Refresh the list to see results come in.
+
+**6. Review.** Sort by priority, open each brief, and read the evidence. Mark
+each account: approve, request changes, flag wrong identity, or not relevant.
+
+**7. Export.** Download approved accounts as CSV for your CRM or spreadsheet.
+
+<details>
+<summary><b>Prefer to run each piece yourself instead of the wizard?</b></summary>
+
+```bash
+pip install -r apps/api/requirements-dev.txt
+npm install
+
+npm run dev                                                    # demo mode
+
+docker compose -f deploy/docker-compose.dev-infra.yml up -d    # database + queue
+npm run dev:live                                               # live mode
+
+npm run dev:oidc    # real browser sign-in against a bundled test login server
+```
+
+`npm run dev:oidc` starts [`services/dev_oidc`](services/dev_oidc), a test
+sign-in server that refuses to start outside development, so you can try the
+real sign-in flow without registering with a provider. For production setup see
+[docs/operations/DEPLOYMENT_RUNBOOK.md](docs/operations/DEPLOYMENT_RUNBOOK.md).
+
+The optional `apps/api/requirements-gateway.txt` installs Agent Reach, an
+extra tool the research gateway can report on. It is off by default and the
+core workflow doesn't use it.
+
+</details>
+
+### Demo mode vs live mode
+
+| | **Demo** (`npx gopilot -y`) | **Live** |
+|---|---|---|
+| Companies | 6 made-up ones, already researched | Yours |
+| Internet access | None | Reads each company's own site |
+| Needs | Nothing extra | Postgres + Redis (Docker starts them for you) |
+| API keys | None | None |
+| Labelled | **DEMO DATA** | **LIVE PUBLIC DATA** |
+
+---
+
+## 🤖 Use it from an AI agent (MCP)
+
+GoPilot includes an [MCP server](services/mcp_server), so Claude Code, Claude
+Desktop, Cursor, Windsurf, Zed, Cline or any other MCP client can use it:
 
 ```json
 {
@@ -36,333 +259,178 @@ Windsurf, Zed, Cline, Continue.
 }
 ```
 
-Three tools. The interesting one, `check_entity_attachment`, **needs nothing
-running** — no server, no database, no keys — because it is the entity-safety
-gate on its own:
+It has three tools. `list_accounts` and `get_account_brief` read from a running
+GoPilot (the demo works). `check_entity_attachment` needs **nothing running**:
 
 > **You:** I found a Series B announcement on optivian.cloud. Can I use it as
 > evidence about optivian.ai?
 >
-> **Agent** *(calls `check_entity_attachment`)*:
-> ```json
-> { "decision": "UNATTACHED_ENTITY_AMBIGUOUS",
->   "reason": "Different first-party domain has no verified account relationship.",
->   "relation": "UNKNOWN", "identity_compatible": false }
-> ```
-> No — same brand token, different registrable domain, and no proven
-> relationship between them. Attaching it would report a funding round that
-> optivian.ai never raised.
+> **Agent** *(calls `check_entity_attachment`)*: No. It's
+> `UNATTACHED_ENTITY_AMBIGUOUS`: same name, different domain, and no proven
+> relationship between them. Using it would report a funding round optivian.ai
+> never raised.
 
-The other two (`list_accounts`, `get_account_brief`) read from a running
-GoPilot; in demo mode that is `npx gopilot -y` with no keys.
+**Read-only by design.** No tool can approve, send or change anything. Those
+tools don't exist, and the server only makes `GET` requests. Tests check both.
 
-**Read-only by construction.** No tool can approve, send, or promote anything —
-not because a check rejects it, but because no such tool exists and the server
-can only issue `GET`. Tests assert both from outside.
+<sub>Tested against the MCP protocol directly (handshake, `tools/list`,
+`tools/call`), not separately inside each client listed.</sub>
 
-*Verified against the protocol directly (handshake, `tools/list`, `tools/call`
-against a live API) rather than against each client above; they are listed
-because the server implements standard MCP stdio, not because each was
-individually tested.*
+---
 
-## Why this exists
+## 🔒 What GoPilot will never do
 
-The claim isn't "we're better at everything." It's narrower, and the parts of it
-that are actually load-bearing are tested, not just asserted:
+These rules are enforced by tests, not just written down:
 
-**Free, with nothing metered underneath it.** There is a common shape in
-open-source tooling where the code is free but the thing it does is not: you
-clone it, then discover it needs a key for a paid search, data, or model API
-before it will do anything useful. The software is free; running it is not.
+- **Never send a message.** Drafts wait for a person. There is no send button.
+- **Never let AI make up a score.** No LLM is used anywhere in the core. Scores
+  are arithmetic, and briefs are built from the verified evidence.
+- **Never attach evidence to the wrong company.** 10 relationship types × 6
+  claim levels, checked against 17 real lookalike company pairs.
+- **Never treat "unknown" as "no".** Missing data is left out and the rest is
+  re-weighted, not counted as zero.
+- **Never scrape logged-in social media**, bypass CAPTCHAs or paywalls, or
+  collect private personal data.
+- **Never pass off demo data as real.** It is labelled everywhere, and
+  production refuses to run with it.
 
-GoPilot's core does not have that layer. Not "no subscription" — *no paid
-third-party dependency of any kind*:
+## 💸 Free, with nothing paid underneath
+
+Plenty of "free" tools need a paid key before they do anything. GoPilot's core
+doesn't:
 
 | | |
 |---|---|
-| Search provider | none. It reads the company's own website directly. |
-| LLM / model API | **none at all.** Scoring is deterministic arithmetic and briefs are composed from templates, so there is no token bill. |
-| Enrichment provider | none. The default derives firmographics from public evidence. |
-| Database / queue | none for the default path — demo mode needs no Postgres, Redis, or Docker. |
+| Search provider | **None.** It reads company websites directly. |
+| AI / LLM API | **None.** No token bill, ever. |
+| Data enrichment provider | **None.** Facts come from public pages. |
+| Database | **None** for the demo. Live mode uses your own local Postgres and Redis. |
 
-Nothing is metered, so there is nothing for anyone to mark up. `EXA_API_KEY` and
-`TAVILY_API_KEY` exist only for the experimental discovery workflow, which is off
-by default; the core loop runs with both unset and CI pins them empty so the
-property cannot silently regress.
-
-That is the whole design, not a pricing decision: reading a company's own site is
-the point, and a site you were going to read anyway costs nothing to read.
-
-**It won't confuse one company for another.** Entity resolution runs 10 relation
-types (same entity, subsidiary, acquired-by, sister brand, unrelated, ...)
-against 6 claim scopes, and a claim from the wrong entity is rejected rather than
-silently attached to your target. 22 tests cover 17 real near-miss pairs — the
-kind of company-name collision ("Optivian" the fintech vs. "Optivian" the totally
-unrelated firm two letters off) that has burned other tools in production.
-
-**It won't tell you something it doesn't know.** When evidence for a scoring
-dimension is missing, the score renormalizes across what *is* known instead of
-defaulting the unknown to zero — whether that's one factor within a dimension or
-every factor in it. A live run against 20 real companies found the second case
-unhandled: when a dimension was *entirely* unknown, it fell through to a
-confident-looking `0` instead of "not determined," which measurably changed one
-account's ranking (`fly.io` scored priority 29 instead of 64 because an unknown
-fit was silently treated as a confirmed poor one). Found, fixed, pinned by a
-regression test built from that exact case, and re-verified against a fresh live
-run — full history in
-[docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md#2-p0--unknown-fit-was-scored-as-zero-and-it-changed-the-ranking-fixed).
-It's kept in the README rather than quietly dropped from history, because a
-repo claiming unknown-aware reasoning should show its work when that property
-was once broken, not just assert it now holds.
-
-Full honest comparison against Clay, Common Room, 6sense, and others — including
-where GoPilot is *not* differentiated — is in
-[docs/product/COMPETITOR_POSITIONING.md](docs/product/COMPETITOR_POSITIONING.md).
-
-## Quickstart — zero API keys, zero signup, under 5 minutes
-
-```bash
-git clone https://github.com/kubuworks-rgb/Gopilot---GTMOS.git
-cd Gopilot---GTMOS
-npm install && npx gopilot
-```
-
-That's it. `gopilot` checks your Node and Python versions, installs whatever is
-missing, asks up to three short questions, starts the stack, waits until it is
-genuinely serving, and opens your browser at `http://localhost:3000`.
-
-In a hurry, or scripting it? `npx gopilot -y` skips the questions and goes
-straight to demo mode. Later runs remember your answers and start immediately —
-`npx gopilot --reconfigure` if you want to change them.
-
-The default needs **no API keys, no Docker, and no database.** It runs in
-**fixture mode** (a deterministic offline dataset — seeded companies, fully
-researched, scored, and briefed) with **demo auth**, so the browser never
-redirects to a sign-in screen. You are looking at the real product surface and
-the real evidence-linked scoring logic, just not live network calls yet.
-
-The wizard offers two other modes. **Live research** runs the real pipeline —
-import a domain, the gateway fetches that company's actual public pages,
-extracts evidence, scores it, produces a brief — still with no search-provider
-key. It needs Postgres and Redis; if Docker is running, the CLI offers to start
-them for you, and that option is hidden entirely when Docker is not available.
-
-### Manual setup
-
-If you would rather see exactly what is happening than run a wizard, the CLI is
-a convenience wrapper and nothing depends on it:
-
-```bash
-pip install -r apps/api/requirements-dev.txt
-npm install
-npm run dev                                                    # demo / fixture mode
-```
-
-Everything the application imports is in that file. One optional extra —
-`apps/api/requirements-gateway.txt` — installs Agent Reach, an external CLI the
-research gateway shells out to for its capability report. It is off by default
-(`AGENT_REACH_ENABLED=false`), the gateway reports the channel as `unavailable`
-without it, and no part of the core workflow uses it. It is kept separate
-because it installs from a GitHub archive URL that rate-limits, and a transient
-429 should not fail the documented setup step.
-
-```bash
-docker compose -f deploy/docker-compose.dev-infra.yml up -d    # Postgres + Redis
-npm run dev:live                                               # live research
-```
-
-This is the mode `scripts/verify_e2e_scenario.py` and
-[docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md) exercise.
-
-To try real browser sign-in (Authorization Code + PKCE against an OIDC issuer)
-without registering with a provider:
-
-```bash
-npm run dev:oidc
-```
-
-This starts `services/dev_oidc`, a bundled test issuer that authenticates
-nobody and refuses to start outside development — see its module docstring. It
-exists so the sign-in flow is reproducible without a real identity provider.
-Production points `JWT_ISSUER` at a real one; see
-[docs/operations/DEPLOYMENT_RUNBOOK.md](docs/operations/DEPLOYMENT_RUNBOOK.md).
-
-### Requirements
-
-**Node 20.9+** (Next.js 16 requires it; 22.6+ if you want to run `npm run test`,
-which uses `--experimental-strip-types`) and **Python 3.11+** (the API uses
-`StrEnum` and `datetime.UTC`). `npx gopilot` checks both and tells you exactly
-what to upgrade rather than failing halfway through.
-
-## What's actually verified
-
-Not marketing language — these are the actual current numbers, reproducible with
-`npm run test`:
-
-- **528 tests passing**: 452 backend and gateway plus 22 in the
-  entity-safety package (`pytest`, 9 skipped because they need a live
-  Postgres/Redis not present in the default fixture-mode run — set
-  `RUN_LIVE_DB_TESTS=1` / `RUN_LIVE_REDIS_TESTS=1` to include them), **43 web**
-  (Node's built-in test runner against the real TypeScript modules, not
-  reimplementations of them), and **11 covering the setup CLI**.
-- **A real scoring bug was found on a live run, fixed, and the fix was
-  re-verified live, not just unit-tested.** An account whose fit was entirely
-  unknown was scored as a confident 0 instead of being excluded and
-  renormalized, silently costing it more than half its priority. Fixed in
-  `_priority_from` ([scoring.py](apps/api/app/services/scoring.py)), pinned by
-  `test_a_fully_unknown_fit_is_excluded_rather_than_scored_zero`, and confirmed
-  by tearing down and rebuilding the live stack from an empty database and
-  re-running the full scenario — full before/after in
-  [docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md#6-live-scoring-fix-re-verification).
-- **17 real confusable company-name pairs, covered by 22 tests** (the pairs
-  plus five whole-matrix invariants) in
-  `packages/entity-safety/tests/test_confusable_pairs.py`. Confirmed to actually
-  catch regressions: removing the different-domain rejection — the historical
-  defect the suite was built for — fails 11 of the 22, including the invariant
-  that no unproven relationship ever produces `ATTACHED`.
-- **A real authentication bypass was found and fixed during development, not
-  hypothesized.** The invite-gate (`assert_invited`) was enforced by only one
-  of the two API routers; a validly-signed but uninvited identity reached the
-  fixture-mode router unchallenged. Fixed, and
-  `test_both_routers_enforce_the_invite_gate` in
-  `apps/api/tests/test_router_contract_parity.py` now fails the build if that
-  class of bug reappears — confirmed by reverting the fix and watching the test
-  go red before restoring it. Full writeup in [SECURITY.md](SECURITY.md).
-- **The live-mode end-to-end scenario has actually been run against real
-  infrastructure** — real Postgres, real Redis, a real worker, real HTTP
-  requests to real company websites — not just fixture data. Results, including
-  what passed and what didn't, are in
-  [docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md).
-- **`scripts/verify_oidc_flow.py`** drives the whole browser sign-in protocol
-  programmatically — PKCE enforcement, code replay rejection, refresh, logout,
-  tenant isolation — 12 groups, all passing, reproducible with one command
-  against the bundled dev issuer.
-
-## Architecture
-
-Two runtime modes share one API contract:
-
-```
-Next.js → FastAPI → fixture repository                         (fixture mode)
-               \-> PostgreSQL repository -> Redis -> worker    (live mode)
-                                                   \-> gateway -> public adapters
-```
-
-Scoring, identity resolution, and access control are deterministic code, never
-an LLM. An LLM is only used for summarization and brief composition — never for
-anything the product acts on. See
-[ARCHITECTURE.md](ARCHITECTURE.md) for the one-page version and
-[docs/architecture](docs/architecture) for the rest — data model, agent/workflow
-architecture, and the research gateway's request handling.
-
-## Use the parts, not just the whole
-
-The most reusable thing here isn't the GTM tool.
-
-**[`packages/entity-safety`](packages/entity-safety)** — the entity-safety gate
-as a standalone, dependency-free Python package. Any pipeline that gathers facts
-about a named entity retrieves documents about a *different* entity with a
-similar name, or a related-but-distinct one. Similarity scoring can't separate
-those; that's the problem. This answers one question with an auditable reason:
-may this passage support a claim about this entity?
-
-**[`packages/entity-safety/benchmark`](packages/entity-safety/benchmark)** — the
-adversarial cases as an open benchmark, so you can score *your* pipeline. 17
-cases, honestly a starting point rather than a standard. A naive brand-token
-matcher scores 17.6% with 14 contaminations against it.
-
-**[`services/mcp_server`](services/mcp_server)** — GoPilot over the Model
-Context Protocol, including the entity check as a tool that needs nothing
-running. Read-only by construction: no tool can approve, send, or promote.
-
-## Building on this
-
-If you want to use this as the foundation for your own GTM tooling rather than
-run it as-is, **[docs/EXTENDING.md](docs/EXTENDING.md)** maps the five seams —
-adding a research source, changing the scoring formula, changing what counts as
-valid evidence, changing qualification states, and adding an API endpoint — with
-the exact file and function for each, plus the four invariants the test suite
-will hold you to.
-
-The short version of what's worth taking: the evidence pipeline. Turning a
-domain into attributed, identity-checked evidence and a number you can defend is
-the part that's genuinely hard, and it's the part that works without any paid
-provider.
-
-### Fork it for your own vertical
-
-MIT, and forking is an expected outcome rather than a tolerated one. The
-architecture — entity-safety gate, evidence chain, deterministic scoring, human
-review — is not specific to sales. What is specific is the ICP model and which
-sources count as evidence, and those are the two things the seams exist to
+`EXA_API_KEY` and `TAVILY_API_KEY` exist only for the *experimental* discovery
+feature, which is off by default. CI runs with both empty so this can't quietly
 change.
 
-Three directions someone could take it, with the actual work named:
+---
 
-**Recruiting / candidate research.** Entities become companies-as-employers
-rather than prospects. Evidence sources shift to careers pages, engineering
-blogs, and public repos; the ICP model becomes team shape, stack, and hiring
-signals. The entity-safety gate matters *more* here, not less — "Anthropic" the
-AI lab versus a similarly-named consultancy is the same collision, and a hiring
-decision made on the wrong company's engineering blog is a worse outcome than a
-mistargeted email. Seams 1 (add a source), 2 (rescore), 4 (states become
-`SHORTLIST` / `WATCH` / `PASS`).
+## 🧩 Use the parts on their own
 
-**VC deal sourcing.** Scoring reweights toward traction and funding-stage
-signals. The `claim_scope` distinction becomes the core feature rather than a
-safeguard: a raise announced by a *parent* company is not a raise by the
-subsidiary you are evaluating, and conflating them misstates a portfolio. The
-`RELATED_ENTITY_ONLY` decision — "we know exactly whose fact this is, and it
-isn't your target" — is worth surfacing directly in the UI. Seams 2, 3
-(`claim_scope_is_compatible`), 4.
+- **[`packages/entity-safety`](packages/entity-safety):** the identity check as a
+  small Python package with no dependencies. It answers one question for any
+  pipeline: *may this passage support a claim about this company?*
+- **[`packages/entity-safety/benchmark`](packages/entity-safety/benchmark):** 17
+  tricky lookalike cases you can use to test your own pipeline. A simple
+  name-matcher scores 17.6% on them.
+- **[`services/mcp_server`](services/mcp_server):** GoPilot for AI agents, as
+  above.
 
-**Real-estate or franchise lead qualification.** Entities become operators or
-franchisees, evidence becomes location pages, permit filings, and local
-listings. The near-miss problem is acute: regional licensees and franchisees
-routinely share a brand token with a parent they are legally distinct from,
-which is exactly the `SISTER_BRAND` / `SUBSIDIARY_OF` distinction the gate
-already models. Mostly Seam 1 plus a geography dimension in Seam 2.
+## ✅ How we know it works
 
-In each case the parts worth keeping are the same: evidence attaches to the
-right entity or is refused with a reason, scores are arithmetic you can audit,
-unknown never becomes a confident zero, and nothing acts without a human. Those
-are enforced by tests that will hold your fork to them too.
+`npm run test` runs **539 tests**: 485 for the backend, gateway and identity
+package, 43 for the web app, and 11 for the setup tool. CI runs them on every
+push, and tests the one-command setup on Linux, macOS and Windows. Some real
+bugs that were found and fixed:
 
-If you build something on this, an issue saying so is welcome — not required by
-the licence, just genuinely interesting.
+- **Unknown fit scored as zero.** A live run on 20 real companies found that a
+  company with *no* fit evidence got a confident 0, which dropped fly.io's
+  priority from 64 to 29. Fixed and pinned by a test built from that exact case.
+  [Full write-up](docs/qa/LIVE_E2E_FINDINGS.md#2-p0--unknown-fit-was-scored-as-zero-and-it-changed-the-ranking-fixed).
+- **Location guessed from a passing mention.** Companies whose site merely
+  offered an "India" region were labelled India-based. Location now has to be
+  stated outright ("headquartered in …") or it stays unknown.
+- **Sign-in check missing on one route.** An invited-users-only check covered
+  only one of two routers. Fixed, and a test now fails the build if it happens
+  again. See [SECURITY.md](SECURITY.md).
 
-## Repository layout
+Live mode has also been run end to end against real infrastructure and real
+company websites. Results, including what failed, are in
+[docs/qa/LIVE_E2E_FINDINGS.md](docs/qa/LIVE_E2E_FINDINGS.md). For an honest
+comparison with Clay, Common Room, 6sense and others, including where GoPilot is
+*not* better, see
+[docs/product/COMPETITOR_POSITIONING.md](docs/product/COMPETITOR_POSITIONING.md).
+
+---
+
+## 🛠️ For developers
+
+<details>
+<summary><b>Architecture</b></summary>
 
 ```
-cli/          `npx gopilot` — prerequisite checks, setup wizard, process supervision
+Browser → Next.js web app → FastAPI API → demo data                    (demo mode)
+                                       └→ Postgres → Redis → worker     (live mode)
+                                                              └→ research gateway → public websites
+```
+
+The research gateway is the only part allowed to make outbound web requests,
+and it refuses redirects to other domains. Scoring, identity checks and access
+control are ordinary deterministic code. See [ARCHITECTURE.md](ARCHITECTURE.md)
+and [docs/architecture](docs/architecture).
+
+</details>
+
+<details>
+<summary><b>Repository layout</b></summary>
+
+```
+cli/          npx gopilot: checks, setup wizard, starts and stops everything
 apps/
-  api/        FastAPI backend — routes, domain services, migrations, tests
-  web/        Next.js command center
+  api/        FastAPI backend: routes, services, migrations, tests
+  web/        Next.js app
 services/
-  research_gateway/   the only thing allowed to make outbound HTTP fetches
-  worker/             async job consumer for live-mode research runs
-  dev_oidc/           test OIDC issuer for local dev and CI — not for production
-deploy/       Docker Compose files and the Caddy TLS reverse-proxy config
-docs/
-  product/       what GoPilot is, why it's scoped this way, competitor positioning
-  architecture/   how the system fits together
-  operations/     deployment runbook, TLS/exposure requirements
-  security/       data handling, threat model, source policy
-  qa/             evaluation history and live-verification findings
-scripts/      operational tooling — retention, deletion, verification, secret scan
+  research_gateway/   the only thing allowed to fetch web pages
+  worker/             runs live research jobs in the background
+  mcp_server/         GoPilot for AI agents
+  dev_oidc/           test sign-in server for local development only
+packages/
+  entity-safety/      the identity check, as a standalone package
+examples/     sample CSV to import
+deploy/       Docker Compose and reverse-proxy config
+docs/         product, architecture, operations, security, QA
+scripts/      maintenance and verification scripts
 ```
 
-## Contributing
+</details>
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) — including the non-negotiable design
-principles (deterministic scoring, evidence-backed claims, fail-closed limits,
-no autonomous outbound action) that a PR is checked against regardless of how
-well-written it otherwise is.
+<details>
+<summary><b>Commands</b></summary>
 
-## Security
+```bash
+npm run dev          # demo mode
+npm run dev:live     # live mode (needs the database running)
+npm run test         # all tests
+npm run lint         # ruff + eslint
+npm run typecheck    # mypy + tsc
+npm run build        # production web build
+npm run mcp          # MCP server over stdio
+```
 
-See [SECURITY.md](SECURITY.md) for how to report a vulnerability.
+</details>
 
-## License
+<details>
+<summary><b>Build on it or fork it</b></summary>
 
-[MIT](LICENSE).
+[docs/EXTENDING.md](docs/EXTENDING.md) shows exactly where to change things:
+adding a research source, changing the scoring formula, changing what counts
+as valid evidence, changing account states, and adding an API endpoint. It also
+lists the rules the tests will hold your changes to.
+
+Forks are welcome. The core ideas (evidence tied to the right company, scores
+you can audit, unknown kept separate from zero, a person approves every action)
+aren't specific to sales. They fit **recruiting** (researching employers),
+**VC deal sourcing** (a parent company's funding round isn't the subsidiary's)
+and **franchise or real-estate qualification** (local operators share a brand
+with a separate parent). If you build something, an issue telling us about it
+is very welcome.
+
+</details>
+
+## Contributing · Security · License
+
+- **Contributing:** see [CONTRIBUTING.md](CONTRIBUTING.md), including the design
+  rules every pull request is checked against.
+- **Security:** report vulnerabilities as described in [SECURITY.md](SECURITY.md).
+- **License:** [MIT](LICENSE). Use it, change it, ship it.
+
+<div align="center">
+<sub>If GoPilot saved you from emailing the wrong company, a ⭐ helps other people find it.</sub>
+</div>

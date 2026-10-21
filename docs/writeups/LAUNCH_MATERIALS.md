@@ -140,7 +140,7 @@ on purpose to confirm the tests go red.
   zero and was multiplied into the final rank, costing one account more than
   half its priority (30 → 66); re-verified against a rebuilt live stack, not
   only in unit tests.
-- 528 tests; CI green on Linux, macOS and Windows; one-command setup from a
+- 539 tests; one-command setup tested on Linux, macOS and Windows, from a
   clean clone in 34s with no paid dependency of any kind — no search provider,
   no enrichment provider, and no LLM — verified on fresh CI runners rather than
   a developer machine. Exposed over MCP for use directly from coding agents.

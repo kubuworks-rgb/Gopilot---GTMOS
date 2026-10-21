@@ -49,7 +49,7 @@ def test_complete_demo_acceptance_flow() -> None:
     assert selected.json()["selected"] is True
 
     accounts = client.get("/api/v1/accounts", headers=headers).json()
-    assert len(accounts) == 3
+    assert len(accounts) == 6
     assert accounts == sorted(accounts, key=lambda item: item["scores"]["priority"], reverse=True)
     account = accounts[0]
     assert all(name in account["scores"] for name in ("fit", "intent", "confidence", "priority"))

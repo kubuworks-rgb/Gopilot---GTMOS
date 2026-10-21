@@ -13,6 +13,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -159,4 +160,15 @@ test("every mode maps to a script that package.json actually defines", () => {
   for (const mode of Object.values(MODES)) {
     assert.ok(scripts[mode.script], `package.json has no "${mode.script}" script`);
   }
+});
+
+// A committed bin without the executable bit works on Windows and fails with
+// "Permission denied" on Linux and macOS, so it passes on a Windows machine and
+// breaks `npx gopilot` for everyone else. It did exactly that.
+test("the CLI entry point is committed executable", () => {
+  const out = spawnSync("git", ["ls-files", "-s", "cli/gopilot.mjs"], {
+    encoding: "utf8",
+  });
+  if (out.status !== 0 || !out.stdout) return; // not a git checkout (e.g. a tarball)
+  assert.match(out.stdout, /^100755 /, "run: git update-index --chmod=+x cli/gopilot.mjs");
 });

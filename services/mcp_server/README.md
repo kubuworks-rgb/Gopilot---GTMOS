@@ -52,8 +52,7 @@ Docker, no database:
 npx gopilot -y
 ```
 
-Point an MCP client at the command. For Claude Desktop, in
-`claude_desktop_config.json`:
+Point an MCP client at the command. In your client's MCP settings file:
 
 ```json
 {

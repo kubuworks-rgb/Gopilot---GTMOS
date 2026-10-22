@@ -1,6 +1,6 @@
 # GoPilot — Private Alpha Execution Plan
 
-**Owner:** Claude (lead engineer)
+**Owner:** lead engineer
 **Opened:** 2026-08-08
 **Baseline commit:** `ef2467c` (`feature/byoa-core-product`)
 **This branch:** `feature/private-alpha-hardening`
@@ -38,7 +38,7 @@ scripts entangled with the product suite. Archiving them stays P2.
 `develop`, rebase this branch onto the updated `develop` and continue. Nothing merges
 automatically.
 
-**Source audit:** [CLAUDE_PROJECT_TAKEOVER_AUDIT.md](../../qa/CLAUDE_PROJECT_TAKEOVER_AUDIT.md)
+**Source audit:** [PROJECT_TAKEOVER_AUDIT.md](../../qa/PROJECT_TAKEOVER_AUDIT.md)
 **Target:** Limited private alpha of `BYOA_CORE`. Not a public launch. Not an
 autonomous-discovery release.
 

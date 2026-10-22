@@ -243,8 +243,8 @@ core workflow doesn't use it.
 
 ## 🤖 Use it from an AI agent (MCP)
 
-GoPilot includes an [MCP server](services/mcp_server), so Claude Code, Claude
-Desktop, Cursor, Windsurf, Zed, Cline or any other MCP client can use it:
+GoPilot includes an [MCP server](services/mcp_server), so Cursor, Windsurf, Zed,
+Cline or any other MCP client can use it:
 
 ```json
 {

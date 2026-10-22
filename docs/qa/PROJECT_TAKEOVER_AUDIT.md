@@ -1,7 +1,7 @@
-# GoPilot — Claude Takeover Audit
+# GoPilot — Project Takeover Audit
 
 **Audit date:** 2026-08-08
-**Auditor:** Claude (incoming lead engineer)
+**Auditor:** incoming lead engineer
 **Commit audited:** `ef2467c7ace974f57ffe54fc9d234e17c3f3d67f` (`feature/byoa-core-product`)
 **Method:** Read-only inspection of executable code, migrations, tests and Git metadata.
 Historical QA reports were treated as claims to be re-verified, not as evidence.

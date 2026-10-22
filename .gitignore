@@ -23,6 +23,3 @@ tmp/
 *.egg-info/
 .eggs/
 build/
-
-# Local editor/assistant tooling
-.claude/

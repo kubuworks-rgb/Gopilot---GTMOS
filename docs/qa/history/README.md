@@ -19,7 +19,7 @@ read the two documents deliberately left at `docs/qa/`:
 - [`LIVE_E2E_FINDINGS.md`](../LIVE_E2E_FINDINGS.md) — the full scenario walked
   against real infrastructure and real company websites, including the P0 that
   run found, how it was fixed, and the live re-verification.
-- [`CLAUDE_PROJECT_TAKEOVER_AUDIT.md`](../CLAUDE_PROJECT_TAKEOVER_AUDIT.md) —
+- [`PROJECT_TAKEOVER_AUDIT.md`](../PROJECT_TAKEOVER_AUDIT.md) —
   the forensic audit of the codebase as inherited.
 
 Names carry their original phase numbering (`PHASE5_`, `PHASE6_`,

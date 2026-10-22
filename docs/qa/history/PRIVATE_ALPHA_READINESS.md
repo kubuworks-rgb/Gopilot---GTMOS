@@ -9,7 +9,7 @@
 **Date:** 2026-08-08
 **Branch:** `feature/private-alpha-hardening` (`5b2c2f3`)
 **Base:** `develop` (`e5d1598`, PR #1 merged)
-**Assessor:** Claude (lead engineer)
+**Assessor:** lead engineer
 
 ## Classification: **B — FUNCTIONAL BUT BLOCKED**
 
